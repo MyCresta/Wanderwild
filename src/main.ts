@@ -13,12 +13,14 @@ import { setupInstallButton } from './install';
 import { loadSave } from './game/save';
 import { GameState } from './game/state';
 import { SHRINE_REACH_M, type Shrine } from './game/shrines';
+import { isNight, RARITIES } from './game/gear';
 import type { RealmId } from './game/realms';
 import { installProbeLayers, realmAt, shrinesNear } from './map/realmProbe';
 import { ShrineLayer } from './map/shrineLayer';
 import { Hud } from './hud/hud';
 import { HearthsteadPanel } from './hud/hearthsteadPanel';
 import { renderParty } from './hud/partyPanel';
+import { ForgePanel } from './hud/forgePanel';
 import { formatWait } from './hud/format';
 import { CompanionMarker, CreatureMarkers } from './map/creatures';
 import { addPet, companion, loadCollection, saveCollection, walkRewards } from './creatures/collection';
@@ -30,10 +32,12 @@ import { openBattle } from './ui/battle';
 import { openBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
 import { openEncounter } from './ui/encounter';
+import { DeedKeeper } from './ui/deeds';
 import { sound } from './audio/sound';
 import { setupSoundButton } from './ui/soundButton';
 import { HuntController } from './ui/hunt';
 import { walkInRealm } from './creatures/evolution';
+import { creatureReach } from './geo/reach';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -42,8 +46,6 @@ const SHRINE_SHOW_M = 600;
 // Add ?walk to the address to move by tapping the map instead of GPS (for testing at a desk).
 const SIMULATE = new URLSearchParams(location.search).has('walk');
 const SIM_SPEED_MPS = 1.4;
-/** How close the player must be to a creature to meet it. Generous, since GPS wanders. */
-const REACH_M = 120;
 /** Re-check spawns after moving this far or this long. */
 const SPAWN_REFRESH_M = 25;
 const SPAWN_REFRESH_MS = 30_000;
@@ -81,10 +83,16 @@ installProbeLayers(map);
 
 const game = new GameState(await loadSave());
 const hud = new Hud(game);
-new HearthsteadPanel(game, (text) => hud.toast(text));
+const forge = new ForgePanel(game, (text) => hud.toast(text));
 // Bank the time the app was closed, so offline production shows straight away.
 game.tickHearthstead();
 const player = new PlayerMarker(map);
+const dressPlayer = () => {
+  const worn = Object.fromEntries(game.equippedItems().map((g) => [g.slot, RARITIES[g.rarity].color]));
+  player.setLook({ cloak: worn.cloak, staff: worn.staff, lantern: !!worn.lantern });
+};
+dressPlayer();
+game.on((e) => e.kind === 'change' && dressPlayer());
 const walk = new WalkTracker();
 
 let following = true;
@@ -104,7 +112,8 @@ recenterEl.addEventListener('click', () => setFollowing(true));
 function useShrine(shrine: Shrine): void {
   if (!lastFix) return hud.toast('Find your location first to reach a shrine.');
   const away = haversine(lastFix, shrine);
-  if (away > SHRINE_REACH_M) return hud.toast(`${shrine.name} is ${Math.round(away)} m away. Walk within ${SHRINE_REACH_M} m to touch it.`);
+  const reach = SHRINE_REACH_M + game.bonuses().reachM;
+  if (away > reach) return hud.toast(`${shrine.name} is ${Math.round(away)} m away. Walk within ${Math.round(reach)} m to touch it.`);
   const wait = game.shrineReadyAt(shrine) - Date.now();
   if (wait > 0) return hud.toast(`${shrine.name} is gathering its power. Ready in ${formatWait(wait)}.`);
   if (game.useShrine(shrine, realmAt(map, shrine.lng, shrine.lat) ?? currentRealm ?? 'hearthfields')) sound.play('shrine');
@@ -116,12 +125,15 @@ const shrines = new ShrineLayer(map, useShrine);
 // Creatures: the collection, wild spawns around the player, and the companion at their side.
 const collection = loadCollection();
 const companionMarker = new CompanionMarker(map);
+// Deeds read the collection, so they are set up just after it.
+let deeds: DeedKeeper | undefined;
 const creatureGame: GameContext = {
   collection,
   changed() {
     saveCollection(collection);
     sealsEl.textContent = String(collection.seals);
     companionMarker.setPet(companion(collection));
+    deeds?.check();
   },
 };
 creatureGame.wayfarer = {
@@ -130,9 +142,15 @@ creatureGame.wayfarer = {
   useTonic: () => game.useTonic(),
   spellMetres: () => game.save.spellChargeM,
   spendSpell: (m) => game.spendSpell(m),
+  gear: () => {
+    const b = game.bonuses();
+    return { petDamage: b.petDamage + (isNight() ? b.nightDamage : 0), petHealth: b.petHealth, catchBonus: b.catchBonus };
+  },
 };
 creatureGame.changed();
+deeds = new DeedKeeper(game, collection, $('deeds'), $('wayfarer-title'));
 $('satchel-open').addEventListener('click', () => renderParty($('satchel-party'), creatureGame));
+new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame, forge);
 
 /** Hatched eggs join the collection as Wildlings (re-rolling past any Blotspawn the seed picks). */
 function claimHatchlings(): void {
@@ -153,7 +171,7 @@ game.on((event) => event.kind === 'hatch' && claimHatchlings());
 if (game.save.hatchlings.length) claimHatchlings();
 
 /** Removes a spawn that was caught, beaten or fled; only the first two earn Wayfarer XP. */
-function clearSpawn(spawn: Spawn, won: boolean): void {
+function clearSpawn(spawn: Spawn, won: boolean, kind: 'pet' | 'monster'): void {
   collection.cleared[spawn.id] = spawn.expiresAt;
   creatures.remove(spawn.id);
   if (won) {
@@ -161,22 +179,24 @@ function clearSpawn(spawn: Spawn, won: boolean): void {
     game.changed();
   }
   creatureGame.changed();
+  if (won) deeds?.win(kind, spawn.rarity);
 }
 
 function meet(spawn: Spawn, encounter: Encounter): void {
   if (!lastFix) return;
   const metres = haversine(lastFix, spawn);
-  if (metres > REACH_M) {
+  const reach = creatureReach(lastFix, game.bonuses().reachM);
+  if (metres > reach) {
     sound.play('error');
-    toast(`That ${encounter.species.name} is ${Math.round(metres)} m away. Walk closer to reach it.`);
+    toast(`That ${encounter.species.name} is ${Math.round(metres)} m away. Walk ${Math.ceil(metres - reach)} m closer, inside the purple ring.`);
     return;
   }
   if (encounter.species.kind === 'pet') {
-    openEncounter(creatureGame, encounter, (caught, fled) => (caught || fled) && clearSpawn(spawn, caught));
+    openEncounter(creatureGame, encounter, (caught, fled) => (caught || fled) && clearSpawn(spawn, caught, 'pet'));
   } else if (!companion(collection)) {
     toast('You need a companion to face Blotspawn.');
   } else {
-    openBattle(creatureGame, encounter, (won) => won && clearSpawn(spawn, true));
+    openBattle(creatureGame, encounter, (won) => won && clearSpawn(spawn, true, 'monster'));
   }
 }
 
@@ -202,7 +222,18 @@ function refreshSpawns(force = false): void {
     spawn.realm = spawnRealms.get(spawn.id);
   }
   creatures.show(live.map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) })));
+  showReach();
 }
+
+/** Draws the reach ring and dims creatures outside it, so what looks near can be tapped. */
+function showReach(): void {
+  if (!lastFix) return;
+  const fix = lastFix;
+  const reach = creatureReach(fix, game.bonuses().reachM);
+  player.setReach(reach);
+  creatures.markReach((spawn) => haversine(fix, spawn) <= reach);
+}
+game.on((e) => e.kind === 'change' && showReach());
 setInterval(() => refreshSpawns(), SPAWN_REFRESH_MS);
 // The first fix can arrive before tiles; look again once they have loaded.
 map.once('idle', () => refreshSpawns(true));
@@ -230,7 +261,9 @@ function refreshWorld(): void {
   const realm = realmAt(map, lastFix.lng, lastFix.lat);
   if (realm) {
     currentRealm = realm;
+    game.visitRealm(realm);
     hud.setRealm(realm);
+    deeds?.enterRealm(realm);
     sound.setRealm(realm);
   }
   const now = Date.now();
@@ -280,8 +313,10 @@ function onFix(fix: Fix): void {
       toast(`${getSpecies(readyToEvolve.speciesId).name} is glowing… it's ready to evolve! Open the bestiary.`);
     }
     creatureGame.changed();
+    deeds?.walk(metres, fix.time);
   }
   refreshSpawns(firstFix);
+  showReach();
   hunts.update(fix, metres);
   if (fix.accuracy <= 40) game.visit(fix.lat, fix.lng);
 

@@ -1,6 +1,9 @@
+import { newDeeds, parseDeeds, type DeedsState } from './deeds';
 import type { Egg, Hatchling } from './eggs';
 import { BUILDING_IDS, newHearthstead, type HearthsteadState, type SupplyId } from './hearthstead';
-import type { MaterialId } from './realms';
+import type { Expedition } from './expeditions';
+import { RUNE_IDS, SLOTS, type GearItem, type GearRarity, type RuneId, type Slot } from './gear';
+import { REALMS, type MaterialId, type RealmId } from './realms';
 
 /**
  * One versioned save holding all progress. It lives in IndexedDB (localStorage as a
@@ -8,7 +11,7 @@ import type { MaterialId } from './realms';
  * a phone change before there is any server.
  */
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface SaveData {
   version: typeof SAVE_VERSION;
@@ -38,7 +41,15 @@ export interface SaveData {
   hatchlings: Hatchling[];
   /** Owned by the creatures code; its shape is defined there. */
   pets: unknown[];
-  gear: unknown[];
+  gear: GearItem[];
+  equipped: Partial<Record<Slot, string>>;
+  /** Unsocketed runes. */
+  runes: RuneId[];
+  expeditions: Expedition[];
+  /** Realms the Wayfarer has stood in, for expeditions. */
+  realmsVisited: RealmId[];
+  /** Achievements, their counters and the worn title; see deeds.ts. */
+  deeds: DeedsState;
 }
 
 export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
@@ -63,9 +74,16 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     hatchlings: [],
     pets: [],
     gear: [],
+    equipped: {},
+    runes: [],
+    expeditions: [],
+    realmsVisited: [],
+    deeds: newDeeds(),
   };
 }
 
+const isRune = (v: unknown): v is RuneId => RUNE_IDS.includes(v as RuneId);
+const isRealm = (v: unknown): v is RealmId => typeof v === 'string' && v in REALMS;
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown, fallback = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 
@@ -78,7 +96,8 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
   if (!isObject(raw) || typeof raw.version !== 'number') throw new Error('Not a Wanderwild save');
   if (raw.version > SAVE_VERSION) throw new Error('This save is from a newer version of Wanderwild');
 
-  // Version 1 had no Hearthstead, supplies or eggs; the defaults below fill them in.
+  // Version 1 had no Hearthstead, supplies or eggs, and version 2 no gear, runes or
+  // expeditions; the defaults below fill them in.
   // Future migrations that rename or reshape fields go here, one version at a time.
   const fresh = newSave(now);
   const strings = (v: unknown) => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : []);
@@ -125,7 +144,29 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
     })),
     hatchlings: records(raw.hatchlings) as unknown as Hatchling[],
     pets: Array.isArray(raw.pets) ? raw.pets : [],
-    gear: Array.isArray(raw.gear) ? raw.gear : [],
+    gear: records(raw.gear)
+      .filter((g) => SLOTS.includes(g.slot as Slot) && ['worn', 'fine', 'rare', 'mythic', 'relic'].includes(g.rarity as string))
+      .map((g) => ({
+        id: String(g.id),
+        slot: g.slot as Slot,
+        rarity: g.rarity as GearRarity,
+        plus: Math.max(0, Math.min(10, num(g.plus))),
+        runes: strings(g.runes).filter(isRune),
+      })),
+    equipped: isObject(raw.equipped)
+      ? Object.fromEntries(Object.entries(raw.equipped).filter(([k, v]) => SLOTS.includes(k as Slot) && typeof v === 'string'))
+      : {},
+    runes: strings(raw.runes).filter(isRune),
+    expeditions: records(raw.expeditions).map((e) => ({
+      petUid: String(e.petUid),
+      petLevel: num(e.petLevel, 1),
+      realm: isRealm(e.realm) ? e.realm : 'hearthfields',
+      startedAt: num(e.startedAt, now),
+      durationMs: num(e.durationMs, 3_600_000),
+      boostMs: num(e.boostMs),
+    })),
+    realmsVisited: strings(raw.realmsVisited).filter(isRealm),
+    deeds: parseDeeds(raw.deeds),
   };
 }
 

@@ -61,6 +61,9 @@ function foeEffectiveness(foe: Species, pet: Species): number {
 export interface BattleOptions {
   rng?: Rng;
   wayfarerLevel?: number;
+  /** Gear multipliers on the party's attack (and Fireball) and health. */
+  petDamage?: number;
+  petHealth?: number;
 }
 
 /**
@@ -78,14 +81,26 @@ export class Battle {
   readonly fought = new Set<number>([0]);
   private readonly rng: Rng;
   private readonly wayfarerLevel: number;
+  private readonly petDamage: number;
 
   constructor(
     readonly party: Fighter[],
     readonly foe: Fighter,
-    { rng = Math.random, wayfarerLevel = 1 }: BattleOptions = {},
+    { rng = Math.random, wayfarerLevel = 1, petDamage = 1, petHealth = 1 }: BattleOptions = {},
   ) {
     this.rng = rng;
     this.wayfarerLevel = wayfarerLevel;
+    this.petDamage = petDamage;
+    for (const f of party) {
+      f.atk = Math.round(f.atk * petDamage);
+      const full = f.hp === f.maxHp;
+      f.maxHp = Math.round(f.maxHp * petHealth);
+      if (full) f.hp = f.maxHp;
+    }
+  }
+
+  get fireball(): number {
+    return Math.round(fireballDamage(this.wayfarerLevel) * this.petDamage);
   }
 
   get pet(): Fighter {
@@ -166,7 +181,7 @@ export class Battle {
         break;
       case 'spell':
         if (action.spell === 'fireball') {
-          const dmg = fireballDamage(this.wayfarerLevel);
+          const dmg = this.fireball;
           this.foe.hp = Math.max(0, this.foe.hp - dmg);
           events.push({ kind: 'fireball', damage: dmg });
         } else {

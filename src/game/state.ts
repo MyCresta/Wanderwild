@@ -13,6 +13,31 @@ import {
   upgradeCost,
   type BuildingId,
 } from './hearthstead';
+import {
+  craftCost,
+  craftItem,
+  FORGE_LEVEL,
+  gearBonuses,
+  maxPlus,
+  newGearSeed,
+  RUNE_IDS,
+  RUNE_LEVEL,
+  runeSockets,
+  upgradeCost as gearUpgradeCost,
+  type GearBonuses,
+  type GearItem,
+  type RuneId,
+  type Slot,
+} from './gear';
+import {
+  EXPEDITION_LEVEL,
+  EXPEDITION_SLOTS,
+  expeditionDone,
+  expeditionReward,
+  type Expedition,
+  type ExpeditionReward,
+} from './expeditions';
+import { hashString, seededRandom } from './rng';
 
 /** Walking pays out per full 100 m: Wanderlight is only ever earned this way. */
 export const WALK_REWARD_STEP_M = 100;
@@ -21,6 +46,8 @@ export const VISITED_CELL_M = 50;
 export const EGG_UNLOCK_LEVEL = 8;
 /** Walking banks spell charge up to this many metres. */
 export const SPELL_CHARGE_MAX_M = 1000;
+/** Chance a shrine gives a rune once runes are unlocked. */
+export const RUNE_SHRINE_CHANCE = 0.06;
 
 export type GameEvent =
   | { kind: 'change' }
@@ -88,10 +115,15 @@ export class GameState {
       s.currencies.coin += steps * WALK_REWARD.coin;
       this.grantXp(steps * WALK_REWARD.xp * (this.isBlessed(now) ? BLESSING_XP_BONUS : 1));
       tick(s.hearthstead, now);
-      const skippedMs = strideBoost(s.hearthstead, steps, now);
+      const bonus = this.bonuses();
+      const skippedMs = strideBoost(s.hearthstead, steps, now, bonus.stride);
+      for (const e of s.expeditions) e.boostMs += skippedMs;
       if (skippedMs > 0) this.emit({ kind: 'stride', skippedMs });
+      // Boots turn part of each 100 m into extra Wanderlight.
+      const extra = Math.floor(steps * (bonus.stride - 1) + seededRandom(hashString(`wl:${s.rewardedMetres}`))());
+      if (extra > 0) s.currencies.wanderlight += extra;
     }
-    for (const hatchling of walkEggs(s.eggs, metres, now)) {
+    for (const hatchling of walkEggs(s.eggs, metres * this.bonuses().eggSpeed, now)) {
       s.hatchlings.push(hatchling);
       this.emit({ kind: 'hatch', hatchling });
     }
@@ -111,6 +143,123 @@ export class GameState {
     this.save.spellChargeM -= metres;
     this.changed();
     return true;
+  }
+
+  // ---- Gear and the Forge ----
+
+  equippedItems(): GearItem[] {
+    const s = this.save;
+    return Object.values(s.equipped)
+      .map((id) => s.gear.find((g) => g.id === id))
+      .filter((g): g is GearItem => !!g);
+  }
+
+  bonuses(): GearBonuses {
+    return gearBonuses(this.equippedItems());
+  }
+
+  private canPay(cost: { coin: number; material: MaterialId; amount: number }): boolean {
+    return this.save.currencies.coin >= cost.coin && (this.save.materials[cost.material] ?? 0) >= cost.amount;
+  }
+
+  private pay(cost: { coin: number; material: MaterialId; amount: number }): void {
+    this.save.currencies.coin -= cost.coin;
+    this.save.materials[cost.material] = (this.save.materials[cost.material] ?? 0) - cost.amount;
+  }
+
+  canCraft(slot: Slot): boolean {
+    return this.level.level >= FORGE_LEVEL && this.canPay(craftCost(slot));
+  }
+
+  /** Forges a new item and equips it if the slot is empty. */
+  craft(slot: Slot, seed = newGearSeed(slot)): GearItem | null {
+    if (!this.canCraft(slot)) return null;
+    this.pay(craftCost(slot));
+    const item = craftItem(slot, this.level.level, seed);
+    this.save.gear.push(item);
+    if (!this.save.equipped[slot]) this.save.equipped[slot] = item.id;
+    this.grantXp(40);
+    this.changed();
+    return item;
+  }
+
+  canUpgradeGear(item: GearItem): boolean {
+    return this.level.level >= FORGE_LEVEL && item.plus < maxPlus(this.level.level) && this.canPay(gearUpgradeCost(item));
+  }
+
+  upgradeGear(id: string): boolean {
+    const item = this.save.gear.find((g) => g.id === id);
+    if (!item || !this.canUpgradeGear(item)) return false;
+    this.pay(gearUpgradeCost(item));
+    item.plus += 1;
+    this.grantXp(20 + 10 * item.plus);
+    this.changed();
+    return true;
+  }
+
+  equip(id: string): void {
+    const item = this.save.gear.find((g) => g.id === id);
+    if (!item) return;
+    this.save.equipped[item.slot] = item.id;
+    this.changed();
+  }
+
+  /** Melts an unequipped item back into half its slot's crafting material. */
+  salvage(id: string): boolean {
+    const s = this.save;
+    const i = s.gear.findIndex((g) => g.id === id);
+    if (i < 0 || s.equipped[s.gear[i].slot] === id) return false;
+    const [item] = s.gear.splice(i, 1);
+    const cost = craftCost(item.slot);
+    this.addMaterials({ [cost.material]: Math.max(1, Math.floor(cost.amount / 2) + item.plus) });
+    s.runes.push(...item.runes);
+    this.changed();
+    return true;
+  }
+
+  socketRune(id: string, rune: RuneId): boolean {
+    const s = this.save;
+    const item = s.gear.find((g) => g.id === id);
+    const r = s.runes.indexOf(rune);
+    if (!item || r < 0 || this.level.level < RUNE_LEVEL || item.runes.length >= runeSockets(item)) return false;
+    s.runes.splice(r, 1);
+    item.runes.push(rune);
+    this.changed();
+    return true;
+  }
+
+  // ---- Realms and expeditions ----
+
+  visitRealm(realm: RealmId): void {
+    if (this.save.realmsVisited.includes(realm)) return;
+    this.save.realmsVisited.push(realm);
+    this.changed();
+  }
+
+  canSendExpedition(): boolean {
+    return this.level.level >= EXPEDITION_LEVEL && this.save.expeditions.length < EXPEDITION_SLOTS;
+  }
+
+  sendExpedition(petUid: string, petLevel: number, realm: RealmId, durationMs: number, now = Date.now()): boolean {
+    const s = this.save;
+    if (!this.canSendExpedition() || !s.realmsVisited.includes(realm) || s.expeditions.some((e) => e.petUid === petUid)) return false;
+    s.expeditions.push({ petUid, petLevel, realm, startedAt: now, durationMs, boostMs: 0 });
+    this.changed();
+    return true;
+  }
+
+  /** Brings a finished expedition home. The caller gives the pet its XP. */
+  claimExpedition(petUid: string, now = Date.now()): { expedition: Expedition; reward: ExpeditionReward } | null {
+    const s = this.save;
+    const i = s.expeditions.findIndex((e) => e.petUid === petUid);
+    if (i < 0 || !expeditionDone(s.expeditions[i], now)) return null;
+    const [expedition] = s.expeditions.splice(i, 1);
+    const reward = expeditionReward(expedition);
+    this.addMaterials(reward.materials);
+    s.currencies.coin += reward.coin;
+    this.grantXp(30);
+    this.changed();
+    return { expedition, reward };
   }
 
   /** Banks the real time that has passed into the Hearthstead. */
@@ -188,6 +337,11 @@ export class GameState {
     this.addMaterials(reward.materials);
     this.grantXp(reward.xp);
     let egg = '';
+    if (this.level.level >= RUNE_LEVEL && Math.random() < RUNE_SHRINE_CHANCE) {
+      const rune = RUNE_IDS[Math.floor(Math.random() * RUNE_IDS.length)];
+      s.runes.push(rune);
+      egg += ` A ${rune} rune glints in the stones!`;
+    }
     if (this.level.level >= EGG_UNLOCK_LEVEL && s.eggs.length < EGG_SLOTS && Math.random() < EGG_SHRINE_CHANCE) {
       const found = rollEgg(shrine.id, now);
       s.eggs.push(found);

@@ -32,6 +32,7 @@
           <span class="hud-seals" title="Binding seals: walk 100 m to earn one"><i aria-hidden="true"></i><span id="seals">0</span></span>
         </div>
       </div>
+      <div class="title-ribbon" id="wayfarer-title" title="Your title" hidden></div>
       <div class="realm-banner" id="realm" role="status" hidden></div>
       <div class="hud-toast" id="toast" role="status" hidden></div>
     </header>
@@ -47,6 +48,14 @@
         <path d="M11 18q5-2 9 1M11 24q5-2 9 1M28 19q4-3 9-1M28 25q4-3 9-1" stroke="currentColor" stroke-width="1.6" fill="none" />
       </svg>
       <span>Bestiary</span>
+    </button>
+
+    <button class="deeds-button" id="deeds" type="button" aria-label="Open deeds and titles">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M17 30l-6 13 8-3 4 5 4-12M31 30l6 13-8-3-4 5-4-12" fill="#8e2b22" />
+        <circle cx="24" cy="20" r="14" fill="currentColor" />
+        <path d="M24 10l3 6.5 7 .7-5.3 4.6 1.6 7L24 25.2l-6.3 3.6 1.6-7-5.3-4.6 7-.7z" fill="#4a3320" />
+      </svg>
     </button>
 
     <button class="recenter" id="recenter" type="button" aria-label="Follow me" aria-pressed="true">
@@ -83,6 +92,14 @@
         <button class="satchel-close" id="hearthstead-close" type="button" aria-label="Close">×</button>
         <h2 id="hearthstead-title">The Hearthstead</h2>
         <div id="hearthstead-content"></div>
+      </div>
+    </dialog>
+
+    <dialog class="satchel" id="forge" aria-labelledby="forge-title">
+      <div class="satchel-body">
+        <button class="satchel-close" id="forge-close" type="button" aria-label="Close">×</button>
+        <h2 id="forge-title">The Forge</h2>
+        <div id="forge-content"></div>
       </div>
     </dialog>
 
