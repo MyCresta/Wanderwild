@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#3b2a1a" />
+    <meta name="description" content="Walk the real world as a fantasy realm." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <title>Wanderwild</title>
+  </head>
+  <body>
+    <div id="map" aria-label="Map of the realm around you"></div>
+    <div class="parchment-overlay" aria-hidden="true"></div>
+
+    <header class="hud">
+      <div class="hud-panel">
+        <span class="hud-label">Distance wandered</span>
+        <span class="hud-value" id="distance">0 m</span>
+      </div>
+    </header>
+
+    <div class="notice" id="notice" role="status" hidden></div>
+
+    <button class="recenter" id="recenter" type="button" aria-label="Follow me" aria-pressed="true">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="2" />
+        <path d="M24 4l4 20-4 20-4-20z" fill="currentColor" />
+        <path d="M4 24l20-4 20 4-20 4z" fill="currentColor" opacity=".5" />
+        <circle cx="24" cy="24" r="3" fill="#e8d9b5" />
+      </svg>
+    </button>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
