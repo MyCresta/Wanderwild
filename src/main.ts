@@ -42,7 +42,7 @@ import { DemesneLayer } from './map/demesneLayer';
 import { DemesnePanel } from './hud/demesnePanel';
 import { walkInRealm } from './creatures/evolution';
 import { creatureReach } from './geo/reach';
-import { watchLayout } from './ui/layout';
+import { setupRailMenu, watchLayout } from './ui/layout';
 import { installOrbitCamera } from './map/orbitCamera';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
@@ -64,6 +64,7 @@ const recenterEl = $<HTMLButtonElement>('recenter');
 const sealsEl = $('seals');
 
 watchLayout();
+setupRailMenu();
 
 function showNotice(text: string | null): void {
   noticeEl.hidden = !text;

@@ -6,7 +6,7 @@
  */
 
 /** Room a rail needs beside a centred top bar: two columns of buttons and their gaps. */
-const RAIL_ROOM_PX = 16 + 56 + 12 + 56 + 12;
+const RAIL_ROOM_PX = 12 + 44 + 10 + 44 + 10;
 
 export function railButtons(side: 'left' | 'right'): HTMLElement {
   return document.getElementById(`rail-${side}`)!;
@@ -31,4 +31,21 @@ export function watchLayout(): void {
   new ResizeObserver(update).observe(hud);
   addEventListener('resize', update);
   update();
+}
+
+/** The "more" button folds the rail's less-used buttons away; touching anything else folds them again. */
+export function setupRailMenu(): void {
+  const more = document.getElementById('rail-more');
+  const rail = more?.parentElement;
+  if (!more || !rail) return;
+  const setOpen = (open: boolean) => {
+    rail.classList.toggle('open', open);
+    more.setAttribute('aria-expanded', String(open));
+  };
+  more.addEventListener('click', () => setOpen(!rail.classList.contains('open')));
+  document.addEventListener('pointerdown', (e) => {
+    if (!rail.contains(e.target as Node)) setOpen(false);
+  });
+  // Opening the deeds sheet is a destination, so the menu has done its job.
+  document.getElementById('deeds')?.addEventListener('click', () => setOpen(false));
 }
