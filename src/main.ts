@@ -36,6 +36,7 @@ import { DeedKeeper } from './ui/deeds';
 import { sound } from './audio/sound';
 import { setupSoundButton } from './ui/soundButton';
 import { HuntController } from './ui/hunt';
+import { walkInRealm } from './creatures/evolution';
 import { creatureReach } from './geo/reach';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
@@ -305,6 +306,11 @@ function onFix(fix: Fix): void {
     if (reward.seals > 0) {
       sound.play('coin');
       toast(`Found ${reward.seals > 1 ? `${reward.seals} binding seals` : 'a binding seal'} along the way.`);
+    }
+    const readyToEvolve = walkInRealm(collection, metres, currentRealm);
+    if (readyToEvolve) {
+      sound.play('discover');
+      toast(`${getSpecies(readyToEvolve.speciesId).name} is glowing… it's ready to evolve! Open the bestiary.`);
     }
     creatureGame.changed();
     deeds?.walk(metres, fix.time);

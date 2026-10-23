@@ -99,3 +99,38 @@ describe('walking', () => {
     expect(pet.xp + pet.level).toBeGreaterThan(1);
   });
 });
+
+describe('evolution', () => {
+  it('has art and a home realm for every evolving form', async () => {
+    const { EVOLVED_ART } = await import('../src/creatures/art/evolved');
+    const { EVOLVED } = await import('../src/creatures/species');
+    for (const pet of PETS) {
+      expect(pet.evolution).toBeDefined();
+      expect(EVOLVED.some((e) => e.id === pet.evolution!.into)).toBe(true);
+    }
+    for (const e of EVOLVED) expect(EVOLVED_ART[e.id]).toBeTypeOf('function');
+  });
+
+  it('needs the level and the walk in the home realm, then keeps level and seed', async () => {
+    const { evolve, evolutionStatus, walkInRealm } = await import('../src/creatures/evolution');
+    const c = emptyCollection();
+    const pet = addPet(c, { species: getSpecies('bramblet'), level: 9, seed: 5 });
+    expect(walkInRealm(c, 5000, 'tidemere')).toBeNull();
+    expect(evolutionStatus(pet)!.walked).toBe(0);
+    expect(walkInRealm(c, 5000, 'wildwood')).toBeNull(); // walked enough, but only level 9
+    expect(evolve(c, pet)).toBeNull();
+    pet.level = 10;
+    expect(evolutionStatus(pet)!.ready).toBe(true);
+    expect(evolve(c, pet)!.id).toBe('thornwarden');
+    expect(pet).toMatchObject({ speciesId: 'thornwarden', level: 10, seed: 5 });
+    expect(c.seen).toContain('thornwarden');
+    expect(evolutionStatus(pet)).toBeNull();
+  });
+
+  it('never spawns evolved forms in the wild', () => {
+    for (let i = 0; i < 500; i++) {
+      const e = creatureForSpawn({ seed: i * 31337, rarity: 'rare' }, 20);
+      expect(e.species.kind === 'pet' ? e.species.stage : 1).toBe(1);
+    }
+  });
+});
