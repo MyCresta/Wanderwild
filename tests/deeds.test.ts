@@ -24,6 +24,8 @@ const base = (over: Partial<DeedStats> = {}): Omit<DeedStats, 'counters' | 'deed
   speciesBound: 0,
   speciesSeen: 0,
   bestPetLevel: 0,
+  huntsSolved: 0,
+  huntsWithoutClues: 0,
   ...over,
 });
 

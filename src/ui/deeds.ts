@@ -1,5 +1,6 @@
 import { sound } from '../audio/sound';
 import type { Collection } from '../creatures/collection';
+import { loadHuntLog } from '../hunts/hunt';
 import {
   DEED_GROUPS,
   DEEDS,
@@ -74,6 +75,7 @@ export class DeedKeeper {
   stats(): DeedStats {
     const s = this.game.save;
     const pets = this.collection.pets;
+    const hunts = loadHuntLog().solved;
     return {
       distanceMetres: s.distanceMetres,
       shrinesVisited: s.shrinesVisited,
@@ -84,6 +86,8 @@ export class DeedKeeper {
       speciesBound: new Set(pets.map((p) => p.speciesId)).size,
       speciesSeen: this.collection.seen.length,
       bestPetLevel: pets.reduce((best, p) => Math.max(best, p.level), 0),
+      huntsSolved: hunts.length,
+      huntsWithoutClues: hunts.filter((h) => h.hints === 0).length,
       counters: this.state.counters,
       deedsEarned: Object.keys(this.state.earned).length,
     };

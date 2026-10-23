@@ -32,6 +32,9 @@ export interface DeedStats {
   speciesSeen: number;
   /** Highest level of any bound Wildling. */
   bestPetLevel: number;
+  /** Treasure-hunt riddles solved, and how many of them without a bought clue. */
+  huntsSolved: number;
+  huntsWithoutClues: number;
   counters: DeedCounters;
   deedsEarned: number;
 }
@@ -125,6 +128,10 @@ export const DEEDS: readonly Deed[] = [
   { id: 'first-blessing', group: 'explore', name: 'First Blessing', text: 'Touch a wayshrine.', tier: 1, goal: 1, progress: (s) => s.shrinesVisited },
   { id: 'pilgrim', group: 'explore', name: 'Pilgrim', text: 'Touch wayshrines 10 times.', title: 'the Pilgrim', tier: 2, goal: 10, progress: (s) => s.shrinesVisited },
   { id: 'shrinekeeper', group: 'explore', name: 'Shrinekeeper', text: 'Touch wayshrines 50 times.', title: 'Shrinekeeper', tier: 3, goal: 50, progress: (s) => s.shrinesVisited },
+  { id: 'riddle-solver', group: 'explore', name: 'Riddle Solver', text: 'Solve a treasure-hunt riddle.', tier: 1, goal: 1, progress: (s) => s.huntsSolved },
+  { id: 'pathfinder', group: 'explore', name: 'Pathfinder', text: 'Solve 5 treasure-hunt riddles.', title: 'the Pathfinder', tier: 2, goal: 5, progress: (s) => s.huntsSolved },
+  { id: 'riddle-keeper', group: 'explore', name: 'Keeper of Riddles', text: 'Solve 25 treasure-hunt riddles.', title: 'Keeper of Riddles', tier: 3, goal: 25, progress: (s) => s.huntsSolved },
+  { id: 'sharp-eyed', group: 'explore', name: 'No Clues Needed', text: 'Solve a riddle without any extra clues.', title: 'the Sharp-eyed', secret: true, tier: 2, goal: 1, progress: (s) => s.huntsWithoutClues },
   { id: 'shrine-dash', group: 'explore', name: 'Shrine Dash', text: 'Touch 3 wayshrines within 15 minutes.', title: 'the Swift', secret: true, tier: 2, goal: 1, progress: (s) => +c(s).feats.includes('shrineDash') },
   { id: 'gravewalker', group: 'explore', name: 'Lantern in the Barrows', text: 'Enter the Barrows after dark.', title: 'Gravewalker', secret: true, tier: 2, goal: 1, progress: (s) => +c(s).feats.includes('barrowsAtNight') },
 

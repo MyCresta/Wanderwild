@@ -20,10 +20,13 @@ A mobile-first, location-based fantasy game: explore the real world on a fantasy
 - **The Inkbound Bestiary.** Creatures that wandered off the margins of old maps now roam the streets around you, all drawn and animated in code with SVG and trigonometry (no image files).
   - Six **Wildlings** to bind and raise: Bramblet, Driftfin, Emberkit, Cragmite, Wisplume and Lumoth. Each one is an individual with its own colouring and temperament, and about 1 in 48 is Gilded.
   - Four **Blotspawn** to drive off with your companion: Smudgeling, Murkwing, Thornmaw and Wickwraith. Each is weak to one element.
-  - Pick a starter, catch Wildlings by timing a binding seal against a closing ring, fight Blotspawn in turn-based battles, and level companions up to 30. Walking earns a seal every 100 m and gives your companion 1 XP every 25 m.
+  - Pick a starter, catch Wildlings in a full-screen scene (flick a binding seal at a creature that wanders and dodges, time it to the closing ring whose colour shows your odds, then tap in time to hold the seal shut as it wobbles), fight Blotspawn in turn-based battles, and level companions up to 30. Walking earns a seal every 100 m and gives your companion 1 XP every 25 m.
   - **Party battles.** Your companion leads a party of up to three (pick them in the satchel). Swap pets mid-fight, and send in another when one is worn out. Pets that fought get full XP, the bench half.
   - **Timing strikes.** Each attack shows a rune circle closing on the foe; tap as the rings meet for a critical hit.
   - **Wayfarer spells** charged by walking: Fireball after 300 m (damage grows with your level, ignores defence) and Mending after 500 m (heals the party). **Tonics** from the Herb Garden heal the active pet.
+  - **Gear and the Forge** (from level 5, in the Hearthstead). Craft a Staff (pet damage and Fireball), Cloak (party health), Boots (stride boost and Wanderlight), Lantern (reach for creatures and shrines) and Charm (catch chance), each from a different realm's material. Rarities run Worn, Fine, Rare and Mythic (level 30); upgrade to +5, or +10 from level 15, and the look changes at +5 and +10. Your cloak, staff and lantern show on your map token. Spare gear can be salvaged.
+  - **Runes** (from level 15) come from shrines and socket into gear at +5 and +10: Nightfang, Hatchstone, Swiftsole, Seer and Warding.
+  - **Pet expeditions** (from level 8). Pets outside the party travel to a realm you have visited for 1, 2 or 4 hours and bring back its material, coin and pet XP. Walking speeds them up.
   - Eggs that hatch join the bestiary as new Wildlings.
   - Each creature leans towards its realm: Bramble kin in the Wildwood, Tide kin by water, and more Blotspawn in the Barrows.
 
