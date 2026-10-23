@@ -304,8 +304,14 @@ body {
 }
 
 /* Player token: a hooded wanderer standing on a glowing rune ring. */
+/* MapLibre places every marker with a transform from the map's top-left corner. Any
+   `position` from a marker's own class would put it back in the page flow, so each
+   one landed beside the one before it instead of on its spot. */
+#map .maplibregl-marker {
+  position: absolute;
+}
+
 .player-token {
-  position: relative;
   width: 40px;
   height: 48px;
   pointer-events: none;
@@ -393,7 +399,6 @@ body {
 }
 
 .map-creature {
-  position: relative;
   padding: 0;
   border: 0;
   background: none;
