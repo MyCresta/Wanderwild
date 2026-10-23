@@ -38,6 +38,23 @@ import {
   type ExpeditionReward,
 } from './expeditions';
 import { hashString, seededRandom } from './rng';
+import type { Glyph } from './glyphs';
+import {
+  borderDistanceM,
+  BORDER_REACH_M,
+  collectParcel,
+  LEY_MS,
+  maxParcels,
+  MAX_LEY_LINES,
+  MAX_RESIDENTS,
+  MAX_WAYMARKS,
+  MIN_PARCEL_M2,
+  newParcel,
+  overlaps,
+  reink,
+  tickParcel,
+  type Parcel,
+} from './demesne';
 
 /** Walking pays out per full 100 m: Wanderlight is only ever earned this way. */
 export const WALK_REWARD_STEP_M = 100;
@@ -54,7 +71,12 @@ export type GameEvent =
   | { kind: 'levelUp'; level: number; unlocks: Unlock[] }
   | { kind: 'reward'; text: string }
   | { kind: 'stride'; skippedMs: number }
-  | { kind: 'hatch'; hatchling: Hatchling };
+  | { kind: 'hatch'; hatchling: Hatchling }
+  /** A walked glyph took effect. `parcel` is the claimed or redrawn parcel for a Ring. */
+  | { kind: 'glyph'; glyph: Glyph; text: string; parcel?: Parcel; realm?: RealmId };
+
+/** XP and Wanderlight for each glyph. */
+export const GLYPH_REWARD = { ring: { xp: 100, wanderlight: 5 }, stroke: { xp: 60, wanderlight: 1 }, knot: { xp: 40, wanderlight: 0 } };
 
 type Listener = (event: GameEvent) => void;
 
@@ -118,6 +140,7 @@ export class GameState {
       const bonus = this.bonuses();
       const skippedMs = strideBoost(s.hearthstead, steps, now, bonus.stride);
       for (const e of s.expeditions) e.boostMs += skippedMs;
+      for (const p of s.parcels) tickParcel(p, s.leyLines, now, skippedMs);
       if (skippedMs > 0) this.emit({ kind: 'stride', skippedMs });
       // Boots turn part of each 100 m into extra Wanderlight.
       const extra = Math.floor(steps * (bonus.stride - 1) + seededRandom(hashString(`wl:${s.rewardedMetres}`))());
@@ -262,6 +285,111 @@ export class GameState {
     return { expedition, reward };
   }
 
+  // ---- Glyphwalking and the Inked Demesne ----
+
+  /**
+   * Applies a walked glyph. A Ring claims (or redraws) a parcel using the realm shares the
+   * map found inside it, a Stroke lays a ley line and a Knot sets a Waymark.
+   */
+  castGlyph(glyph: Glyph, realms: Partial<Record<RealmId, number>> = {}, realm?: RealmId, now = Date.now()): void {
+    const s = this.save;
+    s.glyphsCast[glyph.kind] += 1;
+    const reward = GLYPH_REWARD[glyph.kind];
+    s.currencies.wanderlight += reward.wanderlight;
+    this.grantXp(reward.xp);
+    let text = '';
+    let parcel: Parcel | undefined;
+    if (glyph.kind === 'ring') {
+      const fresh = newParcel(glyph, realms, now);
+      const old = s.parcels.find((p) => overlaps(p, fresh));
+      if ((glyph.areaM2 ?? 0) < MIN_PARCEL_M2) {
+        text = 'Ring cast! The loop was too tight to hold any land; walk a wider one to claim a parcel.';
+      } else if (old) {
+        // Walking a new Ring over a parcel redraws its border and fills the ink.
+        tickParcel(old, s.leyLines, now);
+        Object.assign(old, { polygon: fresh.polygon, centroid: fresh.centroid, areaM2: fresh.areaM2, perimeterM: fresh.perimeterM, realms: fresh.realms, inkedAt: now });
+        parcel = old;
+        text = `Ring cast! ${old.name} is redrawn and freshly inked.`;
+      } else if (s.parcels.length >= maxParcels(this.level.level)) {
+        text = `Ring cast, but your Demesne holds ${s.parcels.length} parcels already. Release one, or level up for more room.`;
+      } else {
+        s.parcels.push(fresh);
+        parcel = fresh;
+        text = `Ring cast! You claimed ${fresh.name}.`;
+      }
+    } else if (glyph.kind === 'stroke') {
+      s.leyLines.push({ id: `ley${now.toString(36)}`, from: glyph.path[0], to: glyph.path[1], until: now + LEY_MS });
+      if (s.leyLines.length > MAX_LEY_LINES) s.leyLines.splice(0, s.leyLines.length - MAX_LEY_LINES);
+      for (const p of s.parcels) tickParcel(p, s.leyLines, now);
+      text = `Stroke cast! A ${glyph.lengthM} m ley line hums for a day.`;
+    } else {
+      const [lng, lat] = glyph.center;
+      if (!s.waymarks.some((w) => Math.abs(w.lng - lng) < 1e-5 && Math.abs(w.lat - lat) < 1e-5)) {
+        s.waymarks.push({ id: `wm${now.toString(36)}`, lng, lat, setAt: now });
+        if (s.waymarks.length > MAX_WAYMARKS) s.waymarks.splice(0, s.waymarks.length - MAX_WAYMARKS);
+      }
+      text = 'Knot cast! A Waymark now holds this corner; a creature will always wait here.';
+    }
+    const extra = reward.wanderlight ? ` +${reward.xp} XP, +${reward.wanderlight} Wanderlight.` : ` +${reward.xp} XP.`;
+    this.emit({ kind: 'glyph', glyph, text: text + extra, parcel, realm });
+    this.changed();
+  }
+
+  /** Banks parcel production up to now. */
+  tickDemesne(now = Date.now()): void {
+    for (const p of this.save.parcels) tickParcel(p, this.save.leyLines, now);
+  }
+
+  /** Walking near a border re-inks it. Call with each position and the metres since the last. */
+  walkBorders(lat: number, lng: number, metres: number, now = Date.now()): void {
+    if (metres <= 0) return;
+    let changed = false;
+    for (const p of this.save.parcels) {
+      if (borderDistanceM(p, lng, lat) > BORDER_REACH_M) continue;
+      tickParcel(p, this.save.leyLines, now);
+      changed = reink(p, metres, now) || changed;
+    }
+    if (changed) this.changed();
+  }
+
+  collectParcel(id: string, now = Date.now()): Partial<Record<MaterialId, number>> {
+    const p = this.save.parcels.find((x) => x.id === id);
+    if (!p) return {};
+    tickParcel(p, this.save.leyLines, now);
+    const got = collectParcel(p);
+    const total = Object.values(got).reduce((a, b) => a + (b ?? 0), 0);
+    if (total > 0) {
+      this.addMaterials(got);
+      this.grantXp(total);
+    }
+    this.changed();
+    return got;
+  }
+
+  releaseParcel(id: string): boolean {
+    const i = this.save.parcels.findIndex((p) => p.id === id);
+    if (i < 0) return false;
+    this.save.parcels.splice(i, 1);
+    this.changed();
+    return true;
+  }
+
+  /** Moves a pet into a parcel (out of any other one), or out of its parcel when already there. */
+  toggleResident(parcelId: string, petUid: string, now = Date.now()): boolean {
+    const target = this.save.parcels.find((p) => p.id === parcelId);
+    if (!target) return false;
+    this.tickDemesne(now);
+    if (target.residents.includes(petUid)) {
+      target.residents = target.residents.filter((u) => u !== petUid);
+    } else {
+      if (target.residents.length >= MAX_RESIDENTS) return false;
+      for (const p of this.save.parcels) p.residents = p.residents.filter((u) => u !== petUid);
+      target.residents.push(petUid);
+    }
+    this.changed();
+    return true;
+  }
+
   /** Banks the real time that has passed into the Hearthstead. */
   tickHearthstead(now = Date.now()): void {
     tick(this.save.hearthstead, now);
@@ -345,7 +473,7 @@ export class GameState {
     if (this.level.level >= EGG_UNLOCK_LEVEL && s.eggs.length < EGG_SLOTS && Math.random() < EGG_SHRINE_CHANCE) {
       const found = rollEgg(shrine.id, now);
       s.eggs.push(found);
-      egg = ` You found a ${found.km} km egg!`;
+      egg += ` You found a ${found.km} km egg!`;
     }
     const mats = (Object.entries(reward.materials) as [MaterialId, number][])
       .map(([id, n]) => `${n} ${MATERIALS[id].name}`)

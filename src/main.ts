@@ -35,6 +35,10 @@ import { openEncounter } from './ui/encounter';
 import { sound } from './audio/sound';
 import { setupSoundButton } from './ui/soundButton';
 import { HuntController } from './ui/hunt';
+import { Trace } from './game/glyphs';
+import { realmShares, samplePoints, waymarkSpawn } from './game/demesne';
+import { DemesneLayer } from './map/demesneLayer';
+import { DemesnePanel } from './hud/demesnePanel';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -147,6 +151,24 @@ creatureGame.changed();
 $('satchel-open').addEventListener('click', () => renderParty($('satchel-party'), creatureGame));
 new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame, forge);
 
+// Glyphwalking: the shape of the walk, kept in memory only, and the Demesne it claims.
+const trace = new Trace();
+const trailMetres = () => {
+  let m = 0;
+  for (let i = 1; i < trace.points.length; i++) m += haversine(trace.points[i - 1], trace.points[i]);
+  return m;
+};
+const demesnePanel = new DemesnePanel(game, (text) => hud.toast(text), creatureGame, trailMetres, (lng, lat) => {
+  setFollowing(false);
+  map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 16) });
+});
+// In practice-walk mode a tap moves the Wayfarer, so parcels open from the panel only.
+const demesneLayer = new DemesneLayer(map, SIMULATE ? undefined : (id) => demesnePanel.open(id));
+const drawDemesne = () => demesneLayer.show(game.save.parcels, game.save.leyLines, game.save.waymarks);
+game.tickDemesne();
+drawDemesne();
+game.on((e) => e.kind === 'change' && drawDemesne());
+
 /** Hatched eggs join the collection as Wildlings (re-rolling past any Blotspawn the seed picks). */
 function claimHatchlings(): void {
   const level = companion(collection)?.level ?? 1;
@@ -204,7 +226,9 @@ function refreshSpawns(force = false): void {
   if (!force && spawnCheck && haversine(spawnCheck, lastFix) < SPAWN_REFRESH_M && now - spawnCheck.at < SPAWN_REFRESH_MS) return;
   spawnCheck = { lat: lastFix.lat, lng: lastFix.lng, at: now };
   const level = companion(collection)?.level ?? 1;
-  const live = spawnsNear(lastFix.lat, lastFix.lng, now, 1).filter(
+  const fix = lastFix;
+  const waymarked = game.save.waymarks.filter((w) => haversine(fix, w) < 1500).map((w) => waymarkSpawn(w, now));
+  const live = [...spawnsNear(lastFix.lat, lastFix.lng, now, 1), ...waymarked].filter(
     (spawn) => spawn.expiresAt > now && !(spawn.id in collection.cleared),
   );
   for (const spawn of live) {
@@ -289,6 +313,16 @@ function onFix(fix: Fix): void {
       toast(`Found ${reward.seals > 1 ? `${reward.seals} binding seals` : 'a binding seal'} along the way.`);
     }
     creatureGame.changed();
+  }
+  game.walkBorders(fix.lat, fix.lng, metres);
+  if (fix.accuracy <= 30) {
+    for (const glyph of trace.add(fix)) {
+      // Ask the map which realms the Ring encloses, so the parcel yields their materials.
+      const shares = glyph.kind === 'ring' ? realmShares(samplePoints(glyph.path).map(([lng, lat]) => realmAt(map, lng, lat)), currentRealm ?? 'hearthfields') : {};
+      game.castGlyph(glyph, shares, currentRealm);
+      if (glyph.kind === 'knot') refreshSpawns(true);
+    }
+    demesneLayer.showTrace(trace.line);
   }
   refreshSpawns(firstFix);
   hunts.update(fix, metres);

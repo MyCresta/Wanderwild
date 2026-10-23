@@ -205,7 +205,7 @@ body {
 .install {
   position: fixed;
   left: 16px;
-  bottom: calc(var(--safe-bottom) + 184px);
+  bottom: calc(var(--safe-bottom) + 252px);
   padding: 10px 16px;
   border: 2px solid var(--leather-dark);
   border-radius: 999px;
@@ -2170,4 +2170,162 @@ body {
   border-radius: 6px;
   background: var(--parchment);
   font: inherit;
+}
+
+/* ---- Glyphwalking and the Inked Demesne ---- */
+.demesne-open {
+  position: fixed;
+  left: 16px;
+  bottom: calc(var(--safe-bottom) + 184px);
+  width: 56px;
+  height: 56px;
+  padding: 8px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 50%;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.demesne-open svg {
+  width: 100%;
+  height: 100%;
+}
+
+.demesne-open.ready {
+  box-shadow: 0 0 0 3px var(--gold), 0 0 14px var(--gold);
+}
+
+.demesne-open.fading::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 50%;
+  background: #b4442f;
+}
+
+.toast-glyph {
+  float: left;
+  margin: -2px 10px -2px 0;
+  color: var(--gold);
+}
+
+.glyph-cards {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.glyph-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border: 1px solid var(--parchment-dark);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.glyph-card p {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.glyph-card small {
+  opacity: 0.7;
+}
+
+.glyph-pic {
+  flex: none;
+  color: var(--leather);
+}
+
+.glyph-effect {
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.parcel.faded {
+  opacity: 0.7;
+}
+
+.ink-bar span {
+  background: linear-gradient(90deg, #7a4b12, #d9a441);
+}
+
+.realm-chips,
+.residents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin: 4px 0;
+}
+
+.realm-chip {
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--realm);
+  background: color-mix(in srgb, var(--realm) 20%, transparent);
+  font-size: 12px;
+}
+
+.resident-chip {
+  padding: 2px 8px;
+  border: 1px solid var(--leather);
+  border-radius: 999px;
+  background: var(--parchment);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.residents select {
+  max-width: 100%;
+  font: inherit;
+  font-size: 13px;
+}
+
+.residents small {
+  opacity: 0.7;
+}
+
+.ley-badge {
+  color: #1f6f8b;
+  font-weight: 600;
+}
+
+.ley-list,
+.waymark-list {
+  margin: 4px 0;
+  padding-left: 18px;
+  font-size: 14px;
+}
+
+.waymark-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 4px 0;
+}
+
+.waymark-row small {
+  flex: 1;
+  opacity: 0.7;
+}
+
+.waymark-row button {
+  padding: 3px 10px;
+  border: 1px solid var(--leather-dark);
+  border-radius: 6px;
+  background: var(--parchment);
+  font: inherit;
+  cursor: pointer;
 }
