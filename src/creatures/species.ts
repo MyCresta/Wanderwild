@@ -46,7 +46,7 @@ export interface PetSpecies extends SpeciesBase {
 
 export interface MonsterSpecies extends SpeciesBase {
   kind: 'monster';
-  /** Element moves of this kind hit for extra damage. */
+  /** The element that overpowers it on the Elemental Wheel (see elements.ts). */
   weakTo: Element;
 }
 
@@ -228,10 +228,10 @@ export const MONSTERS: readonly MonsterSpecies[] = [
     id: 'smudgeling',
     name: 'Smudgeling',
     epithet: 'Blotspawn of Spilled Ink',
-    lore: 'A puddle of ink that learned to want things. It wants your map. Water thins it out.',
+    lore: 'A puddle of ink that learned to want things. It wants your map. Bright light dries it to a crust.',
     element: 'tide',
     rarity: 'common',
-    weakTo: 'tide',
+    weakTo: 'lumen',
     base: { hp: 40, atk: 10, def: 9 },
     move: 'Ink Splash',
   },
@@ -240,10 +240,10 @@ export const MONSTERS: readonly MonsterSpecies[] = [
     id: 'murkwing',
     name: 'Murkwing',
     epithet: 'Blotspawn of the Unlit Lane',
-    lore: 'Flits between streetlamps that have gone out, blotting the ones that have not. Bright light makes it lose its shape.',
+    lore: 'Flits between streetlamps that have gone out, blotting the ones that have not. It cannot fly through stone, and a wall stops it dead.',
     element: 'gale',
     rarity: 'common',
-    weakTo: 'lumen',
+    weakTo: 'stone',
     base: { hp: 34, atk: 13, def: 8 },
     move: 'Shade Screech',
   },
