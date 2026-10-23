@@ -8,3 +8,10 @@ export function formatWait(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
 }
+
+export function formatDuration(ms: number): string {
+  const m = Math.round(ms / 60_000);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  return m % 60 ? `${h}h ${m % 60}m` : `${h}h`;
+}

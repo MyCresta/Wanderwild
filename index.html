@@ -24,6 +24,7 @@
         <div class="hud-stat hud-distance">
           <span class="hud-label">Wandered</span>
           <span class="hud-value" id="distance">0 m</span>
+          <span class="stride-pop" id="stride-pop" aria-live="polite"></span>
         </div>
         <div class="hud-purse">
           <span class="hud-coin" title="Coin"><i aria-hidden="true"></i><span id="coin">0</span></span>
@@ -65,6 +66,23 @@
         <circle cx="24" cy="28" r="3" fill="#e8d9b5" />
       </svg>
     </button>
+
+    <button class="hearthstead-open" id="hearthstead-open" type="button" aria-label="Open Hearthstead" hidden>
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M6 24L24 9l18 15" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" />
+        <path d="M11 22v18h26V22L24 11z" fill="currentColor" />
+        <path d="M20 40V30h8v10" fill="#e8d9b5" opacity=".5" />
+        <path d="M31 14v-5h4v8" fill="currentColor" />
+      </svg>
+    </button>
+
+    <dialog class="satchel" id="hearthstead" aria-labelledby="hearthstead-title">
+      <div class="satchel-body">
+        <button class="satchel-close" id="hearthstead-close" type="button" aria-label="Close">×</button>
+        <h2 id="hearthstead-title">The Hearthstead</h2>
+        <div id="hearthstead-content"></div>
+      </div>
+    </dialog>
 
     <dialog class="satchel" id="satchel" aria-labelledby="satchel-level">
       <div class="satchel-body">

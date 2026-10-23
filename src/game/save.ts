@@ -1,3 +1,5 @@
+import type { Egg, Hatchling } from './eggs';
+import { BUILDING_IDS, newHearthstead, type HearthsteadState, type SupplyId } from './hearthstead';
 import type { MaterialId } from './realms';
 
 /**
@@ -6,7 +8,7 @@ import type { MaterialId } from './realms';
  * a phone change before there is any server.
  */
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export interface SaveData {
   version: typeof SAVE_VERSION;
@@ -27,6 +29,11 @@ export interface SaveData {
   blessingUntil: number;
   /** Coarse ~50 m cells walked through, never a raw GPS trail. */
   visitedCells: string[];
+  supplies: Record<SupplyId, number>;
+  hearthstead: HearthsteadState;
+  eggs: Egg[];
+  /** Hatched creatures waiting for the creatures code to add them to the roster. */
+  hatchlings: Hatchling[];
   /** Owned by the creatures code; its shape is defined there. */
   pets: unknown[];
   gear: unknown[];
@@ -47,6 +54,10 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     shrinesVisited: 0,
     blessingUntil: 0,
     visitedCells: [],
+    supplies: { tonic: 0, petXp: 0 },
+    hearthstead: newHearthstead(now),
+    eggs: [],
+    hatchlings: [],
     pets: [],
     gear: [],
   };
@@ -64,13 +75,18 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
   if (!isObject(raw) || typeof raw.version !== 'number') throw new Error('Not a Wanderwild save');
   if (raw.version > SAVE_VERSION) throw new Error('This save is from a newer version of Wanderwild');
 
-  // Future migrations go here, e.g. `if (data.version === 1) data = fromV1(data);`.
+  // Version 1 had no Hearthstead, supplies or eggs; the defaults below fill them in.
+  // Future migrations that rename or reshape fields go here, one version at a time.
   const fresh = newSave(now);
   const strings = (v: unknown) => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : []);
   const numbers = (v: unknown) =>
     isObject(v) ? Object.fromEntries(Object.entries(v).filter(([, n]) => typeof n === 'number' && Number.isFinite(n))) : {};
   const currencies = isObject(raw.currencies) ? raw.currencies : {};
   const wayfarer = isObject(raw.wayfarer) ? raw.wayfarer : {};
+  const supplies = isObject(raw.supplies) ? raw.supplies : {};
+  const hearth = isObject(raw.hearthstead) ? raw.hearthstead : {};
+  const buildings = isObject(hearth.buildings) ? hearth.buildings : {};
+  const records = (v: unknown) => (Array.isArray(v) ? v.filter(isObject) : []);
   return {
     ...fresh,
     createdAt: num(raw.createdAt, now),
@@ -84,6 +100,26 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
     shrinesVisited: num(raw.shrinesVisited),
     blessingUntil: num(raw.blessingUntil),
     visitedCells: strings(raw.visitedCells),
+    supplies: { tonic: num(supplies.tonic), petXp: num(supplies.petXp) },
+    hearthstead: {
+      buildings: Object.fromEntries(
+        BUILDING_IDS.filter((id) => isObject(buildings[id])).map((id) => {
+          const b = buildings[id] as Record<string, unknown>;
+          return [id, { level: Math.max(1, num(b.level, 1)), progressMs: num(b.progressMs) }];
+        }),
+      ),
+      lastTick: num(hearth.lastTick, now),
+      strideDay: typeof hearth.strideDay === 'string' ? hearth.strideDay : '',
+      strideUsedMs: num(hearth.strideUsedMs),
+    },
+    eggs: records(raw.eggs).map((e) => ({
+      id: String(e.id),
+      km: ([2, 5, 10].includes(e.km as number) ? e.km : 2) as Egg['km'],
+      seed: num(e.seed),
+      walkedM: num(e.walkedM),
+      foundAt: num(e.foundAt, now),
+    })),
+    hatchlings: records(raw.hatchlings) as unknown as Hatchling[],
     pets: Array.isArray(raw.pets) ? raw.pets : [],
     gear: Array.isArray(raw.gear) ? raw.gear : [],
   };

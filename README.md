@@ -13,6 +13,9 @@ A mobile-first, location-based fantasy game: explore the real world on a fantasy
 - **Realms.** What is under you on the map decides your realm: parks and woods are the Wildwood, water and riversides Tidemere, shops and old town the Stoneward, cemeteries the Barrows, and homes the Hearthfields. A banner shows where you are.
 - **Wayshrines.** Churches, libraries, monuments, viewpoints and town halls become shrines. Touch one within 40 m for coin, XP, that realm's material and a 10-minute blessing (+25% walking XP); each shrine then rests for 5 minutes.
 - **Shared spawns.** `src/game/spawns.ts` derives creature spawns from a 150 m map cell plus the current 15-minute window, so friends standing together see the same ones and reopening the app cannot reroll them.
+- **The Hearthstead** (from Wayfarer level 3). Herb Garden, Mine, Lumber Grove and Kennel produce while the app is closed, up to 8 hours of storage (24 hours at building level 9). Upgrade them with coin and materials.
+- **Stride boost.** Every 100 m walked moves all Hearthstead timers forward 10 minutes, up to 8 hours a day.
+- **Wild eggs** (from level 8). Shrines sometimes give a 2, 5 or 10 km egg; walk that far to hatch it. Longer eggs hold rarer creatures.
 - **Save system.** All progress is one versioned save in IndexedDB, with export and import as a file from the satchel to move to another phone.
 - **The Inkbound Bestiary.** Creatures that wandered off the margins of old maps now roam the streets around you, all drawn and animated in code with SVG and trigonometry (no image files).
   - Six **Wildlings** to bind and raise: Bramblet, Driftfin, Emberkit, Cragmite, Wisplume and Lumoth. Each one is an individual with its own colouring and temperament, and about 1 in 48 is Gilded.
@@ -47,7 +50,7 @@ Every `claude/*` branch also gets a preview build on the same site, so work in p
 - `src/map/realmProbe.ts`: reads loaded vector tiles to find the realm under a point and nearby shrines.
 - `src/map/shrineLayer.ts`: wayshrine pins.
 - `src/game/`: game rules with no DOM: save, Wayfarer levels, realms, spawns, shrines, and `state.ts` which ties them together.
-- `src/hud/`: the top bar, realm banner, toasts and satchel panel.
+- `src/hud/`: the top bar, realm banner, toasts, satchel and Hearthstead panels.
 - `src/creatures/`: the species roster, procedural SVG art (`art/`), levelling, catching and battle maths, spawns and the saved collection.
 - `src/ui/`: catch, battle, bestiary and starter screens.
 - `src/map/creatures.ts`: wild creatures and your companion on the map.

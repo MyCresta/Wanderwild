@@ -17,6 +17,7 @@ import type { RealmId } from './game/realms';
 import { installProbeLayers, realmAt, shrinesNear } from './map/realmProbe';
 import { ShrineLayer } from './map/shrineLayer';
 import { Hud } from './hud/hud';
+import { HearthsteadPanel } from './hud/hearthsteadPanel';
 import { formatWait } from './hud/format';
 import { CompanionMarker, CreatureMarkers } from './map/creatures';
 import { companion, loadCollection, saveCollection, walkRewards } from './creatures/collection';
@@ -75,6 +76,9 @@ installProbeLayers(map);
 
 const game = new GameState(await loadSave());
 const hud = new Hud(game);
+new HearthsteadPanel(game, (text) => hud.toast(text));
+// Bank the time the app was closed, so offline production shows straight away.
+game.tickHearthstead();
 const player = new PlayerMarker(map);
 const walk = new WalkTracker();
 
