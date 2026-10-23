@@ -9,6 +9,8 @@ import {
   type Rarity,
   type Species,
 } from './species';
+import { matchup } from './elements';
+import { rollFoe, type FoeTrait, type Rank } from './foes';
 
 export const MAX_LEVEL = 30;
 
@@ -77,11 +79,9 @@ export function addXp(creature: Levelled, amount: number): number {
   return gained;
 }
 
-/** How hard an element move lands on a monster. */
+/** How hard an element move lands, by the Elemental Wheel. */
 export function effectiveness(move: Element, target: Species): number {
-  if (target.kind === 'monster' && move === target.weakTo) return 1.75;
-  if (move === target.element) return 0.6;
-  return 1;
+  return matchup(move, target.element);
 }
 
 export function damage(atk: number, def: number, power: number, eff: number, roll: number, crit: boolean): number {
@@ -138,6 +138,9 @@ export interface Encounter {
   level: number;
   /** Seed for this individual's look and trait. */
   seed: number;
+  /** Blotspawn only: Rare and Elite foes are tougher and carry quirks. */
+  rank?: Rank;
+  traits?: FoeTrait[];
 }
 
 /** Decides which creature stands at a spawn point. The same spawn always gives the same creature. */
@@ -155,5 +158,6 @@ export function creatureForSpawn(spawn: SpawnSeed, companionLevel: number): Enco
   const level = isMonster
     ? companionLevel + Math.round(rng() * 4 - 2) + bonus
     : 1 + Math.floor(rng() * (companionLevel + 2)) + bonus;
-  return { species, level: Math.min(MAX_LEVEL, Math.max(1, level)), seed: Math.floor(rng() * 2 ** 32) };
+  const encounter: Encounter = { species, level: Math.min(MAX_LEVEL, Math.max(1, level)), seed: Math.floor(rng() * 2 ** 32) };
+  return isMonster ? { ...encounter, ...rollFoe(spawn.rarity, spawn.seed) } : encounter;
 }

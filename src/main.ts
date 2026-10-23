@@ -44,6 +44,7 @@ import { ringInRealm, walkInRealm } from './creatures/evolution';
 import { creatureReach } from './geo/reach';
 import { setupRailMenu, watchLayout } from './ui/layout';
 import { installOrbitCamera } from './map/orbitCamera';
+import { FightBoard, type FoeNear } from './ui/fightBoard';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -246,6 +247,18 @@ function meet(spawn: Spawn, encounter: Encounter): void {
 }
 
 const creatures = new CreatureMarkers(map, meet);
+/** What stands on the map right now, so the Fight board can list the Blotspawn. */
+let shown: { spawn: Spawn; encounter: Encounter }[] = [];
+let foeHinted = false;
+const fights = new FightBoard({
+  fight: meet,
+  show(spawn) {
+    setFollowing(false);
+    map.flyTo({ center: [spawn.lng, spawn.lat], zoom: Math.max(map.getZoom(), 17) });
+  },
+  practice: (encounter) => openBattle(creatureGame, encounter, () => {}, { practice: true }),
+  companionLevel: () => companion(collection)?.level ?? null,
+});
 let spawnCheck: { lat: number; lng: number; at: number } | null = null;
 // Realm lookups read tiles, so each spawn's realm is worked out once.
 const spawnRealms = new globalThis.Map<string, RealmId>();
@@ -268,7 +281,8 @@ function refreshSpawns(force = false): void {
     }
     spawn.realm = spawnRealms.get(spawn.id);
   }
-  creatures.show(live.map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) })));
+  shown = live.map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) }));
+  creatures.show(shown);
   showReach();
 }
 
@@ -279,6 +293,17 @@ function showReach(): void {
   const reach = creatureReach(fix, game.bonuses().reachM);
   player.setReach(reach);
   creatures.markReach((spawn) => haversine(fix, spawn) <= reach);
+  const foes: FoeNear[] = shown
+    .filter(({ spawn, encounter }) => encounter.species.kind === 'monster' && !(spawn.id in collection.cleared))
+    .map(({ spawn, encounter }) => {
+      const metres = haversine(fix, spawn);
+      return { spawn, encounter, metres, inReach: metres <= reach };
+    });
+  fights.update(foes);
+  if (!foeHinted && companion(collection) && foes.some((f) => f.inReach)) {
+    foeHinted = true;
+    toast('A Blotspawn is close enough to fight! Tap it, or the ⚔ button.');
+  }
 }
 game.on((e) => e.kind === 'change' && showReach());
 setInterval(() => refreshSpawns(), SPAWN_REFRESH_MS);

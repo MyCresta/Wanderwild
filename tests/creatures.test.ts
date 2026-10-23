@@ -78,11 +78,11 @@ describe('spawns', () => {
 
 describe('battle', () => {
   it('ends with a winner and the weakness hits harder', () => {
-    const lumoth = getSpecies('lumoth');
+    const cragmite = getSpecies('cragmite');
     const murkwing = getSpecies('murkwing');
-    expect(effectiveness(lumoth.element, murkwing)).toBeGreaterThan(1);
+    expect(effectiveness(cragmite.element, murkwing)).toBeGreaterThan(1);
 
-    const battle = new Battle([makeFighter(lumoth, 5, 1)], makeFighter(murkwing, 3, 2), { rng: mulberry32(42) });
+    const battle = new Battle([makeFighter(cragmite, 5, 1)], makeFighter(murkwing, 3, 2), { rng: mulberry32(42) });
     for (let i = 0; i < 100 && !battle.winner; i++) battle.turn({ kind: battle.moveReady ? 'move' : 'strike' });
     expect(battle.winner).toBe('pet');
     expect(victoryRewards(battle.foe).xp).toBeGreaterThan(0);
