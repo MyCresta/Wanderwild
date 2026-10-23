@@ -1,9 +1,6 @@
 /* ---------- Treasure hunts ---------- */
 
 .hunt-button {
-  position: fixed;
-  right: 16px;
-  bottom: calc(var(--safe-bottom) + 172px);
   display: flex;
   flex-direction: column;
   align-items: center;
