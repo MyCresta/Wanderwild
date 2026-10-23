@@ -17,14 +17,29 @@
 
     <header class="hud">
       <div class="hud-panel">
-        <span class="hud-label">Distance wandered</span>
-        <span class="hud-value" id="distance">0 m</span>
+        <div class="hud-stat">
+          <span class="hud-label">Distance wandered</span>
+          <span class="hud-value" id="distance">0 m</span>
+        </div>
+        <div class="hud-stat" title="Binding seals: walk 100 m to earn one">
+          <span class="hud-label">Seals</span>
+          <span class="hud-value" id="seals">0</span>
+        </div>
       </div>
     </header>
 
     <div class="notice" id="notice" role="status" hidden></div>
 
     <button class="install" id="install" type="button" hidden>Install Wanderwild</button>
+
+    <button class="bestiary-button" id="bestiary" type="button" aria-label="Open the bestiary">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M6 10q9-4 18 2v28q-9-6-18-2z" fill="#e8d9b5" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" />
+        <path d="M42 10q-9-4-18 2v28q9-6 18-2z" fill="#e8d9b5" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" />
+        <path d="M11 18q5-2 9 1M11 24q5-2 9 1M28 19q4-3 9-1M28 25q4-3 9-1" stroke="currentColor" stroke-width="1.6" fill="none" />
+      </svg>
+      <span>Bestiary</span>
+    </button>
 
     <button class="recenter" id="recenter" type="button" aria-label="Follow me" aria-pressed="true">
       <svg viewBox="0 0 48 48" aria-hidden="true">
