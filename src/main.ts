@@ -14,7 +14,7 @@ import { loadSave } from './game/save';
 import { GameState } from './game/state';
 import { SHRINE_REACH_M, type Shrine } from './game/shrines';
 import { isNight, RARITIES } from './game/gear';
-import type { RealmId } from './game/realms';
+import { MATERIALS, type MaterialId, type RealmId } from './game/realms';
 import { installProbeLayers, realmAt, shrinesNear } from './map/realmProbe';
 import { ShrineLayer } from './map/shrineLayer';
 import { Hud } from './hud/hud';
@@ -45,6 +45,9 @@ import { creatureReach } from './geo/reach';
 import { setupRailMenu, watchLayout } from './ui/layout';
 import { installOrbitCamera } from './map/orbitCamera';
 import { FightBoard, type FoeNear } from './ui/fightBoard';
+import { Farsight } from './ui/farsight';
+import { CurioLayer } from './map/curioLayer';
+import { CURIO_KINDS, curiosNear, FARSIGHT_SHARE, type Curio } from './game/farsight';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -111,6 +114,8 @@ let lastFix: Fix | null = null;
 let currentRealm: RealmId | undefined;
 
 function setFollowing(value: boolean): void {
+  // Following the Wayfarer means coming home from Farsight.
+  if (value && farsight.active) return farsight.set(false);
   following = value;
   recenterEl.setAttribute('aria-pressed', String(value));
   if (value && lastFix) map.easeTo({ center: [lastFix.lng, lastFix.lat], zoom: Math.max(map.getZoom(), 15) });
@@ -216,33 +221,38 @@ function claimHatchlings(): void {
 game.on((event) => event.kind === 'hatch' && claimHatchlings());
 if (game.save.hatchlings.length) claimHatchlings();
 
-/** Removes a spawn that was caught, beaten or fled; only the first two earn Wayfarer XP. */
-function clearSpawn(spawn: Spawn, won: boolean, kind: 'pet' | 'monster'): void {
+/** Removes a spawn that was caught, beaten or fled; only the first two earn Wayfarer XP, less by Farsight. */
+function clearSpawn(spawn: Spawn, won: boolean, kind: 'pet' | 'monster', remote = false): void {
   collection.cleared[spawn.id] = spawn.expiresAt;
   creatures.remove(spawn.id);
   if (won) {
-    game.grantXp(CREATURE_XP[spawn.rarity]);
+    game.grantXp(CREATURE_XP[spawn.rarity] * (remote ? FARSIGHT_SHARE : 1));
     game.changed();
   }
   creatureGame.changed();
   if (won) deeds?.win(kind, spawn.rarity);
 }
 
+/** Within the purple ring of where the Wayfarer actually stands. */
+const onFoot = (p: { lat: number; lng: number }) => !!lastFix && haversine(lastFix, p) <= creatureReach(lastFix, game.bonuses().reachM);
+
 function meet(spawn: Spawn, encounter: Encounter): void {
-  if (!lastFix) return;
-  const metres = haversine(lastFix, spawn);
-  const reach = creatureReach(lastFix, game.bonuses().reachM);
-  if (metres > reach) {
+  // By Farsight anything on the map can be met, for a smaller reward; in person it pays in full.
+  const remote = !onFoot(spawn);
+  if (remote && !farsight.active) {
+    if (!lastFix) return;
+    const metres = haversine(lastFix, spawn);
+    const reach = creatureReach(lastFix, game.bonuses().reachM);
     sound.play('error');
-    toast(`That ${encounter.species.name} is ${Math.round(metres)} m away. Walk ${Math.ceil(metres - reach)} m closer, inside the purple ring.`);
+    toast(`That ${encounter.species.name} is ${Math.round(metres)} m away. Walk ${Math.ceil(metres - reach)} m closer, or reach it by Farsight 👁 for ${Math.round(FARSIGHT_SHARE * 100)}% rewards.`);
     return;
   }
   if (encounter.species.kind === 'pet') {
-    openEncounter(creatureGame, encounter, (caught, fled) => (caught || fled) && clearSpawn(spawn, caught, 'pet'));
+    openEncounter(creatureGame, encounter, (caught, fled) => (caught || fled) && clearSpawn(spawn, caught, 'pet', remote));
   } else if (!companion(collection)) {
     toast('You need a companion to face Blotspawn.');
   } else {
-    openBattle(creatureGame, encounter, (won) => won && clearSpawn(spawn, true, 'monster'));
+    openBattle(creatureGame, encounter, (won) => won && clearSpawn(spawn, true, 'monster', remote));
   }
 }
 
@@ -259,19 +269,54 @@ const fights = new FightBoard({
   practice: (encounter) => openBattle(creatureGame, encounter, () => {}, { practice: true }),
   companionLevel: () => companion(collection)?.level ?? null,
 });
+
+function seenFarsightHint(): boolean {
+  try {
+    if (localStorage.getItem('wanderwild.farsightHint')) return true;
+    localStorage.setItem('wanderwild.farsightHint', '1');
+  } catch {
+    // Without storage the hint just shows every time.
+  }
+  return false;
+}
+
+// Farsight: drag the map freely and play wherever the lens in the middle looks.
+const farsight = new Farsight({
+  enter() {
+    following = false;
+    recenterEl.setAttribute('aria-pressed', 'false');
+    orbit.setFree(true);
+    if (!seenFarsightHint()) {
+      hud.toast(`Farsight: drag anywhere to explore. Fight, sketch and pick up curios from here for ${Math.round(FARSIGHT_SHARE * 100)}% rewards. Walking still pays full.`, 6000);
+    }
+    refreshAround(true);
+  },
+  exit() {
+    orbit.setFree(false);
+    setFollowing(true);
+    refreshAround(true);
+  },
+});
+/** Where play is happening: the lens while in Farsight, otherwise the Wayfarer. */
+function focus(): { lat: number; lng: number } | null {
+  if (!farsight.active) return lastFix;
+  const c = map.getCenter();
+  return { lat: c.lat, lng: c.lng };
+}
+
 let spawnCheck: { lat: number; lng: number; at: number } | null = null;
 // Realm lookups read tiles, so each spawn's realm is worked out once.
 const spawnRealms = new globalThis.Map<string, RealmId>();
 
 function refreshSpawns(force = false): void {
-  if (!lastFix) return;
+  const fix = focus();
+  if (!fix) return;
   const now = Date.now();
-  if (!force && spawnCheck && haversine(spawnCheck, lastFix) < SPAWN_REFRESH_M && now - spawnCheck.at < SPAWN_REFRESH_MS) return;
-  spawnCheck = { lat: lastFix.lat, lng: lastFix.lng, at: now };
+  if (!force && spawnCheck && haversine(spawnCheck, fix) < SPAWN_REFRESH_M && now - spawnCheck.at < SPAWN_REFRESH_MS) return;
+  spawnCheck = { lat: fix.lat, lng: fix.lng, at: now };
   const level = companion(collection)?.level ?? 1;
-  const fix = lastFix;
   const waymarked = game.save.waymarks.filter((w) => haversine(fix, w) < 1500).map((w) => waymarkSpawn(w, now));
-  const live = [...spawnsNear(lastFix.lat, lastFix.lng, now, 1), ...waymarked].filter(
+  const live = [...spawnsNear(fix.lat, fix.lng, now, 1), ...waymarked].filter(
     (spawn) => spawn.expiresAt > now && !(spawn.id in collection.cleared),
   );
   for (const spawn of live) {
@@ -288,16 +333,17 @@ function refreshSpawns(force = false): void {
 
 /** Draws the reach ring and dims creatures outside it, so what looks near can be tapped. */
 function showReach(): void {
-  if (!lastFix) return;
-  const fix = lastFix;
-  const reach = creatureReach(fix, game.bonuses().reachM);
-  player.setReach(reach);
-  creatures.markReach((spawn) => haversine(fix, spawn) <= reach);
+  const fix = focus();
+  if (!fix) return;
+  const reach = lastFix ? creatureReach(lastFix, game.bonuses().reachM) : 0;
+  if (lastFix) player.setReach(reach);
+  // By Farsight everything shown is in reach, so nothing is dimmed.
+  creatures.markReach((spawn) => farsight.active || onFoot(spawn));
   const foes: FoeNear[] = shown
     .filter(({ spawn, encounter }) => encounter.species.kind === 'monster' && !(spawn.id in collection.cleared))
     .map(({ spawn, encounter }) => {
       const metres = haversine(fix, spawn);
-      return { spawn, encounter, metres, inReach: metres <= reach };
+      return { spawn, encounter, metres, inReach: farsight.active || onFoot(spawn) };
     });
   fights.update(foes);
   if (!foeHinted && companion(collection) && foes.some((f) => f.inReach)) {
@@ -309,6 +355,56 @@ game.on((e) => e.kind === 'change' && showReach());
 setInterval(() => refreshSpawns(), SPAWN_REFRESH_MS);
 // The first fix can arrive before tiles; look again once they have loaded.
 map.once('idle', () => refreshSpawns(true));
+
+// Curios: small daily finds. Walk past one to pick it up in full, or tap it by Farsight for a share.
+const curioLayer = new CurioLayer(map, (curio) => takeCurio(curio));
+
+function takeCurio(curio: Curio): void {
+  const here = onFoot(curio);
+  if (!here && !farsight.active) {
+    sound.play('error');
+    const away = lastFix ? `${Math.round(haversine(lastFix, curio))} m away. ` : '';
+    toast(`${CURIO_KINDS[curio.kind].name}, ${away}Walk to it, or pick it up by Farsight 👁 for ${Math.round(FARSIGHT_SHARE * 100)}%.`);
+    return;
+  }
+  const reward = game.findCurio(curio, realmAt(map, curio.lng, curio.lat) ?? currentRealm ?? 'hearthfields', here);
+  curioLayer.remove(curio.id);
+  if (!reward) return;
+  if (reward.seals) {
+    collection.seals += reward.seals;
+    creatureGame.changed();
+  }
+  const parts = [
+    reward.coin && `+${reward.coin} coin`,
+    reward.xp && `+${reward.xp} XP`,
+    reward.seals && `+${reward.seals} binding seal${reward.seals > 1 ? 's' : ''}`,
+    ...Object.entries(reward.materials).map(([id, n]) => `+${n} ${MATERIALS[id as MaterialId].name}`),
+  ].filter(Boolean);
+  sound.play('coin');
+  toast(`${CURIO_KINDS[curio.kind].name}${here ? '' : ' (by Farsight)'}: ${parts.join(', ')}.`);
+}
+
+/** Today's curios around wherever play is happening. */
+function refreshCurios(): void {
+  const at = focus();
+  if (!at) return;
+  curioLayer.show(curiosNear(at.lat, at.lng, Date.now(), game.save.curiosFound));
+}
+
+/** Walking within a few steps of a curio picks it up without a tap. */
+function pickUpNearby(fix: Fix): void {
+  for (const curio of curiosNear(fix.lat, fix.lng, Date.now(), game.save.curiosFound, 1))
+    if (haversine(fix, curio) <= Math.max(25, Math.min(fix.accuracy, 40))) takeCurio(curio);
+}
+
+/** Re-reads spawns, curios and shrines around the lens or the Wayfarer. */
+function refreshAround(force = false): void {
+  refreshSpawns(force);
+  showReach();
+  refreshCurios();
+  refreshWorld();
+}
+map.on('moveend', () => farsight.active && refreshAround());
 
 $('bestiary').addEventListener('click', () => openBestiary(creatureGame));
 if (!collection.pets.length) openStarterChoice(creatureGame);
@@ -339,7 +435,8 @@ function refreshWorld(): void {
     sound.setRealm(realm);
   }
   const now = Date.now();
-  const near = shrinesNear(map, lastFix.lng, lastFix.lat, SHRINE_SHOW_M).filter((s) => !hunts.hides(s));
+  const at = focus() ?? lastFix;
+  const near = shrinesNear(map, at.lng, at.lat, SHRINE_SHOW_M).filter((s) => !hunts.hides(s));
   shrines.set(near, new Set(near.filter((s) => game.shrineReadyAt(s) > now).map((s) => s.id)));
 }
 
@@ -399,6 +496,8 @@ function onFix(fix: Fix): void {
   }
   refreshSpawns(firstFix);
   showReach();
+  if (firstFix || !farsight.active) refreshCurios();
+  pickUpNearby(fix);
   hunts.update(fix, metres);
   if (fix.accuracy <= 40) game.visit(fix.lat, fix.lng);
 
@@ -413,6 +512,7 @@ if (SIMULATE) {
   onFix({ lat: FALLBACK_CENTER[1], lng: FALLBACK_CENTER[0], accuracy: 5, time });
   hud.toast('Practice walk: tap the map to walk there.', 5000);
   map.on('click', (e) => {
+    if (farsight.active) return;
     const target = { lat: e.lngLat.lat, lng: e.lngLat.lng };
     time += (lastFix ? haversine(lastFix, target) / SIM_SPEED_MPS : 0) * 1000 + 1000;
     onFix({ ...target, accuracy: 5, time });

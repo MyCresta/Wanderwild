@@ -14,14 +14,36 @@ const MIN_PITCH = 0;
  * around the centre too. While an orbit is under way, callers should re-centre with jumpTo
  * rather than easeTo, which would fight the finger for the bearing. Taps are left alone, so markers, layers and `?walk` still get clicks.
  */
-export function installOrbitCamera(map: Map): { orbiting: () => boolean } {
-  map.dragPan.disable();
-  map.dragRotate.disable();
-  map.doubleClickZoom.disable();
-  map.keyboard.disable();
-  map.touchPitch.disable();
-  map.touchZoomRotate.enable({ around: 'center' });
-  map.scrollZoom.enable({ around: 'center' });
+export interface OrbitCamera {
+  orbiting(): boolean;
+  /** Free mode (Farsight) hands the map back its usual drag-to-pan; orbit mode takes it away again. */
+  setFree(free: boolean): void;
+}
+
+export function installOrbitCamera(map: Map): OrbitCamera {
+  let free = false;
+  const lock = () => {
+    map.dragPan.disable();
+    map.dragRotate.disable();
+    map.doubleClickZoom.disable();
+    map.keyboard.disable();
+    map.touchPitch.disable();
+    map.touchZoomRotate.enable({ around: 'center' });
+    map.scrollZoom.enable({ around: 'center' });
+  };
+  const unlock = () => {
+    map.dragPan.enable();
+    map.dragRotate.enable();
+    map.doubleClickZoom.enable();
+    map.keyboard.enable();
+    map.touchPitch.enable();
+    // Re-enabling without `around` drops the centre anchor, so pinches zoom under the fingers.
+    map.touchZoomRotate.disable();
+    map.touchZoomRotate.enable();
+    map.scrollZoom.disable();
+    map.scrollZoom.enable();
+  };
+  lock();
 
   const el = map.getCanvasContainer();
   // With drag-pan off MapLibre hands one-finger drags back to the browser, which would cancel the orbit to scroll.
@@ -33,6 +55,7 @@ export function installOrbitCamera(map: Map): { orbiting: () => boolean } {
   let drag: { id: number; x: number; y: number; lastX: number; lastY: number; axis?: 'x' | 'y'; below: boolean } | null = null;
 
   el.addEventListener('pointerdown', (e) => {
+    if (free) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     pointers.add(e.pointerId);
     swallowClick = false;
@@ -85,5 +108,15 @@ export function installOrbitCamera(map: Map): { orbiting: () => boolean } {
     },
     true,
   );
-  return { orbiting: () => !!drag?.axis };
+  return {
+    orbiting: () => !!drag?.axis,
+    setFree(value) {
+      if (value === free) return;
+      free = value;
+      drag = null;
+      pointers.clear();
+      if (free) unlock();
+      else lock();
+    },
+  };
 }

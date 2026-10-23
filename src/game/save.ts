@@ -57,6 +57,8 @@ export interface SaveData {
   glyphsCast: Record<GlyphKind, number>;
   /** Achievements, their counters and the worn title; see deeds.ts. */
   deeds: DeedsState;
+  /** Curio id → when it expires, for curios already picked up today. */
+  curiosFound: Record<string, number>;
 }
 
 export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
@@ -90,6 +92,7 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     waymarks: [],
     glyphsCast: { ring: 0, stroke: 0, knot: 0 },
     deeds: newDeeds(),
+    curiosFound: {},
   };
 }
 
@@ -206,6 +209,7 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
       return { ring: num(g.ring), stroke: num(g.stroke), knot: num(g.knot) };
     })(),
     deeds: parseDeeds(raw.deeds),
+    curiosFound: numbers(raw.curiosFound) as Record<string, number>,
   };
 }
 
@@ -228,6 +232,7 @@ export function importSave(text: string, now = Date.now()): SaveData {
 export function pruneSave(save: SaveData, now = Date.now()): void {
   for (const [id, readyAt] of Object.entries(save.shrineCooldowns)) if (readyAt <= now) delete save.shrineCooldowns[id];
   save.leyLines = save.leyLines.filter((l) => l.until > now);
+  for (const [id, until] of Object.entries(save.curiosFound)) if (until <= now) delete save.curiosFound[id];
 }
 
 // ---- Storage ----
