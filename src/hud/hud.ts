@@ -2,6 +2,7 @@ import { exportSave, importSave } from '../game/save';
 import { MATERIALS, REALMS, type MaterialId, type RealmId } from '../game/realms';
 import type { GameState } from '../game/state';
 import { nextUnlock, UNLOCKS } from '../game/wayfarer';
+import { sound } from '../audio/sound';
 import { formatCount, formatDistance } from './format';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -23,6 +24,7 @@ export class Hud {
     $('satchel-open').addEventListener('click', () => {
       this.renderSatchel();
       this.satchel.showModal();
+      sound.play('open');
     });
     $('satchel-close').addEventListener('click', () => this.satchel.close());
     this.satchel.addEventListener('click', (e) => {
@@ -39,8 +41,11 @@ export class Hud {
 
     game.on((event) => {
       if (event.kind === 'change') this.render();
-      else if (event.kind === 'reward') this.toast(event.text);
-      else if (event.kind === 'levelUp') {
+      else if (event.kind === 'reward') {
+        sound.play('reward');
+        this.toast(event.text);
+      } else if (event.kind === 'levelUp') {
+        sound.play('levelUp', 0.3);
         const unlocked = event.unlocks.map((u) => u.what).join('; ');
         this.toast(`Wayfarer level ${event.level}!${unlocked ? ` Unlocked: ${unlocked}.` : ''}`, 6000, true);
       }
@@ -71,6 +76,7 @@ export class Hud {
     this.realmEl.style.setProperty('--realm', r.color);
     this.realmEl.innerHTML = `<b>${r.name[0].toUpperCase()}${r.name.slice(1)}</b><span>${r.flavour}</span>`;
     if (!first) {
+      sound.play('realm');
       this.realmEl.classList.remove('arrive');
       void this.realmEl.offsetWidth; // Restart the arrival animation.
       this.realmEl.classList.add('arrive');

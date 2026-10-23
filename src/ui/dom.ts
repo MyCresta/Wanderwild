@@ -1,3 +1,5 @@
+import { sound } from '../audio/sound';
+
 type Child = Node | string | null | undefined | false;
 
 /** Tiny element builder: h('button', { class: 'x', onclick }, 'Label'). */
@@ -59,6 +61,7 @@ export function openSheet(title: string, opts: { closable?: boolean; className?:
   }
   card.append(header, body);
   document.body.appendChild(root);
+  sound.play('open');
   current = sheet;
   return sheet;
 }

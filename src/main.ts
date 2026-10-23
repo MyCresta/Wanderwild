@@ -28,6 +28,8 @@ import { openBattle } from './ui/battle';
 import { openBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
 import { openEncounter } from './ui/encounter';
+import { sound } from './audio/sound';
+import { setupSoundButton } from './ui/soundButton';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -98,7 +100,7 @@ function useShrine(shrine: Shrine): void {
   if (away > SHRINE_REACH_M) return hud.toast(`${shrine.name} is ${Math.round(away)} m away. Walk within ${SHRINE_REACH_M} m to touch it.`);
   const wait = game.shrineReadyAt(shrine) - Date.now();
   if (wait > 0) return hud.toast(`${shrine.name} is gathering its power. Ready in ${formatWait(wait)}.`);
-  game.useShrine(shrine, realmAt(map, shrine.lng, shrine.lat) ?? currentRealm ?? 'hearthfields');
+  if (game.useShrine(shrine, realmAt(map, shrine.lng, shrine.lat) ?? currentRealm ?? 'hearthfields')) sound.play('shrine');
   refreshWorld();
 }
 
@@ -132,6 +134,7 @@ function meet(spawn: Spawn, encounter: Encounter): void {
   if (!lastFix) return;
   const metres = haversine(lastFix, spawn);
   if (metres > REACH_M) {
+    sound.play('error');
     toast(`That ${encounter.species.name} is ${Math.round(metres)} m away. Walk closer to reach it.`);
     return;
   }
@@ -181,6 +184,7 @@ function refreshWorld(): void {
   if (realm) {
     currentRealm = realm;
     hud.setRealm(realm);
+    sound.setRealm(realm);
   }
   const now = Date.now();
   const near = shrinesNear(map, lastFix.lng, lastFix.lat, SHRINE_SHOW_M);
@@ -215,8 +219,14 @@ function onFix(fix: Fix): void {
     const before = companion(collection)?.level;
     const reward = walkRewards(collection, metres);
     const pet = companion(collection);
-    if (pet && reward.levels > 0 && before !== pet.level) toast(`${getSpecies(pet.speciesId).name} grew to level ${pet.level} on the road!`);
-    if (reward.seals > 0) toast(`Found ${reward.seals > 1 ? `${reward.seals} binding seals` : 'a binding seal'} along the way.`);
+    if (pet && reward.levels > 0 && before !== pet.level) {
+      sound.play('levelUp');
+      toast(`${getSpecies(pet.speciesId).name} grew to level ${pet.level} on the road!`);
+    }
+    if (reward.seals > 0) {
+      sound.play('coin');
+      toast(`Found ${reward.seals > 1 ? `${reward.seals} binding seals` : 'a binding seal'} along the way.`);
+    }
     creatureGame.changed();
   }
   refreshSpawns(firstFix);
@@ -252,6 +262,9 @@ if (SIMULATE) {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') void game.flush();
 });
+
+sound.install();
+setupSoundButton($<HTMLButtonElement>('sound-toggle'));
 
 registerSW({ immediate: true });
 setupInstallButton($<HTMLButtonElement>('install'), showNotice);

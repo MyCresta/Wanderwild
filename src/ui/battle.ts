@@ -5,6 +5,7 @@ import type { Encounter } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
 import type { GameContext } from './context';
 import { h, openSheet, wait } from './dom';
+import { sound } from '../audio/sound';
 
 function hpBar(f: Fighter) {
   const fill = h('span', { class: 'hp-fill' });
@@ -42,7 +43,11 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     reported = true;
     onDone(won);
   };
-  sheet.onClose(() => finish(false));
+  const endMusic = sound.scene('battle');
+  sheet.onClose(() => {
+    endMusic();
+    finish(false);
+  });
 
   const foeSvg = createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 170, facing: -1 });
   const petSvg = createCreatureSvg({ speciesId: owned.speciesId, seed: owned.seed, size: 170 });
@@ -85,8 +90,10 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     const target = hit.attacker === 'pet' ? foeSpot : petSpot;
     log.textContent = describe(hit);
     attacker.classList.add(hit.action === 'move' ? 'cast' : 'lunge');
+    sound.play(hit.action === 'move' ? 'spell' : 'strike');
     await wait(260);
     target.classList.add('hit');
+    sound.play(hit.crit ? 'crit' : hit.effectiveness > 1 ? 'weakHit' : 'hit');
     floatText(target, `-${hit.damage}`, hit.effectiveness > 1 || hit.crit ? 'big' : 'dmg');
     foeHp.update();
     petHp.update();
@@ -106,6 +113,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     }
     if (battle.winner === 'pet') {
       foeSpot.classList.add('dissolve');
+      sound.play('victory');
       const reward = victoryRewards(battle.foe);
       const levels = grantPetXp(owned, reward.xp);
       ctx.collection.seals = Math.min(MAX_SEALS, ctx.collection.seals + reward.seals);
@@ -120,6 +128,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       );
     } else {
       petSpot.classList.add('faint');
+      sound.play('defeat');
       finish(false);
       sheet.setTitle('Driven back');
       log.textContent = `${petSpecies.name} is worn out and retreats to rest. Level up by walking and catching, then try again.`;
