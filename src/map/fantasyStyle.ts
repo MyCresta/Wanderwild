@@ -8,31 +8,33 @@ import type { StyleSpecification, LayerSpecification } from '@maplibre/maplibre-
 export const TILE_SOURCE_URL = 'https://tiles.openfreemap.org/planet';
 export const GLYPHS_URL = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf';
 
+// Faded, tea-stained inks: every colour is pulled toward sepia so the map reads as an old,
+// much-handled chart rather than a fresh print.
 export const palette = {
-  parchment: '#e8d9b5',
-  parchmentDark: '#d9c59a',
-  ink: '#3b2a1a',
-  inkSoft: '#6b5236',
-  water: '#9db7b0',
-  waterDeep: '#7fa19b',
-  waterInk: '#4f716c',
-  forest: '#8fa070',
-  forestDark: '#6f8455',
-  meadow: '#c9c98f',
-  farmland: '#d8cc98',
-  sand: '#e3cf9a',
-  wetland: '#a9b795',
-  rock: '#c2b49a',
-  ice: '#eef0ea',
-  settlement: '#dcc79c',
-  building: '#d2b183',
-  buildingEdge: '#8c6a45',
-  road: '#efdfb8',
-  roadCasing: '#7a5b3a',
-  path: '#7a5b3a',
-  rail: '#5a4632',
-  border: '#7b3f3f',
-  halo: 'rgba(232, 217, 181, 0.85)',
+  parchment: '#e2cfa3',
+  parchmentDark: '#d3bb8a',
+  ink: '#3d2914',
+  inkSoft: '#62482b',
+  water: '#a9b49a',
+  waterDeep: '#8b9a82',
+  waterInk: '#4e5f52',
+  forest: '#a3a172',
+  forestDark: '#6e6c43',
+  meadow: '#cdc48e',
+  farmland: '#d9c793',
+  sand: '#e0c992',
+  wetland: '#afaf8a',
+  rock: '#c4b190',
+  ice: '#ebe5d2',
+  settlement: '#d4bb88',
+  building: '#cdaa76',
+  buildingEdge: '#7d5c38',
+  road: '#ecdcb3',
+  roadCasing: '#6e5032',
+  path: '#6e5032',
+  rail: '#55412b',
+  border: '#7a3a2c',
+  halo: 'rgba(226, 207, 163, 0.75)',
 } as const;
 
 const SOURCE = 'openmaptiles';
@@ -106,7 +108,7 @@ const roadWidth = (...stops: [number, [number, number, number, number]][]) => [
 ];
 
 const layers: Layer[] = [
-  { id: 'background', type: 'background', paint: { 'background-color': palette.parchment } },
+  { id: 'background', type: 'background', paint: { 'background-pattern': 'pattern-paper' } },
 
   // Land cover: forests, meadows, farmland and wilderness.
   fill('landcover-farmland', 'landcover', classIn('farmland'), palette.farmland, { 'fill-opacity': 0.7 }),
@@ -145,7 +147,7 @@ const layers: Layer[] = [
     'landuse',
     classIn('residential', 'suburb', 'neighbourhood', 'quarter', 'commercial', 'retail', 'industrial'),
     palette.settlement,
-    { 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.4, 14, 0.7] },
+    { 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.25, 14, 0.45] },
   ),
   fill('landuse-cemetery', 'landuse', classIn('cemetery'), palette.wetland, { 'fill-opacity': 0.6 }),
   pattern('texture-cemetery', 'landuse', classIn('cemetery'), 'pattern-graves', 14),
@@ -165,7 +167,8 @@ const layers: Layer[] = [
     paint: {
       'line-color': palette.waterInk,
       'line-width': widthByZoom([6, 0.6], [16, 2.2]),
-      'line-opacity': 0.85,
+      'line-opacity': 0.75,
+      'line-blur': 0.5,
     },
   },
   pattern('texture-water', 'water', ['!=', ['get', 'brunnel'], 'tunnel'], 'pattern-waves', 10),
@@ -236,6 +239,17 @@ const layers: Layer[] = [
     },
   },
   {
+    id: 'building-hatch',
+    type: 'fill',
+    source: SOURCE,
+    'source-layer': 'building',
+    minzoom: 15,
+    paint: {
+      'fill-pattern': 'pattern-hatch',
+      'fill-opacity': ['interpolate', ['linear'], ['zoom'], 15, 0, 16, 0.9],
+    },
+  },
+  {
     id: 'building-ink',
     type: 'line',
     source: SOURCE,
@@ -258,7 +272,9 @@ const layers: Layer[] = [
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
       'line-color': palette.roadCasing,
-      'line-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0.4, 12, 0.9],
+      'line-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0.35, 12, 0.8],
+      // A touch of blur reads as ink that has bled into the paper.
+      'line-blur': 0.6,
       'line-width': roadWidth([5, [1, 0, 0, 0]], [10, [3, 2, 1.2, 0]], [14, [8, 6, 5, 2.5]], [18, [22, 18, 14, 10]]),
     },
   },
@@ -332,7 +348,7 @@ const layers: Layer[] = [
       'text-letter-spacing': 0.15,
       'symbol-placement': placement,
     },
-    paint: { 'text-color': palette.waterInk, 'text-halo-color': palette.halo, 'text-halo-width': 1 },
+    paint: { 'text-color': palette.waterInk, 'text-halo-color': palette.halo, 'text-halo-width': 1, 'text-halo-blur': 0.8 },
   })),
   {
     id: 'waterway-name',
@@ -347,7 +363,7 @@ const layers: Layer[] = [
       'symbol-placement': 'line',
       'text-letter-spacing': 0.1,
     },
-    paint: { 'text-color': palette.waterInk, 'text-halo-color': palette.halo, 'text-halo-width': 1 },
+    paint: { 'text-color': palette.waterInk, 'text-halo-color': palette.halo, 'text-halo-width': 1, 'text-halo-blur': 0.8 },
   },
   {
     id: 'road-name',
@@ -361,7 +377,7 @@ const layers: Layer[] = [
       'text-size': widthByZoom([14, 10], [18, 14]),
       'symbol-placement': 'line',
     },
-    paint: { 'text-color': palette.inkSoft, 'text-halo-color': palette.halo, 'text-halo-width': 1.2 },
+    paint: { 'text-color': palette.inkSoft, 'text-halo-color': palette.halo, 'text-halo-width': 1.2, 'text-halo-blur': 0.8 },
   },
   {
     // Named parks and woods, lettered in italics like the forests on an old map.
@@ -379,7 +395,7 @@ const layers: Layer[] = [
       'text-letter-spacing': 0.05,
       'text-max-width': 7,
     },
-    paint: { 'text-color': palette.forestDark, 'text-halo-color': palette.halo, 'text-halo-width': 1.2 },
+    paint: { 'text-color': palette.forestDark, 'text-halo-color': palette.halo, 'text-halo-width': 1.2, 'text-halo-blur': 0.8 },
   },
   {
     id: 'peak',
@@ -396,7 +412,7 @@ const layers: Layer[] = [
       'text-offset': [0, 0.9],
       'text-optional': true,
     },
-    paint: { 'text-color': palette.inkSoft, 'text-halo-color': palette.halo, 'text-halo-width': 1 },
+    paint: { 'text-color': palette.inkSoft, 'text-halo-color': palette.halo, 'text-halo-width': 1, 'text-halo-blur': 0.8 },
   },
   {
     id: 'place-minor',
@@ -415,7 +431,7 @@ const layers: Layer[] = [
       'text-offset': ['match', ['get', 'class'], ['village', 'hamlet'], ['literal', [0, 0.7]], ['literal', [0, 0]]],
       'text-max-width': 8,
     },
-    paint: { 'text-color': palette.inkSoft, 'text-halo-color': palette.halo, 'text-halo-width': 1.5 },
+    paint: { 'text-color': palette.inkSoft, 'text-halo-color': palette.halo, 'text-halo-width': 1.5, 'text-halo-blur': 0.8 },
   },
   {
     id: 'place-town',
@@ -435,7 +451,7 @@ const layers: Layer[] = [
       'text-offset': [0, 0.2],
       'text-max-width': 8,
     },
-    paint: { 'text-color': palette.ink, 'text-halo-color': palette.halo, 'text-halo-width': 1.5 },
+    paint: { 'text-color': palette.ink, 'text-halo-color': palette.halo, 'text-halo-width': 1.5, 'text-halo-blur': 0.8 },
   },
   {
     id: 'place-city',
@@ -455,7 +471,7 @@ const layers: Layer[] = [
       'text-offset': [0, 0.2],
       'text-max-width': 8,
     },
-    paint: { 'text-color': palette.ink, 'text-halo-color': palette.halo, 'text-halo-width': 2 },
+    paint: { 'text-color': palette.ink, 'text-halo-color': palette.halo, 'text-halo-width': 2, 'text-halo-blur': 0.8 },
   },
   {
     id: 'place-realm',
@@ -471,14 +487,14 @@ const layers: Layer[] = [
       'text-transform': 'uppercase',
       'text-letter-spacing': 0.4,
     },
-    paint: { 'text-color': palette.border, 'text-halo-color': palette.halo, 'text-halo-width': 1.5 },
+    paint: { 'text-color': palette.border, 'text-halo-color': palette.halo, 'text-halo-width': 1.5, 'text-halo-blur': 0.8 },
   },
 ];
 
 export function createFantasyStyle(): StyleSpecification {
   return {
     version: 8,
-    name: 'Wanderwild Parchment',
+    name: 'Wanderwild Old Parchment',
     glyphs: GLYPHS_URL,
     sources: {
       [SOURCE]: {

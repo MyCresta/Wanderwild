@@ -27,7 +27,7 @@ describe('fantasy map art and fonts', () => {
     typeof value === 'string' ? [value] : Array.isArray(value) ? value.flatMap(strings) : [];
 
   it('only uses images that fantasyImages.ts draws', () => {
-    const used = layers.flatMap((l) => [...strings(l.paint?.['fill-pattern']), ...strings(l.layout?.['icon-image'])]);
+    const used = layers.flatMap((l) => [...strings(l.paint?.['fill-pattern']), ...strings(l.paint?.['background-pattern']), ...strings(l.layout?.['icon-image'])]);
     const images = used.filter((name) => /^(pattern|icon)-/.test(name));
     expect(images.length).toBeGreaterThan(5);
     for (const name of images) expect(FANTASY_IMAGE_NAMES).toContain(name);
