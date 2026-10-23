@@ -1,7 +1,6 @@
 import {
   Battle,
   CRIT_QUALITY,
-  fireballDamage,
   makeFighter,
   shareXp,
   SPELLS,
@@ -98,7 +97,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   const battle = new Battle(
     owned.map((p) => makeFighter(getSpecies(p.speciesId), p.level, p.seed, p.uid)),
     makeFighter(encounter.species, encounter.level, encounter.seed),
-    { wayfarerLevel: way?.level() ?? 1 },
+    { wayfarerLevel: way?.level() ?? 1, petDamage: way?.gear().petDamage, petHealth: way?.gear().petHealth },
   );
   const sheet = openSheet(`${encounter.species.name} blocks the way`, { className: 'sheet-battle' });
   let reported = false;
@@ -187,7 +186,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       const ready = metres >= spell.metres;
       el.replaceChildren(
         id === 'fireball' ? `🔥 ${spell.name}` : `✚ ${spell.name}`,
-        h('small', {}, ready ? (id === 'fireball' ? ` ${fireballDamage(way?.level() ?? 1)}` : ' ready') : ` ${Math.round(metres)}/${spell.metres} m`),
+        h('small', {}, ready ? (id === 'fireball' ? ` ${battle.fireball}` : ' ready') : ` ${Math.round(metres)}/${spell.metres} m`),
       );
       el.title = `${spell.blurb} Charged by walking ${spell.metres} m.`;
       el.disabled = busy || forced || !ready;

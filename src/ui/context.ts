@@ -9,6 +9,8 @@ export interface WayfarerHooks {
   /** Metres walked toward spells since the last cast. */
   spellMetres(): number;
   spendSpell(metres: number): boolean;
+  /** Gear bonuses: multipliers on pet damage and health, and extra catch chance (0.06 = +6 points). */
+  gear(): { petDamage: number; petHealth: number; catchBonus: number };
 }
 
 /** What the creature screens need from the rest of the game. */

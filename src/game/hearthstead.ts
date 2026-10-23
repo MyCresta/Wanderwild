@@ -132,14 +132,14 @@ const dayKey = (now: number) => {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 };
 
-/** Applies the stride boost for `steps` × 100 m. Returns the time actually skipped. */
-export function strideBoost(h: HearthsteadState, steps: number, now: number): number {
+/** Applies the stride boost for `steps` × 100 m, scaled by `factor` (boots). Returns the time actually skipped. */
+export function strideBoost(h: HearthsteadState, steps: number, now: number, factor = 1): number {
   const day = dayKey(now);
   if (h.strideDay !== day) {
     h.strideDay = day;
     h.strideUsedMs = 0;
   }
-  const ms = Math.min(steps * STRIDE_BOOST_MS, STRIDE_DAILY_CAP_MS - h.strideUsedMs);
+  const ms = Math.min(Math.round(steps * STRIDE_BOOST_MS * factor), STRIDE_DAILY_CAP_MS - h.strideUsedMs);
   if (ms <= 0) return 0;
   h.strideUsedMs += ms;
   bank(h, ms);

@@ -13,12 +13,14 @@ import { setupInstallButton } from './install';
 import { loadSave } from './game/save';
 import { GameState } from './game/state';
 import { SHRINE_REACH_M, type Shrine } from './game/shrines';
+import { isNight, RARITIES } from './game/gear';
 import type { RealmId } from './game/realms';
 import { installProbeLayers, realmAt, shrinesNear } from './map/realmProbe';
 import { ShrineLayer } from './map/shrineLayer';
 import { Hud } from './hud/hud';
 import { HearthsteadPanel } from './hud/hearthsteadPanel';
 import { renderParty } from './hud/partyPanel';
+import { ForgePanel } from './hud/forgePanel';
 import { formatWait } from './hud/format';
 import { CompanionMarker, CreatureMarkers } from './map/creatures';
 import { addPet, companion, loadCollection, saveCollection, walkRewards } from './creatures/collection';
@@ -79,10 +81,16 @@ installProbeLayers(map);
 
 const game = new GameState(await loadSave());
 const hud = new Hud(game);
-new HearthsteadPanel(game, (text) => hud.toast(text));
+const forge = new ForgePanel(game, (text) => hud.toast(text));
 // Bank the time the app was closed, so offline production shows straight away.
 game.tickHearthstead();
 const player = new PlayerMarker(map);
+const dressPlayer = () => {
+  const worn = Object.fromEntries(game.equippedItems().map((g) => [g.slot, RARITIES[g.rarity].color]));
+  player.setLook({ cloak: worn.cloak, staff: worn.staff, lantern: !!worn.lantern });
+};
+dressPlayer();
+game.on((e) => e.kind === 'change' && dressPlayer());
 const walk = new WalkTracker();
 
 let following = true;
@@ -102,7 +110,8 @@ recenterEl.addEventListener('click', () => setFollowing(true));
 function useShrine(shrine: Shrine): void {
   if (!lastFix) return hud.toast('Find your location first to reach a shrine.');
   const away = haversine(lastFix, shrine);
-  if (away > SHRINE_REACH_M) return hud.toast(`${shrine.name} is ${Math.round(away)} m away. Walk within ${SHRINE_REACH_M} m to touch it.`);
+  const reach = SHRINE_REACH_M + game.bonuses().reachM;
+  if (away > reach) return hud.toast(`${shrine.name} is ${Math.round(away)} m away. Walk within ${Math.round(reach)} m to touch it.`);
   const wait = game.shrineReadyAt(shrine) - Date.now();
   if (wait > 0) return hud.toast(`${shrine.name} is gathering its power. Ready in ${formatWait(wait)}.`);
   if (game.useShrine(shrine, realmAt(map, shrine.lng, shrine.lat) ?? currentRealm ?? 'hearthfields')) sound.play('shrine');
@@ -128,9 +137,14 @@ creatureGame.wayfarer = {
   useTonic: () => game.useTonic(),
   spellMetres: () => game.save.spellChargeM,
   spendSpell: (m) => game.spendSpell(m),
+  gear: () => {
+    const b = game.bonuses();
+    return { petDamage: b.petDamage + (isNight() ? b.nightDamage : 0), petHealth: b.petHealth, catchBonus: b.catchBonus };
+  },
 };
 creatureGame.changed();
 $('satchel-open').addEventListener('click', () => renderParty($('satchel-party'), creatureGame));
+new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame, forge);
 
 /** Hatched eggs join the collection as Wildlings (re-rolling past any Blotspawn the seed picks). */
 function claimHatchlings(): void {
@@ -164,7 +178,7 @@ function clearSpawn(spawn: Spawn, won: boolean): void {
 function meet(spawn: Spawn, encounter: Encounter): void {
   if (!lastFix) return;
   const metres = haversine(lastFix, spawn);
-  if (metres > REACH_M) {
+  if (metres > REACH_M + game.bonuses().reachM) {
     sound.play('error');
     toast(`That ${encounter.species.name} is ${Math.round(metres)} m away. Walk closer to reach it.`);
     return;
@@ -214,6 +228,7 @@ function refreshWorld(): void {
   const realm = realmAt(map, lastFix.lng, lastFix.lat);
   if (realm) {
     currentRealm = realm;
+    game.visitRealm(realm);
     hud.setRealm(realm);
     sound.setRealm(realm);
   }

@@ -1675,3 +1675,149 @@ body {
 .party-list small {
   opacity: 0.75;
 }
+
+/* ---------- Gear on the token ---------- */
+
+.player-lantern {
+  display: none;
+}
+
+.has-lantern .player-lantern {
+  display: inline;
+  filter: drop-shadow(0 0 4px #f3d27a);
+}
+
+/* ---------- The Forge ---------- */
+
+.forge-card {
+  background: linear-gradient(rgba(184, 85, 42, 0.12), rgba(255, 255, 255, 0.2));
+}
+
+.gear-slots,
+.gear-list,
+.exp-pets {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gear-slot,
+.gear-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.gear-slot small,
+.gear-info small {
+  display: block;
+  font-size: 12px;
+  color: var(--leather);
+}
+
+.gear-svg {
+  flex: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+}
+
+.gear-empty {
+  opacity: 0.35;
+}
+
+.gear-item {
+  flex-wrap: wrap;
+  padding: 8px;
+  border: 1px solid var(--parchment-dark);
+  border-radius: 8px;
+}
+
+.gear-equipped {
+  border-color: #2f6b55;
+  background: rgba(47, 107, 85, 0.08);
+}
+
+.gear-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.gear-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+.gear-tag {
+  align-self: center;
+  font-size: 12px;
+  font-weight: bold;
+  color: #2f6b55;
+}
+
+.gear-runes {
+  color: #8a3fa0 !important;
+}
+
+.forge-craft {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px;
+}
+
+.forge-craft button,
+.gear-actions button,
+.exp-pets button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 8px;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  font: inherit;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: left;
+  cursor: pointer;
+}
+
+.forge-craft small,
+.exp-pets small {
+  display: block;
+  font-size: 11px;
+  font-weight: normal;
+  opacity: 0.85;
+}
+
+.forge-craft button:disabled,
+.gear-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.exp-form {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.exp-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.exp-form select {
+  padding: 6px;
+  border: 1px solid var(--leather);
+  border-radius: 6px;
+  background: var(--parchment);
+  font: inherit;
+}
