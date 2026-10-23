@@ -7,7 +7,7 @@ A mobile-first, location-based fantasy game: explore the real world on a fantasy
 - Installable PWA (Vite + TypeScript) that runs full screen on phones.
 - Real-world map from OpenStreetMap, drawn as an old parchment map with MapLibre. Tiles and fonts come from [OpenFreeMap](https://openfreemap.org), which is free and needs no API key.
 - A wanderer token that follows your GPS position, with a ring showing GPS accuracy. Drag the map to look around; the compass button snaps back to you.
-- A "distance wandered" counter that only counts walking: it ignores GPS jitter, inaccurate fixes and anything faster than about 25 km/h. 
+- A "distance wandered" counter that only counts walking: it ignores GPS jitter, inaccurate fixes and anything faster than about 25 km/h.
 - **Wayfarer levels.** XP from walking (30 per 100 m), shrines and, soon, catching. Each level needs `100 × level^1.5` XP and unlocks features gradually; the satchel shows what comes next.
 - **Currencies.** Coin from everything, Wanderlight only from walking (1 per 100 m), and realm materials.
 - **Realms.** What is under you on the map decides your realm: parks and woods are the Wildwood, water and riversides Tidemere, shops and old town the Stoneward, cemeteries the Barrows, and homes the Hearthfields. A banner shows where you are.
