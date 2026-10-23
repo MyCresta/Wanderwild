@@ -1,3 +1,4 @@
+import { sound } from '../audio/sound';
 import type { Collection } from '../creatures/collection';
 import {
   DEED_GROUPS,
@@ -158,6 +159,7 @@ export class DeedKeeper {
         ),
       );
       document.body.appendChild(banner);
+      sound.play('levelUp');
       await new Promise((r) => setTimeout(r, 3400));
       banner.classList.add('deed-banner-out');
       await new Promise((r) => setTimeout(r, 400));
