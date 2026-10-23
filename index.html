@@ -28,15 +28,25 @@
         <div class="hud-purse">
           <span class="hud-coin" title="Coin"><i aria-hidden="true"></i><span id="coin">0</span></span>
           <span class="hud-light" title="Wanderlight"><i aria-hidden="true"></i><span id="wanderlight">0</span></span>
+          <span class="hud-seals" title="Binding seals: walk 100 m to earn one"><i aria-hidden="true"></i><span id="seals">0</span></span>
         </div>
       </div>
       <div class="realm-banner" id="realm" role="status" hidden></div>
-      <div class="toast" id="toast" role="status" hidden></div>
+      <div class="hud-toast" id="toast" role="status" hidden></div>
     </header>
 
     <div class="notice" id="notice" role="status" hidden></div>
 
     <button class="install" id="install" type="button" hidden>Install Wanderwild</button>
+
+    <button class="bestiary-button" id="bestiary" type="button" aria-label="Open the bestiary">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M6 10q9-4 18 2v28q-9-6-18-2z" fill="#e8d9b5" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" />
+        <path d="M42 10q-9-4-18 2v28q9-6 18-2z" fill="#e8d9b5" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" />
+        <path d="M11 18q5-2 9 1M11 24q5-2 9 1M28 19q4-3 9-1M28 25q4-3 9-1" stroke="currentColor" stroke-width="1.6" fill="none" />
+      </svg>
+      <span>Bestiary</span>
+    </button>
 
     <button class="recenter" id="recenter" type="button" aria-label="Follow me" aria-pressed="true">
       <svg viewBox="0 0 48 48" aria-hidden="true">

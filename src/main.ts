@@ -16,6 +16,16 @@ import { installProbeLayers, realmAt, shrinesNear } from './map/realmProbe';
 import { ShrineLayer } from './map/shrineLayer';
 import { Hud } from './hud/hud';
 import { formatWait } from './hud/format';
+import { CompanionMarker, CreatureMarkers } from './map/creatures';
+import { companion, loadCollection, saveCollection, walkRewards } from './creatures/collection';
+import { spawnsNear, type Spawn } from './game/spawns';
+import { getSpecies } from './creatures/species';
+import { creatureForSpawn, type Encounter } from './creatures/stats';
+import type { GameContext } from './ui/context';
+import { openBattle } from './ui/battle';
+import { openBestiary, openStarterChoice } from './ui/bestiary';
+import { toast } from './ui/dom';
+import { openEncounter } from './ui/encounter';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -24,10 +34,18 @@ const SHRINE_SHOW_M = 600;
 // Add ?walk to the address to move by tapping the map instead of GPS (for testing at a desk).
 const SIMULATE = new URLSearchParams(location.search).has('walk');
 const SIM_SPEED_MPS = 1.4;
+/** How close the player must be to a creature to meet it. Generous, since GPS wanders. */
+const REACH_M = 120;
+/** Re-check spawns after moving this far or this long. */
+const SPAWN_REFRESH_M = 25;
+const SPAWN_REFRESH_MS = 30_000;
+/** Wayfarer XP for binding a Wildling or driving off Blotspawn, by spawn rarity. */
+const CREATURE_XP: Record<Spawn['rarity'], number> = { common: 60, uncommon: 90, rare: 150, epic: 250, legendary: 400 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const noticeEl = $('notice');
 const recenterEl = $<HTMLButtonElement>('recenter');
+const sealsEl = $('seals');
 
 function showNotice(text: string | null): void {
   noticeEl.hidden = !text;
@@ -82,6 +100,76 @@ function useShrine(shrine: Shrine): void {
 
 const shrines = new ShrineLayer(map, useShrine);
 
+// Creatures: the collection, wild spawns around the player, and the companion at their side.
+const collection = loadCollection();
+const companionMarker = new CompanionMarker(map);
+const creatureGame: GameContext = {
+  collection,
+  changed() {
+    saveCollection(collection);
+    sealsEl.textContent = String(collection.seals);
+    companionMarker.setPet(companion(collection));
+  },
+};
+creatureGame.changed();
+
+/** Removes a spawn that was caught, beaten or fled; only the first two earn Wayfarer XP. */
+function clearSpawn(spawn: Spawn, won: boolean): void {
+  collection.cleared[spawn.id] = spawn.expiresAt;
+  creatures.remove(spawn.id);
+  if (won) {
+    game.grantXp(CREATURE_XP[spawn.rarity]);
+    game.changed();
+  }
+  creatureGame.changed();
+}
+
+function meet(spawn: Spawn, encounter: Encounter): void {
+  if (!lastFix) return;
+  const metres = haversine(lastFix, spawn);
+  if (metres > REACH_M) {
+    toast(`That ${encounter.species.name} is ${Math.round(metres)} m away. Walk closer to reach it.`);
+    return;
+  }
+  if (encounter.species.kind === 'pet') {
+    openEncounter(creatureGame, encounter, (caught, fled) => (caught || fled) && clearSpawn(spawn, caught));
+  } else if (!companion(collection)) {
+    toast('You need a companion to face Blotspawn.');
+  } else {
+    openBattle(creatureGame, encounter, (won) => won && clearSpawn(spawn, true));
+  }
+}
+
+const creatures = new CreatureMarkers(map, meet);
+let spawnCheck: { lat: number; lng: number; at: number } | null = null;
+// Realm lookups read tiles, so each spawn's realm is worked out once.
+const spawnRealms = new globalThis.Map<string, RealmId>();
+
+function refreshSpawns(force = false): void {
+  if (!lastFix) return;
+  const now = Date.now();
+  if (!force && spawnCheck && haversine(spawnCheck, lastFix) < SPAWN_REFRESH_M && now - spawnCheck.at < SPAWN_REFRESH_MS) return;
+  spawnCheck = { lat: lastFix.lat, lng: lastFix.lng, at: now };
+  const level = companion(collection)?.level ?? 1;
+  const live = spawnsNear(lastFix.lat, lastFix.lng, now, 1).filter(
+    (spawn) => spawn.expiresAt > now && !(spawn.id in collection.cleared),
+  );
+  for (const spawn of live) {
+    if (!spawnRealms.has(spawn.id)) {
+      const realm = realmAt(map, spawn.lng, spawn.lat);
+      if (realm) spawnRealms.set(spawn.id, realm);
+    }
+    spawn.realm = spawnRealms.get(spawn.id);
+  }
+  creatures.show(live.map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) })));
+}
+setInterval(() => refreshSpawns(), SPAWN_REFRESH_MS);
+// The first fix can arrive before tiles; look again once they have loaded.
+map.once('idle', () => refreshSpawns(true));
+
+$('bestiary').addEventListener('click', () => openBestiary(creatureGame));
+if (!collection.pets.length) openStarterChoice(creatureGame);
+
 /** Re-reads realm and shrines from the loaded tiles around the player. */
 function refreshWorld(): void {
   if (!lastFix || !map.isStyleLoaded()) return;
@@ -115,9 +203,19 @@ function onFix(fix: Fix): void {
   lastFix = fix;
   showNotice(null);
   player.update(fix);
+  companionMarker.update(fix.lng, fix.lat);
 
   const metres = walk.add(fix);
-  if (metres > 0) game.recordWalk(metres);
+  if (metres > 0) {
+    game.recordWalk(metres);
+    const before = companion(collection)?.level;
+    const reward = walkRewards(collection, metres);
+    const pet = companion(collection);
+    if (pet && reward.levels > 0 && before !== pet.level) toast(`${getSpecies(pet.speciesId).name} grew to level ${pet.level} on the road!`);
+    if (reward.seals > 0) toast(`Found ${reward.seals > 1 ? `${reward.seals} binding seals` : 'a binding seal'} along the way.`);
+    creatureGame.changed();
+  }
+  refreshSpawns(firstFix);
   if (fix.accuracy <= 40) game.visit(fix.lat, fix.lng);
 
   if (firstFix) map.jumpTo({ center: [fix.lng, fix.lat], zoom: PLAY_ZOOM });
