@@ -174,12 +174,22 @@ export interface HuntLog {
   active: ActiveHunt | null;
   /** Landmark ids already found; each one is hunted only once. */
   found: string[];
-  /** The most recent finds, newest first, for the log. */
-  recent: { name: string; at: number; hints: number }[];
+  /**
+   * Every solved riddle, newest first. Kept whole (place, riddle, clues used) so the
+   * atlas can later turn each one into a page of local lore.
+   */
+  solved: SolvedHunt[];
+}
+
+export interface SolvedHunt {
+  landmark: Landmark;
+  riddle: string;
+  at: number;
+  hints: number;
 }
 
 export function newHuntLog(): HuntLog {
-  return { version: 1, active: null, found: [], recent: [] };
+  return { version: 1, active: null, found: [], solved: [] };
 }
 
 /**
@@ -364,7 +374,7 @@ export function finishHunt(log: HuntLog, now = Date.now()): Treasure | undefined
   const treasure = rollTreasure(hunt);
   log.active = null;
   if (!log.found.includes(hunt.landmark.id)) log.found.push(hunt.landmark.id);
-  log.recent = [{ name: hunt.landmark.name, at: now, hints: hunt.hints }, ...log.recent].slice(0, 10);
+  log.solved.unshift({ landmark: hunt.landmark, riddle: hunt.riddle, at: now, hints: hunt.hints });
   return treasure;
 }
 
@@ -377,7 +387,8 @@ export function parseHuntLog(raw: unknown): HuntLog {
   const log = newHuntLog();
   if (!isObject(raw) || raw.version !== 1) return log;
   if (Array.isArray(raw.found)) log.found = raw.found.filter((s): s is string => typeof s === 'string');
-  if (Array.isArray(raw.recent)) log.recent = raw.recent.filter(isObject).slice(0, 10) as HuntLog['recent'];
+  if (Array.isArray(raw.solved))
+    log.solved = raw.solved.filter((e) => isObject(e) && isObject(e.landmark) && typeof e.riddle === 'string') as SolvedHunt[];
   const a = raw.active;
   if (isObject(a) && isObject(a.landmark) && isObject(a.origin) && typeof a.riddle === 'string') log.active = a as unknown as ActiveHunt;
   return log;

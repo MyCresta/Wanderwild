@@ -98,7 +98,8 @@ describe('treasure hunts', () => {
     expect(finishHunt(restored, 5)).toBeDefined();
     expect(restored.active).toBeNull();
     expect(restored.found).toEqual([giles.id]);
-    expect(restored.recent[0].name).toBe(giles.name);
+    expect(restored.solved[0].landmark.name).toBe(giles.name);
+    expect(restored.solved[0].riddle).toBe(log.active?.riddle ?? restored.solved[0].riddle);
     expect(parseHuntLog('junk')).toEqual(newHuntLog());
   });
 });

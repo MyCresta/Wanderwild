@@ -246,14 +246,14 @@ export class HuntController {
 
   private openIdle(): void {
     const sheet = openSheet('Treasure hunts', { className: 'hunt-sheet' });
-    const recent = this.log.recent;
+    const recent = this.log.solved.slice(0, 10);
     sheet.body.append(
       h('p', { class: 'hunt-intro' }, 'Cartographers of old hid chests at the landmarks of this land. Take a treasure map, solve its riddle, and walk to the place it speaks of.'),
       h('p', { class: 'hint' }, 'Walking uncovers more clues. The fewer clues you need, the richer the chest.'),
       h('div', { class: 'actions' }, h('button', { class: 'btn btn-primary', type: 'button', onclick: () => void this.begin() }, 'Take a treasure map')),
       h('h3', {}, `Treasures found: ${this.log.found.length}`),
       recent.length
-        ? h('ul', { class: 'hunt-log' }, ...recent.map((r) => h('li', {}, r.name, h('small', {}, r.hints === 0 ? ' · no clues' : ` · ${r.hints} ${r.hints === 1 ? 'clue' : 'clues'}`))))
+        ? h('ul', { class: 'hunt-log' }, ...recent.map((r) => h('li', {}, r.landmark.name, h('small', {}, r.hints === 0 ? ' · no clues' : ` · ${r.hints} ${r.hints === 1 ? 'clue' : 'clues'}`))))
         : h('p', { class: 'hint' }, 'No treasure found yet.'),
     );
   }
