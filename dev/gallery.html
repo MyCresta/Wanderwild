@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wanderwild creature gallery</title>
+    <style>
+      body { margin: 0; padding: 16px; background: #e8d9b5; font-family: Georgia, serif; color: #3b2a1a; }
+      .grid { display: flex; flex-wrap: wrap; gap: 12px; }
+      figure { margin: 0; text-align: center; background: rgba(255,255,255,.25); border-radius: 8px; padding: 4px; }
+      figcaption { font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <p>Dev-only page: every species with a few individual seeds. Add <code>?seed=N</code> to vary them.</p>
+    <div class="grid" id="grid"></div>
+    <script type="module">
+      import { ALL_SPECIES } from '../src/creatures/species';
+      import { createCreatureSvg } from '../src/creatures/view';
+      const base = Number(new URLSearchParams(location.search).get('seed') ?? 1);
+      const grid = document.getElementById('grid');
+      for (const s of ALL_SPECIES)
+        for (let i = 0; i < 2; i++) {
+          const fig = document.createElement('figure');
+          fig.appendChild(createCreatureSvg({ speciesId: s.id, seed: base * 7919 + i * 104729, size: 180 }));
+          const cap = document.createElement('figcaption');
+          cap.textContent = s.name;
+          fig.appendChild(cap);
+          grid.appendChild(fig);
+        }
+    </script>
+  </body>
+</html>

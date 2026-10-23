@@ -1,0 +1,79 @@
+import { Marker, type Map } from 'maplibre-gl';
+import type { OwnedPet } from '../creatures/collection';
+import type { Spawn } from '../creatures/spawning';
+import type { Encounter } from '../creatures/stats';
+import { createCreatureSvg } from '../creatures/view';
+
+interface Placed {
+  marker: Marker;
+  spawn: Spawn;
+}
+
+/** Wild creatures standing on the map. Tapping one reports it with its encounter. */
+export class CreatureMarkers {
+  private placed = new globalThis.Map<string, Placed>();
+
+  constructor(
+    private readonly map: Map,
+    private readonly onTap: (spawn: Spawn, encounter: Encounter) => void,
+  ) {}
+
+  /** Shows exactly these spawns, keeping markers that are already up. */
+  show(entries: { spawn: Spawn; encounter: Encounter }[]): void {
+    const keep = new Set(entries.map((e) => e.spawn.id));
+    for (const [id, placed] of this.placed)
+      if (!keep.has(id)) {
+        placed.marker.remove();
+        this.placed.delete(id);
+      }
+    for (const { spawn, encounter } of entries) {
+      if (this.placed.has(spawn.id)) continue;
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = `map-creature map-creature-${encounter.species.kind} map-creature-${encounter.species.rarity}`;
+      el.dataset.lngLat = `${spawn.lng},${spawn.lat}`;
+      el.setAttribute('aria-label', `${encounter.species.kind === 'pet' ? 'Wild' : 'Hostile'} ${encounter.species.name}, level ${encounter.level}`);
+      el.appendChild(createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 64 }));
+      el.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this.onTap(spawn, encounter);
+      });
+      const marker = new Marker({ element: el, anchor: 'bottom' }).setLngLat([spawn.lng, spawn.lat]).addTo(this.map);
+      this.placed.set(spawn.id, { marker, spawn });
+    }
+  }
+
+  remove(id: string): void {
+    this.placed.get(id)?.marker.remove();
+    this.placed.delete(id);
+  }
+}
+
+/** The current companion trotting beside the player token. */
+export class CompanionMarker {
+  private readonly marker: Marker;
+  private shownUid: string | null = null;
+  private placed = false;
+  private readonly el: HTMLElement;
+
+  constructor(private readonly map: Map) {
+    this.el = document.createElement('div');
+    this.el.className = 'map-companion';
+    this.marker = new Marker({ element: this.el, anchor: 'bottom', offset: [-34, 4] });
+  }
+
+  setPet(pet: OwnedPet | null): void {
+    if ((pet?.uid ?? null) === this.shownUid) return;
+    this.shownUid = pet?.uid ?? null;
+    this.el.replaceChildren();
+    if (pet) this.el.appendChild(createCreatureSvg({ speciesId: pet.speciesId, seed: pet.seed, size: 48 }));
+  }
+
+  update(lng: number, lat: number): void {
+    this.marker.setLngLat([lng, lat]);
+    if (!this.placed) {
+      this.marker.addTo(this.map);
+      this.placed = true;
+    }
+  }
+}
