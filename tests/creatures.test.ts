@@ -82,8 +82,8 @@ describe('battle', () => {
     const murkwing = getSpecies('murkwing');
     expect(effectiveness(lumoth.element, murkwing)).toBeGreaterThan(1);
 
-    const battle = new Battle(makeFighter(lumoth, 5, 1), makeFighter(murkwing, 3, 2), mulberry32(42));
-    for (let i = 0; i < 100 && !battle.winner; i++) battle.turn(battle.moveReady ? 'move' : 'strike');
+    const battle = new Battle([makeFighter(lumoth, 5, 1)], makeFighter(murkwing, 3, 2), { rng: mulberry32(42) });
+    for (let i = 0; i < 100 && !battle.winner; i++) battle.turn({ kind: battle.moveReady ? 'move' : 'strike' });
     expect(battle.winner).toBe('pet');
     expect(victoryRewards(battle.foe).xp).toBeGreaterThan(0);
   });

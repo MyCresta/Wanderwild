@@ -1440,3 +1440,212 @@ body {
 .egg-10 {
   background: radial-gradient(circle at 35% 30%, #fff, #c9a0e8 60%);
 }
+
+/* ---------- Battle: timing ring, party bench, spells ---------- */
+
+.arena {
+  position: relative;
+}
+
+.rune-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.rune-ring,
+.rune-target {
+  position: absolute;
+  left: calc(var(--cx) - 50px);
+  top: calc(var(--cy) - 50px);
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.rune-target {
+  border: 3px dashed rgba(243, 210, 122, 0.95);
+  box-shadow: 0 0 12px rgba(243, 210, 122, 0.8), inset 0 0 12px rgba(243, 210, 122, 0.5);
+  animation: rune-spin 3s linear infinite;
+}
+
+.rune-ring {
+  border: 4px solid #8e2b22;
+  box-shadow: 0 0 10px rgba(142, 43, 34, 0.6);
+}
+
+.rune-perfect .rune-target {
+  border-style: solid;
+  border-color: #fff4c2;
+  box-shadow: 0 0 30px #f3d27a, inset 0 0 20px #f3d27a;
+}
+
+.rune-good .rune-target {
+  border-color: #c99a3a;
+}
+
+.rune-miss .rune-target {
+  opacity: 0.3;
+}
+
+.rune-perfect,
+.rune-good,
+.rune-miss {
+  animation: rune-fade 0.38s ease-out forwards;
+}
+
+@keyframes rune-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes rune-fade {
+  to {
+    opacity: 0;
+  }
+}
+
+.party-bench {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.party-bench[hidden],
+.battle-extras[hidden],
+.btn[hidden] {
+  display: none;
+}
+
+.bench-pet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 64px;
+  padding: 4px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 12px;
+  background: var(--parchment);
+  cursor: pointer;
+}
+
+.bench-pet .creature {
+  width: 44px;
+  height: 44px;
+}
+
+.bench-active {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold);
+}
+
+.bench-down {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
+.bench-pet:disabled:not(.bench-active):not(.bench-down) {
+  opacity: 0.6;
+}
+
+.bench-hp {
+  display: block;
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(59, 42, 26, 0.2);
+  overflow: hidden;
+}
+
+.bench-hp span {
+  display: block;
+  height: 100%;
+  background: #4b6a3c;
+}
+
+.battle-extras {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.btn-small {
+  min-height: 38px;
+  padding: 4px 10px;
+  font-size: 14px;
+  border-radius: 10px;
+}
+
+.btn-spell {
+  background: linear-gradient(#f6e7c4, #e4cc94);
+}
+
+.btn-small small {
+  font-weight: normal;
+  opacity: 0.75;
+}
+
+.fighter.burn {
+  filter: drop-shadow(0 0 14px #e8742a) brightness(1.4);
+}
+
+.fighter.healed {
+  filter: drop-shadow(0 0 14px #9fe3d0);
+}
+
+.fighter.swap-out {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+
+.float-heal {
+  color: #2f6b55;
+}
+
+/* ---------- Party picker in the satchel ---------- */
+
+.party-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.party-list button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: 4px;
+  border: 2px solid var(--parchment-dark);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.25);
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.party-list .creature {
+  width: 56px;
+  height: 56px;
+}
+
+.party-list button[aria-pressed='true'] {
+  border-color: #2f6b55;
+  background: rgba(47, 107, 85, 0.15);
+}
+
+.party-list small {
+  opacity: 0.75;
+}
