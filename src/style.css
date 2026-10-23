@@ -163,3 +163,23 @@ body {
 .maplibregl-ctrl-attrib {
   font-family: system-ui, sans-serif;
 }
+
+.install {
+  position: fixed;
+  left: 16px;
+  bottom: calc(var(--safe-bottom) + 56px);
+  padding: 10px 16px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 999px;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  font: inherit;
+  font-size: 15px;
+  font-weight: bold;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.install[hidden] {
+  display: none;
+}

@@ -7,6 +7,7 @@ import { createFantasyStyle } from './map/fantasyStyle';
 import { PlayerMarker } from './map/player';
 import { WalkTracker, type Fix } from './geo/distance';
 import { watchLocation } from './geo/location';
+import { setupInstallButton } from './install';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -101,3 +102,4 @@ watchLocation((event) => {
 });
 
 registerSW({ immediate: true });
+setupInstallButton($<HTMLButtonElement>('install'), showNotice);
