@@ -30,6 +30,8 @@ export interface SaveData {
   /** Coarse ~50 m cells walked through, never a raw GPS trail. */
   visitedCells: string[];
   supplies: Record<SupplyId, number>;
+  /** Metres walked since the last spell, capped at SPELL_CHARGE_MAX_M. */
+  spellChargeM: number;
   hearthstead: HearthsteadState;
   eggs: Egg[];
   /** Hatched creatures waiting for the creatures code to add them to the roster. */
@@ -55,6 +57,7 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     blessingUntil: 0,
     visitedCells: [],
     supplies: { tonic: 0, petXp: 0 },
+    spellChargeM: 0,
     hearthstead: newHearthstead(now),
     eggs: [],
     hatchlings: [],
@@ -101,6 +104,7 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
     blessingUntil: num(raw.blessingUntil),
     visitedCells: strings(raw.visitedCells),
     supplies: { tonic: num(supplies.tonic), petXp: num(supplies.petXp) },
+    spellChargeM: num(raw.spellChargeM),
     hearthstead: {
       buildings: Object.fromEntries(
         BUILDING_IDS.filter((id) => isObject(buildings[id])).map((id) => {
