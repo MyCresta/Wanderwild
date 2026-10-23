@@ -35,6 +35,7 @@ import { openEncounter } from './ui/encounter';
 import { sound } from './audio/sound';
 import { setupSoundButton } from './ui/soundButton';
 import { HuntController } from './ui/hunt';
+import { creatureReach } from './geo/reach';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -43,8 +44,6 @@ const SHRINE_SHOW_M = 600;
 // Add ?walk to the address to move by tapping the map instead of GPS (for testing at a desk).
 const SIMULATE = new URLSearchParams(location.search).has('walk');
 const SIM_SPEED_MPS = 1.4;
-/** How close the player must be to a creature to meet it. Generous, since GPS wanders. */
-const REACH_M = 120;
 /** Re-check spawns after moving this far or this long. */
 const SPAWN_REFRESH_M = 25;
 const SPAWN_REFRESH_MS = 30_000;
@@ -179,9 +178,10 @@ function clearSpawn(spawn: Spawn, won: boolean): void {
 function meet(spawn: Spawn, encounter: Encounter): void {
   if (!lastFix) return;
   const metres = haversine(lastFix, spawn);
-  if (metres > REACH_M + game.bonuses().reachM) {
+  const reach = creatureReach(lastFix, game.bonuses().reachM);
+  if (metres > reach) {
     sound.play('error');
-    toast(`That ${encounter.species.name} is ${Math.round(metres)} m away. Walk closer to reach it.`);
+    toast(`That ${encounter.species.name} is ${Math.round(metres)} m away. Walk ${Math.ceil(metres - reach)} m closer, inside the purple ring.`);
     return;
   }
   if (encounter.species.kind === 'pet') {
@@ -215,7 +215,18 @@ function refreshSpawns(force = false): void {
     spawn.realm = spawnRealms.get(spawn.id);
   }
   creatures.show(live.map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) })));
+  showReach();
 }
+
+/** Draws the reach ring and dims creatures outside it, so what looks near can be tapped. */
+function showReach(): void {
+  if (!lastFix) return;
+  const fix = lastFix;
+  const reach = creatureReach(fix, game.bonuses().reachM);
+  player.setReach(reach);
+  creatures.markReach((spawn) => haversine(fix, spawn) <= reach);
+}
+game.on((e) => e.kind === 'change' && showReach());
 setInterval(() => refreshSpawns(), SPAWN_REFRESH_MS);
 // The first fix can arrive before tiles; look again once they have loaded.
 map.once('idle', () => refreshSpawns(true));
@@ -291,6 +302,7 @@ function onFix(fix: Fix): void {
     creatureGame.changed();
   }
   refreshSpawns(firstFix);
+  showReach();
   hunts.update(fix, metres);
   if (fix.accuracy <= 40) game.visit(fix.lat, fix.lng);
 
