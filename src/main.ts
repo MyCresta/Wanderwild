@@ -32,6 +32,7 @@ import { toast } from './ui/dom';
 import { openEncounter } from './ui/encounter';
 import { sound } from './audio/sound';
 import { setupSoundButton } from './ui/soundButton';
+import { HuntController } from './ui/hunt';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -208,6 +209,20 @@ map.once('idle', () => refreshSpawns(true));
 $('bestiary').addEventListener('click', () => openBestiary(creatureGame));
 if (!collection.pets.length) openStarterChoice(creatureGame);
 
+// Treasure hunts: riddles that lead to real landmarks.
+const hunts = new HuntController({
+  map,
+  game,
+  position: () => lastFix,
+  realmAt: (lat, lng) => realmAt(map, lng, lat),
+  addSeals(n) {
+    collection.seals += n;
+    creatureGame.changed();
+  },
+  stopFollowing: () => setFollowing(false),
+  onChange: () => refreshWorld(),
+});
+
 /** Re-reads realm and shrines from the loaded tiles around the player. */
 function refreshWorld(): void {
   if (!lastFix || !map.isStyleLoaded()) return;
@@ -218,7 +233,7 @@ function refreshWorld(): void {
     sound.setRealm(realm);
   }
   const now = Date.now();
-  const near = shrinesNear(map, lastFix.lng, lastFix.lat, SHRINE_SHOW_M);
+  const near = shrinesNear(map, lastFix.lng, lastFix.lat, SHRINE_SHOW_M).filter((s) => !hunts.hides(s));
   shrines.set(near, new Set(near.filter((s) => game.shrineReadyAt(s) > now).map((s) => s.id)));
 }
 
@@ -261,6 +276,7 @@ function onFix(fix: Fix): void {
     creatureGame.changed();
   }
   refreshSpawns(firstFix);
+  hunts.update(fix, metres);
   if (fix.accuracy <= 40) game.visit(fix.lat, fix.lng);
 
   if (firstFix) map.jumpTo({ center: [fix.lng, fix.lat], zoom: PLAY_ZOOM });
