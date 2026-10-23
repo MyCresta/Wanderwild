@@ -19,6 +19,8 @@ export const WALK_REWARD_STEP_M = 100;
 export const WALK_REWARD = { wanderlight: 1, xp: 30, coin: 2 };
 export const VISITED_CELL_M = 50;
 export const EGG_UNLOCK_LEVEL = 8;
+/** Walking banks spell charge up to this many metres. */
+export const SPELL_CHARGE_MAX_M = 1000;
 
 export type GameEvent =
   | { kind: 'change' }
@@ -78,6 +80,7 @@ export class GameState {
   recordWalk(metres: number, now = Date.now()): number {
     const s = this.save;
     s.distanceMetres += metres;
+    s.spellChargeM = Math.min(SPELL_CHARGE_MAX_M, s.spellChargeM + metres);
     const steps = Math.floor((s.distanceMetres - s.rewardedMetres) / WALK_REWARD_STEP_M);
     if (steps > 0) {
       s.rewardedMetres += steps * WALK_REWARD_STEP_M;
@@ -94,6 +97,20 @@ export class GameState {
     }
     this.changed();
     return steps;
+  }
+
+  useTonic(): boolean {
+    if (this.save.supplies.tonic < 1) return false;
+    this.save.supplies.tonic -= 1;
+    this.changed();
+    return true;
+  }
+
+  spendSpell(metres: number): boolean {
+    if (this.save.spellChargeM < metres) return false;
+    this.save.spellChargeM -= metres;
+    this.changed();
+    return true;
   }
 
   /** Banks the real time that has passed into the Hearthstead. */
