@@ -134,7 +134,51 @@ function mountain(ctx: Ctx, x: number, y: number, w: number, h: number, fill: st
   inkStroke(ctx, 0.7, INK, 0.55);
 }
 
+/** A soft round blot that fades to nothing at its rim, for stains and mottling. */
+function blot(ctx: Ctx, x: number, y: number, r: number, color: string, alpha: number): void {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, color);
+  g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
 const ART: Record<string, Art> = {
+  // Aged paper for the whole map: mottled tea stains, darker age spots and stray fibres.
+  'pattern-paper': {
+    width: 160,
+    height: 160,
+    paint(ctx, rand) {
+      ctx.fillStyle = '#e2cfa3';
+      ctx.fillRect(0, 0, 160, 160);
+      scatter(160, 9, rand, (x, y, i) => blot(ctx, x, y, 26 + (i % 3) * 10, i % 2 ? '#c9ab74' : '#f0e2bf', 0.35));
+      scatter(160, 16, rand, (x, y, i) => blot(ctx, x, y, 2 + (i % 4), '#9a7344', 0.18));
+      scatter(160, 14, rand, (x, y, i) => {
+        const a = (i * 2.39) % Math.PI;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(x + Math.cos(a) * 4, y + Math.sin(a) * 4 + 1.5, x + Math.cos(a) * 9, y + Math.sin(a) * 9);
+        inkStroke(ctx, 0.4, '#8a6c47', 0.25);
+      });
+    },
+  },
+  // Engraver's hatching laid over buildings, like inked roofs on an old town plan.
+  'pattern-hatch': {
+    width: 8,
+    height: 8,
+    paint(ctx) {
+      ctx.beginPath();
+      for (let i = -8; i <= 8; i += 4) {
+        ctx.moveTo(i, 8);
+        ctx.lineTo(i + 8, 0);
+      }
+      inkStroke(ctx, 0.6, INK, 0.3);
+    },
+  },
   'pattern-forest': {
     width: 56,
     height: 56,
