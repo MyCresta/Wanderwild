@@ -47,7 +47,8 @@
       <span>Bestiary</span>
     </button>
 
-    <!-- Map buttons stack upward from the bottom corners; the first child sits lowest. -->
+    <!-- Map buttons stack upward from the bottom corners; the first child sits lowest.
+         Buttons marked rail-extra stay folded behind the "more" button until it is opened. -->
     <nav class="rail rail-left" id="rail-left" aria-label="Wayfarer">
       <button class="satchel-open" id="satchel-open" type="button" aria-label="Open satchel">
         <svg viewBox="0 0 48 48" aria-hidden="true">
@@ -90,8 +91,15 @@
           <circle cx="24" cy="24" r="3" fill="#e8d9b5" />
         </svg>
       </button>
-      <button class="sound-toggle" id="sound-toggle" type="button" aria-label="Sound"></button>
-      <button class="deeds-button" id="deeds" type="button" aria-label="Open deeds and titles">
+      <button class="rail-more" id="rail-more" type="button" aria-label="More" aria-expanded="false" aria-controls="sound-toggle deeds">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <circle cx="12" cy="24" r="4" fill="currentColor" />
+          <circle cx="24" cy="24" r="4" fill="currentColor" />
+          <circle cx="36" cy="24" r="4" fill="currentColor" />
+        </svg>
+      </button>
+      <button class="sound-toggle rail-extra" id="sound-toggle" type="button" aria-label="Sound"></button>
+      <button class="deeds-button rail-extra" id="deeds" type="button" aria-label="Open deeds and titles">
         <svg viewBox="0 0 48 48" aria-hidden="true">
           <path d="M17 30l-6 13 8-3 4 5 4-12M31 30l6 13-8-3-4 5-4-12" fill="#8e2b22" />
           <circle cx="24" cy="20" r="14" fill="currentColor" />

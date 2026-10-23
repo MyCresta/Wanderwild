@@ -77,8 +77,8 @@ export class HuntController {
     this.button = h('button', { class: 'hunt-button', type: 'button', 'aria-label': 'Treasure hunt', onclick: () => this.open() });
     this.button.innerHTML = SCROLL_ICON;
     this.button.append(this.label);
-    // Sits just under the deeds medal in the right-hand rail.
-    railButtons('right').insertBefore(this.button, document.getElementById('deeds'));
+    // Sits just under the "more" button in the right-hand rail.
+    railButtons('right').insertBefore(this.button, document.getElementById('rail-more'));
     this.render();
   }
 

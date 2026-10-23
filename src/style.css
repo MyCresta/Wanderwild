@@ -44,13 +44,13 @@ body {
 
 .hud {
   position: fixed;
-  top: calc(var(--safe-top) + 12px);
-  left: 16px;
-  right: 16px;
+  top: calc(var(--safe-top) + 8px);
+  left: 12px;
+  right: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   pointer-events: none;
 }
 
@@ -65,15 +65,15 @@ body {
 .rail {
   position: fixed;
   top: var(--rail-top, calc(var(--safe-top) + 108px));
-  bottom: calc(var(--safe-bottom) + 50px);
-  left: 16px;
-  right: 16px;
+  bottom: calc(var(--safe-bottom) + 36px);
+  left: 12px;
+  right: 12px;
   display: flex;
   flex-direction: column-reverse;
   flex-wrap: wrap;
   align-content: flex-start;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   pointer-events: none;
 }
 
@@ -91,6 +91,69 @@ body {
   display: none;
 }
 
+/* Every rail button is one size: 44px is the smallest comfortable tap target. */
+.rail > button {
+  width: 44px;
+  height: 44px;
+  padding: 6px;
+}
+
+.rail > .hunt-button,
+.rail > .install {
+  height: 52px;
+  padding: 3px 0 2px;
+  border-radius: 22px;
+  font-size: 8.5px;
+}
+
+.rail > .hunt-button svg,
+.rail > .install svg {
+  width: 30px;
+  height: 30px;
+}
+
+/* Less-used buttons fold away behind the "more" button until it is opened. */
+.rail > .rail-extra {
+  display: none;
+}
+
+.rail.open > .rail-extra:not([hidden]) {
+  display: block;
+  animation: fade-in 0.15s ease-out;
+}
+
+.rail-more {
+  border: 2px solid var(--leather-dark);
+  border-radius: 50%;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.rail-more svg {
+  width: 100%;
+  height: 100%;
+  transition: transform 0.2s;
+}
+
+.rail.open > .rail-more svg {
+  transform: rotate(90deg);
+}
+
+/* A deed waiting to be seen shows on the closed menu too. */
+.rail:not(.open):has(.deeds-button:not([data-unseen=''])[data-unseen]) > .rail-more::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--parchment);
+  border-radius: 50%;
+  background: #8e2b22;
+}
+
 .banners {
   position: fixed;
   z-index: 20;
@@ -106,7 +169,7 @@ body {
 
 .banners > * {
   width: 100%;
-  max-width: 420px;
+  max-width: 360px;
   pointer-events: auto;
 }
 
@@ -137,28 +200,28 @@ body {
 }
 
 .hud-label {
-  font-size: 11px;
-  letter-spacing: 0.18em;
+  font-size: 9px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   opacity: 0.8;
 }
 
 .hud-value {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: bold;
   color: var(--gold);
   font-variant-numeric: tabular-nums;
 }
 
 .notice {
-  max-width: 420px;
-  padding: 10px 14px;
+  max-width: 360px;
+  padding: 5px 12px;
   border: 1px solid var(--leather);
   border-radius: 8px;
   background: rgba(232, 217, 181, 0.95);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   text-align: center;
-  font-size: 15px;
+  font-size: 13px;
 }
 
 .recenter {
@@ -330,20 +393,20 @@ body {
 .bestiary-button {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--safe-bottom) + 40px);
+  bottom: calc(var(--safe-bottom) + 28px);
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 76px;
-  height: 76px;
-  padding: 10px 0 6px;
+  width: 60px;
+  height: 60px;
+  padding: 7px 0 4px;
   border: 2px solid var(--leather-dark);
   border-radius: 50%;
   background: radial-gradient(circle at 50% 35%, var(--leather), var(--leather-dark));
   color: var(--gold);
   font: inherit;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: bold;
   letter-spacing: 0.06em;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4), inset 0 0 0 2px rgba(243, 210, 122, 0.3);
@@ -351,8 +414,8 @@ body {
 }
 
 .bestiary-button svg {
-  width: 38px;
-  height: 38px;
+  width: 30px;
+  height: 30px;
 }
 
 /* Short landscape screens: tuck everything closer to the edges to leave the map some room. */
@@ -368,8 +431,8 @@ body {
 
   /* Clear two columns of rail buttons on each side. */
   .banners {
-    left: 152px;
-    right: 152px;
+    left: 124px;
+    right: 124px;
   }
 
   .rail {
@@ -379,9 +442,6 @@ body {
 
   .bestiary-button {
     bottom: calc(var(--safe-bottom) + 8px);
-    width: 64px;
-    height: 64px;
-    padding-top: 6px;
   }
 }
 
@@ -565,8 +625,9 @@ body {
 }
 
 .toast {
-  max-width: 420px;
-  padding: 10px 14px;
+  max-width: 360px;
+  padding: 6px 12px;
+  font-size: 14px;
   border: 2px solid var(--leather-dark);
   border-radius: 10px;
   background: linear-gradient(var(--leather), var(--leather-dark));
@@ -1424,10 +1485,10 @@ body:has(.catch-scene) .banners {
 .hud-bar {
   flex-direction: row;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
-  max-width: 440px;
-  padding: 8px 12px;
+  max-width: 380px;
+  padding: 4px 10px;
 }
 
 .hud-level {
@@ -1435,27 +1496,27 @@ body:has(.catch-scene) .banners {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  min-width: 44px;
+  min-width: 36px;
 }
 
 .hud-level-num {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   border: 2px solid var(--gold);
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #6b4a2a, var(--leather-dark));
   color: var(--gold);
   font-weight: bold;
-  font-size: 16px;
+  font-size: 13px;
   box-shadow: 0 0 6px rgba(243, 210, 122, 0.45);
 }
 
 .hud-xp {
   display: block;
-  width: 44px;
-  height: 5px;
+  width: 36px;
+  height: 4px;
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.45);
   overflow: hidden;
@@ -1480,11 +1541,11 @@ body:has(.catch-scene) .banners {
 .hud-purse {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 64px;
+  gap: 0;
+  min-width: 56px;
   font-variant-numeric: tabular-nums;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .hud-purse > span {
@@ -1494,8 +1555,8 @@ body:has(.catch-scene) .banners {
 }
 
 .hud-purse i {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex: none;
 }
@@ -1521,8 +1582,8 @@ body:has(.catch-scene) .banners {
   display: flex;
   flex-direction: column;
   align-items: center;
-  max-width: 340px;
-  padding: 5px 16px 6px;
+  max-width: 300px;
+  padding: 2px 14px 3px;
   border: 1px solid rgba(0, 0, 0, 0.35);
   border-radius: 4px;
   background: linear-gradient(var(--realm), color-mix(in srgb, var(--realm) 70%, black));
@@ -1538,13 +1599,13 @@ body:has(.catch-scene) .banners {
 }
 
 .realm-banner b {
-  font-size: 15px;
+  font-size: 13px;
   letter-spacing: 0.06em;
   color: var(--gold);
 }
 
 .realm-banner span {
-  font-size: 12px;
+  font-size: 10.5px;
   font-style: italic;
   opacity: 0.9;
 }
@@ -1562,14 +1623,14 @@ body:has(.catch-scene) .banners {
 
 /* ---- Toast ---- */
 .hud-toast {
-  max-width: 380px;
-  padding: 8px 14px;
+  max-width: 340px;
+  padding: 5px 12px;
   border: 1px solid var(--leather);
   border-radius: 8px;
   background: rgba(232, 217, 181, 0.97);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   text-align: center;
-  font-size: 14px;
+  font-size: 13px;
   animation: toast-in 0.25s ease-out;
 }
 
@@ -2481,28 +2542,28 @@ body:has(.catch-scene) .banners {
   position: absolute;
   top: -4px;
   right: -4px;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
   border: 2px solid var(--parchment);
   border-radius: 999px;
   background: #8e2b22;
   color: #fdf6e3;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: bold;
-  line-height: 18px;
+  line-height: 14px;
   text-align: center;
 }
 
 .title-ribbon {
-  margin-top: -8px;
-  padding: 2px 14px 3px;
+  margin-top: -6px;
+  padding: 1px 12px 2px;
   border: 1px solid var(--leather-dark);
   border-top: 0;
   border-radius: 0 0 10px 10px;
   background: linear-gradient(#8e2b22, #6a1d16);
   color: var(--gold);
-  font-size: 12px;
+  font-size: 11px;
   font-style: italic;
   letter-spacing: 0.05em;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
@@ -2515,9 +2576,9 @@ body:has(.catch-scene) .banners {
 .deed-banner {
   display: flex;
   align-items: center;
-  gap: 12px;
-  max-width: 420px;
-  padding: 10px 14px;
+  gap: 10px;
+  max-width: 360px;
+  padding: 6px 12px;
   border: 2px solid var(--gold);
   border-radius: 12px;
   background: linear-gradient(var(--leather), var(--leather-dark));
@@ -2531,8 +2592,8 @@ body:has(.catch-scene) .banners {
 }
 
 .deed-banner .deed-medal {
-  width: 48px;
-  height: 48px;
+  width: 38px;
+  height: 38px;
   animation: deed-spin 0.9s ease-out;
 }
 
@@ -2549,7 +2610,7 @@ body:has(.catch-scene) .banners {
 }
 
 .deed-banner-text b {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .deed-banner-text span {
