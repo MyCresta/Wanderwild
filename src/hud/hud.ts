@@ -2,7 +2,7 @@ import { exportSave, importSave } from '../game/save';
 import { MATERIALS, REALMS, type MaterialId, type RealmId } from '../game/realms';
 import type { GameState } from '../game/state';
 import { nextUnlock, UNLOCKS } from '../game/wayfarer';
-import { formatCount, formatDistance } from './format';
+import { formatCount, formatDistance, formatDuration } from './format';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -40,6 +40,9 @@ export class Hud {
     game.on((event) => {
       if (event.kind === 'change') this.render();
       else if (event.kind === 'reward') this.toast(event.text);
+      else if (event.kind === 'stride') this.stridePop(event.skippedMs);
+      else if (event.kind === 'hatch')
+        this.toast(`Your ${event.hatchling.fromKm} km egg hatched! A ${event.hatchling.rarity} creature joins you.`, 6000, true);
       else if (event.kind === 'levelUp') {
         const unlocked = event.unlocks.map((u) => u.what).join('; ');
         this.toast(`Wayfarer level ${event.level}!${unlocked ? ` Unlocked: ${unlocked}.` : ''}`, 6000, true);
@@ -75,6 +78,14 @@ export class Hud {
       void this.realmEl.offsetWidth; // Restart the arrival animation.
       this.realmEl.classList.add('arrive');
     }
+  }
+
+  private stridePop(ms: number): void {
+    const el = $('stride-pop');
+    el.textContent = `Hearthstead +${formatDuration(ms)}`;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
   }
 
   toast(text: string, ms = 3800, grand = false): void {

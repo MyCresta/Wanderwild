@@ -3,16 +3,29 @@ import { pruneSave, storeSave, type SaveData } from './save';
 import { MATERIALS, type MaterialId, type RealmId } from './realms';
 import { BLESSING_MS, BLESSING_XP_BONUS, rollShrineReward, SHRINE_COOLDOWN_MS, type Shrine } from './shrines';
 import { levelFromXp, unlocksBetween, type Unlock } from './wayfarer';
+import { EGG_SHRINE_CHANCE, EGG_SLOTS, rollEgg, walkEggs, type Hatchling } from './eggs';
+import {
+  BUILDINGS,
+  collect,
+  MAX_BUILDING_LEVEL,
+  strideBoost,
+  tick,
+  upgradeCost,
+  type BuildingId,
+} from './hearthstead';
 
 /** Walking pays out per full 100 m: Wanderlight is only ever earned this way. */
 export const WALK_REWARD_STEP_M = 100;
 export const WALK_REWARD = { wanderlight: 1, xp: 30, coin: 2 };
 export const VISITED_CELL_M = 50;
+export const EGG_UNLOCK_LEVEL = 8;
 
 export type GameEvent =
   | { kind: 'change' }
   | { kind: 'levelUp'; level: number; unlocks: Unlock[] }
-  | { kind: 'reward'; text: string };
+  | { kind: 'reward'; text: string }
+  | { kind: 'stride'; skippedMs: number }
+  | { kind: 'hatch'; hatchling: Hatchling };
 
 type Listener = (event: GameEvent) => void;
 
@@ -71,9 +84,67 @@ export class GameState {
       s.currencies.wanderlight += steps * WALK_REWARD.wanderlight;
       s.currencies.coin += steps * WALK_REWARD.coin;
       this.grantXp(steps * WALK_REWARD.xp * (this.isBlessed(now) ? BLESSING_XP_BONUS : 1));
+      tick(s.hearthstead, now);
+      const skippedMs = strideBoost(s.hearthstead, steps, now);
+      if (skippedMs > 0) this.emit({ kind: 'stride', skippedMs });
+    }
+    for (const hatchling of walkEggs(s.eggs, metres, now)) {
+      s.hatchlings.push(hatchling);
+      this.emit({ kind: 'hatch', hatchling });
     }
     this.changed();
     return steps;
+  }
+
+  /** Banks the real time that has passed into the Hearthstead. */
+  tickHearthstead(now = Date.now()): void {
+    tick(this.save.hearthstead, now);
+    this.changed();
+  }
+
+  /** Builds a building at level 1 once the Wayfarer level allows it. */
+  build(id: BuildingId, now = Date.now()): boolean {
+    const h = this.save.hearthstead;
+    if (h.buildings[id] || this.level.level < BUILDINGS[id].unlockLevel) return false;
+    tick(h, now);
+    h.buildings[id] = { level: 1, progressMs: 0 };
+    this.changed();
+    return true;
+  }
+
+  collect(id: BuildingId, now = Date.now()): number {
+    const b = this.save.hearthstead.buildings[id];
+    if (!b) return 0;
+    tick(this.save.hearthstead, now);
+    const def = BUILDINGS[id];
+    const amount = collect(def, b);
+    if (amount > 0) {
+      if (def.product.kind === 'material') this.addMaterials({ [def.product.id]: amount });
+      else this.save.supplies[def.product.id] += amount;
+      this.grantXp(amount * (def.product.kind === 'supply' && def.product.id === 'petXp' ? 0.1 : 1));
+    }
+    this.changed();
+    return amount;
+  }
+
+  canUpgrade(id: BuildingId): boolean {
+    const b = this.save.hearthstead.buildings[id];
+    if (!b || b.level >= MAX_BUILDING_LEVEL) return false;
+    const cost = upgradeCost(BUILDINGS[id], b.level);
+    return this.save.currencies.coin >= cost.coin && (this.save.materials[cost.material] ?? 0) >= cost.amount;
+  }
+
+  upgrade(id: BuildingId, now = Date.now()): boolean {
+    if (!this.canUpgrade(id)) return false;
+    const b = this.save.hearthstead.buildings[id]!;
+    tick(this.save.hearthstead, now);
+    const cost = upgradeCost(BUILDINGS[id], b.level);
+    this.save.currencies.coin -= cost.coin;
+    this.save.materials[cost.material] = (this.save.materials[cost.material] ?? 0) - cost.amount;
+    b.level += 1;
+    this.grantXp(25 * b.level);
+    this.changed();
+    return true;
   }
 
   /** Marks the ~50 m cell under the player as walked. */
@@ -99,10 +170,16 @@ export class GameState {
     s.currencies.coin += reward.coin;
     this.addMaterials(reward.materials);
     this.grantXp(reward.xp);
+    let egg = '';
+    if (this.level.level >= EGG_UNLOCK_LEVEL && s.eggs.length < EGG_SLOTS && Math.random() < EGG_SHRINE_CHANCE) {
+      const found = rollEgg(shrine.id, now);
+      s.eggs.push(found);
+      egg = ` You found a ${found.km} km egg!`;
+    }
     const mats = (Object.entries(reward.materials) as [MaterialId, number][])
       .map(([id, n]) => `${n} ${MATERIALS[id].name}`)
       .join(', ');
-    this.emit({ kind: 'reward', text: `+${reward.coin} coin, ${mats}, +${reward.xp} XP. Blessed for 10 minutes.` });
+    this.emit({ kind: 'reward', text: `+${reward.coin} coin, ${mats}, +${reward.xp} XP. Blessed for 10 minutes.${egg}` });
     this.changed();
     return true;
   }
