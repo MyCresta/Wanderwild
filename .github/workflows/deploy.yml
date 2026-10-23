@@ -1,22 +1,22 @@
 name: Test and deploy
 
+# The Pages site holds main at the root and a preview of every claude/* branch at
+# /preview/<branch-name-with-dashes>/. Only main may deploy to Pages, so a push to a
+# preview branch asks main to rebuild the whole site, and deleting a branch drops its preview.
+
 on:
   push:
-    branches: [main]
+    branches: [main, 'claude/**']
   pull_request:
   workflow_dispatch:
+  delete:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
 
 jobs:
-  build:
+  test:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,15 +27,72 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
-        if: github.ref == 'refs/heads/main'
+
+  request-preview:
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - run: gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build-site:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
         with:
-          path: dist
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build main
+        run: |
+          npm ci
+          npm run build
+          mv dist site
+      - name: Build previews
+        run: |
+          mkdir -p site/preview
+          links=""
+          for branch in $(git for-each-ref --format='%(refname:strip=3)' 'refs/remotes/origin/claude/'); do
+            slug="${branch//\//-}"
+            echo "::group::$branch"
+            git worktree add --detach "../wt-$slug" "origin/$branch"
+            if (cd "../wt-$slug" && npm ci && npm run build); then
+              mv "../wt-$slug/dist" "site/preview/$slug"
+              links="$links<li><a href=\"./$slug/\">$branch</a></li>"
+            else
+              echo "::warning::Preview build failed for $branch"
+            fi
+            echo "::endgroup::"
+          done
+          cat > site/preview/index.html <<EOF
+          <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Wanderwild previews</title>
+          <body style="font-family: Georgia, serif; background: #e8d9b5; color: #3b2a1a; padding: 16px">
+          <h1>Wanderwild previews</h1><p><a href="../">Main game</a></p><ul>${links:-<li>No previews right now.</li>}</ul>
+          EOF
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
 
   deploy:
-    if: github.ref == 'refs/heads/main'
-    needs: build
+    needs: build-site
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: true
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
