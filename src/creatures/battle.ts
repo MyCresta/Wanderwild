@@ -46,7 +46,13 @@ export type Action =
 
 export type StatusKind = 'guard' | 'dodge' | 'focus' | 'burn' | 'ward-break';
 
-export type BattleEvent =
+/** Everyone's health right after an event, so the screen can show each blow as it lands. */
+export interface HpSnap {
+  foe: number;
+  party: number[];
+}
+
+export type BattleEvent = (
   | {
       kind: 'hit';
       attacker: Side;
@@ -68,7 +74,8 @@ export type BattleEvent =
   | { kind: 'swap'; to: number }
   | { kind: 'heal'; targets: number[]; amount: number; source: 'tonic' | 'mending' | 'art' }
   | { kind: 'fireball'; damage: number }
-  | { kind: 'faint'; index: number };
+  | { kind: 'faint'; index: number }
+) & { hp?: HpSnap };
 
 /** Turns between uses: the element move is ready every other turn, the art every third. */
 export const MOVE_COOLDOWN = 2;
@@ -171,6 +178,11 @@ export class Battle {
     }
   }
 
+  /** Stamps an event with everyone's health as it stands now. */
+  private snap<E extends BattleEvent>(e: E): E {
+    return { ...e, hp: { foe: this.foe.hp, party: this.party.map((f) => f.hp) } };
+  }
+
   get fireball(): number {
     return Math.round(fireballDamage(this.wayfarerLevel) * this.petDamage);
   }
@@ -218,10 +230,11 @@ export class Battle {
     const pet = this.pet;
     const elemental = action !== 'strike';
     let eff = elemental ? matchup(pet.species.element, this.foe.species.element) : 1;
-    const crit = this.focus || (action === 'move' && quality >= CRIT_QUALITY);
+    const timed = action !== 'art';
+    const crit = this.focus || (timed && quality >= CRIT_QUALITY);
     this.focus = false;
     // A well-timed tap also nudges damage up; a missed one still lands.
-    const timing = action === 'move' ? 0.85 + 0.15 * Math.min(1, quality / CRIT_QUALITY) : 1;
+    const timing = timed ? 0.85 + 0.15 * Math.min(1, quality / CRIT_QUALITY) : 1;
     const events: BattleEvent[] = [];
     let warded = false;
     if (this.wardUp) {
@@ -236,7 +249,7 @@ export class Battle {
     const dmg = Math.max(1, Math.round(damage(pet.atk, this.foe.def, power, eff, this.rng(), crit) * timing * PACE));
     this.foe.hp = Math.max(0, this.foe.hp - dmg);
     const name = action === 'move' ? pet.species.move : action === 'art' ? ARTS[pet.species.element].name : 'Strike';
-    events.unshift({ kind: 'hit', attacker: 'pet', action, name, damage: dmg, effectiveness: elemental ? matchup(pet.species.element, this.foe.species.element) : 1, crit, warded });
+    events.unshift(this.snap({ kind: 'hit', attacker: 'pet', action, name, damage: dmg, effectiveness: elemental ? matchup(pet.species.element, this.foe.species.element) : 1, crit, warded }));
     return events;
   }
 
@@ -258,7 +271,7 @@ export class Battle {
       case 'tide': {
         const add = Math.min(pet.maxHp - pet.hp, Math.round(pet.maxHp / 3));
         pet.hp += add;
-        return [{ kind: 'heal', targets: [this.active], amount: add, source: 'art' }];
+        return [this.snap({ kind: 'heal', targets: [this.active], amount: add, source: 'art' })];
       }
       case 'grove':
         this.guard = { turns: 1, through: 0.5, reflect: 0.5 };
@@ -280,7 +293,7 @@ export class Battle {
       f.hp += add;
       amount += add;
     }
-    return { kind: 'heal', targets, amount, source };
+    return this.snap({ kind: 'heal', targets, amount, source });
   }
 
   private swapTo(index: number): BattleEvent {
@@ -313,13 +326,13 @@ export class Battle {
     const dmg = guard ? Math.max(1, Math.round(raw * guard.through)) : raw;
     pet.hp = Math.max(0, pet.hp - dmg);
     const events: BattleEvent[] = [
-      { kind: 'hit', attacker: 'foe', action: intent.big ? 'big' : 'strike', name: intent.name, damage: dmg, effectiveness: eff, crit, guarded: !!guard },
+      this.snap({ kind: 'hit', attacker: 'foe', action: intent.big ? 'big' : 'strike', name: intent.name, damage: dmg, effectiveness: eff, crit, guarded: !!guard }),
     ];
     if (guard) {
       if (guard.reflect > 0) {
         const back = Math.max(1, Math.round((raw - dmg) * guard.reflect));
         this.foe.hp = Math.max(0, this.foe.hp - back);
-        events.push({ kind: 'reflect', damage: back });
+        events.push(this.snap({ kind: 'reflect', damage: back }));
       }
       if (--guard.turns <= 0) this.guard = null;
     }
@@ -327,7 +340,7 @@ export class Battle {
       const amount = Math.min(this.foe.maxHp - this.foe.hp, Math.round(dmg * LEECH_SHARE));
       if (amount > 0) {
         this.foe.hp += amount;
-        events.push({ kind: 'leech', amount });
+        events.push(this.snap({ kind: 'leech', amount }));
       }
     }
     return events;
@@ -370,7 +383,7 @@ export class Battle {
         if (action.spell === 'fireball') {
           const dmg = this.fireball;
           this.foe.hp = Math.max(0, this.foe.hp - dmg);
-          events.push({ kind: 'fireball', damage: dmg });
+          events.push(this.snap({ kind: 'fireball', damage: dmg }));
         } else {
           const standing = this.party.map((f, i) => (f.hp > 0 ? i : -1)).filter((i) => i >= 0);
           events.push(this.heal(standing, MENDING_HEAL, 'mending'));
@@ -384,7 +397,7 @@ export class Battle {
       this.burn--;
       const dmg = Math.max(1, Math.round(this.foe.maxHp * BURN_SHARE));
       this.foe.hp = Math.max(0, this.foe.hp - dmg);
-      events.push({ kind: 'burn', damage: dmg });
+      events.push(this.snap({ kind: 'burn', damage: dmg }));
       if (this.foeDown()) return events;
     }
 
