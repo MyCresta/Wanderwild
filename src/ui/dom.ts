@@ -1,4 +1,5 @@
 import { sound } from '../audio/sound';
+import { bannerStack } from './layout';
 
 type Child = Node | string | null | undefined | false;
 
@@ -69,7 +70,7 @@ export function openSheet(title: string, opts: { closable?: boolean; className?:
 /** A short-lived banner, e.g. "Bramblet grew to level 4!". */
 export function toast(text: string): void {
   const node = h('div', { class: 'toast', role: 'status' }, text);
-  document.body.appendChild(node);
+  bannerStack().appendChild(node);
   setTimeout(() => node.classList.add('toast-out'), 2600);
   setTimeout(() => node.remove(), 3200);
 }

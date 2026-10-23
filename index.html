@@ -35,11 +35,8 @@
       <div class="title-ribbon" id="wayfarer-title" title="Your title" hidden></div>
       <div class="realm-banner" id="realm" role="status" hidden></div>
       <div class="hud-toast" id="toast" role="status" hidden></div>
+      <div class="notice" id="notice" role="status" hidden></div>
     </header>
-
-    <div class="notice" id="notice" role="status" hidden></div>
-
-    <button class="install" id="install" type="button" hidden>Install Wanderwild</button>
 
     <button class="bestiary-button" id="bestiary" type="button" aria-label="Open the bestiary">
       <svg viewBox="0 0 48 48" aria-hidden="true">
@@ -50,50 +47,60 @@
       <span>Bestiary</span>
     </button>
 
-    <button class="deeds-button" id="deeds" type="button" aria-label="Open deeds and titles">
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M17 30l-6 13 8-3 4 5 4-12M31 30l6 13-8-3-4 5-4-12" fill="#8e2b22" />
-        <circle cx="24" cy="20" r="14" fill="currentColor" />
-        <path d="M24 10l3 6.5 7 .7-5.3 4.6 1.6 7L24 25.2l-6.3 3.6 1.6-7-5.3-4.6 7-.7z" fill="#4a3320" />
-      </svg>
-    </button>
+    <!-- Map buttons stack upward from the bottom corners; the first child sits lowest. -->
+    <nav class="rail rail-left" id="rail-left" aria-label="Wayfarer">
+      <button class="satchel-open" id="satchel-open" type="button" aria-label="Open satchel">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M14 18c0-7 4-11 10-11s10 4 10 11" fill="none" stroke="currentColor" stroke-width="3" />
+          <path d="M8 18h32l-3 22H11z" fill="currentColor" />
+          <path d="M8 18h32v6H8z" fill="#e8d9b5" opacity=".35" />
+          <circle cx="24" cy="28" r="3" fill="#e8d9b5" />
+        </svg>
+      </button>
+      <button class="hearthstead-open" id="hearthstead-open" type="button" aria-label="Open Hearthstead" hidden>
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M6 24L24 9l18 15" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" />
+          <path d="M11 22v18h26V22L24 11z" fill="currentColor" />
+          <path d="M20 40V30h8v10" fill="#e8d9b5" opacity=".5" />
+          <path d="M31 14v-5h4v8" fill="currentColor" />
+        </svg>
+      </button>
+      <button class="demesne-open" id="demesne-open" type="button" aria-label="Open your Demesne">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M10 14q14-8 28 0 6 12 0 22-14 8-28 0-6-10 0-22z" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="5 3" />
+          <path d="M24 13v22M17 20h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+          <circle cx="24" cy="30" r="3" fill="#e8d9b5" />
+        </svg>
+      </button>
+      <button class="install" id="install" type="button" aria-label="Install Wanderwild" hidden>
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M24 8v20M15 20l9 9 9-9" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M10 32v6h28v-6" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span>Install</span>
+      </button>
+    </nav>
 
-    <button class="recenter" id="recenter" type="button" aria-label="Follow me" aria-pressed="true">
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="2" />
-        <path d="M24 4l4 20-4 20-4-20z" fill="currentColor" />
-        <path d="M4 24l20-4 20 4-20 4z" fill="currentColor" opacity=".5" />
-        <circle cx="24" cy="24" r="3" fill="#e8d9b5" />
-      </svg>
-    </button>
+    <nav class="rail rail-right" id="rail-right" aria-label="Map tools">
+      <button class="recenter" id="recenter" type="button" aria-label="Follow me" aria-pressed="true">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="2" />
+          <path d="M24 4l4 20-4 20-4-20z" fill="currentColor" />
+          <path d="M4 24l20-4 20 4-20 4z" fill="currentColor" opacity=".5" />
+          <circle cx="24" cy="24" r="3" fill="#e8d9b5" />
+        </svg>
+      </button>
+      <button class="sound-toggle" id="sound-toggle" type="button" aria-label="Sound"></button>
+      <button class="deeds-button" id="deeds" type="button" aria-label="Open deeds and titles">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M17 30l-6 13 8-3 4 5 4-12M31 30l6 13-8-3-4 5-4-12" fill="#8e2b22" />
+          <circle cx="24" cy="20" r="14" fill="currentColor" />
+          <path d="M24 10l3 6.5 7 .7-5.3 4.6 1.6 7L24 25.2l-6.3 3.6 1.6-7-5.3-4.6 7-.7z" fill="#4a3320" />
+        </svg>
+      </button>
+    </nav>
 
-    <button class="sound-toggle" id="sound-toggle" type="button" aria-label="Sound"></button>
-
-    <button class="satchel-open" id="satchel-open" type="button" aria-label="Open satchel">
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M14 18c0-7 4-11 10-11s10 4 10 11" fill="none" stroke="currentColor" stroke-width="3" />
-        <path d="M8 18h32l-3 22H11z" fill="currentColor" />
-        <path d="M8 18h32v6H8z" fill="#e8d9b5" opacity=".35" />
-        <circle cx="24" cy="28" r="3" fill="#e8d9b5" />
-      </svg>
-    </button>
-
-    <button class="hearthstead-open" id="hearthstead-open" type="button" aria-label="Open Hearthstead" hidden>
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M6 24L24 9l18 15" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" />
-        <path d="M11 22v18h26V22L24 11z" fill="currentColor" />
-        <path d="M20 40V30h8v10" fill="#e8d9b5" opacity=".5" />
-        <path d="M31 14v-5h4v8" fill="currentColor" />
-      </svg>
-    </button>
-
-    <button class="demesne-open" id="demesne-open" type="button" aria-label="Open your Demesne">
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M10 14q14-8 28 0 6 12 0 22-14 8-28 0-6-10 0-22z" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="5 3" />
-        <path d="M24 13v22M17 20h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
-        <circle cx="24" cy="30" r="3" fill="#e8d9b5" />
-      </svg>
-    </button>
+    <div class="banners" id="banners"></div>
 
     <dialog class="satchel" id="demesne" aria-labelledby="demesne-title">
       <div class="satchel-body">

@@ -54,6 +54,66 @@ body {
   pointer-events: none;
 }
 
+/*
+ * Screen layout. Round map buttons live in two rails that stack upward from the
+ * bottom corners and wrap into a second column when the screen is short, and
+ * every passing banner (notices, toasts, deeds) stacks in one column under the
+ * top bar. New buttons go in a rail and new banners in #banners, never at a
+ * fixed spot of their own, so nothing lands on top of anything else.
+ * --rail-top and --hud-bottom are kept up to date by src/ui/layout.ts.
+ */
+.rail {
+  position: fixed;
+  top: var(--rail-top, calc(var(--safe-top) + 108px));
+  bottom: calc(var(--safe-bottom) + 50px);
+  left: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column-reverse;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.rail-right {
+  flex-wrap: wrap-reverse;
+}
+
+.rail > * {
+  position: relative;
+  flex: none;
+  pointer-events: auto;
+}
+
+.rail > [hidden] {
+  display: none;
+}
+
+.banners {
+  position: fixed;
+  z-index: 20;
+  top: calc(var(--hud-bottom, calc(var(--safe-top) + 84px)) + 8px);
+  left: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.banners > * {
+  width: 100%;
+  max-width: 420px;
+  pointer-events: auto;
+}
+
+.hud > .notice {
+  pointer-events: auto;
+}
+
 .hud-panel {
   display: flex;
   gap: 18px;
@@ -91,11 +151,6 @@ body {
 }
 
 .notice {
-  position: fixed;
-  left: 16px;
-  right: 16px;
-  bottom: calc(var(--safe-bottom) + 124px);
-  margin: 0 auto;
   max-width: 420px;
   padding: 10px 14px;
   border: 1px solid var(--leather);
@@ -107,9 +162,6 @@ body {
 }
 
 .recenter {
-  position: fixed;
-  right: 16px;
-  bottom: calc(var(--safe-bottom) + 48px);
   width: 56px;
   height: 56px;
   padding: 8px;
@@ -133,9 +185,6 @@ body {
 
 /* Sound: all → effects only → muted. Sits above the follow button. */
 .sound-toggle {
-  position: fixed;
-  right: 22px;
-  bottom: calc(var(--safe-bottom) + 116px);
   width: 44px;
   height: 44px;
   padding: 7px;
@@ -203,23 +252,32 @@ body {
 }
 
 .install {
-  position: fixed;
-  left: 16px;
-  bottom: calc(var(--safe-bottom) + 252px);
-  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 56px;
+  height: 64px;
+  padding: 6px 0 4px;
   border: 2px solid var(--leather-dark);
-  border-radius: 999px;
+  border-radius: 28px;
   background: linear-gradient(var(--leather), var(--leather-dark));
   color: var(--gold);
   font: inherit;
-  font-size: 15px;
+  font-size: 9.5px;
   font-weight: bold;
+  letter-spacing: 0.03em;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
   cursor: pointer;
 }
 
 .install[hidden] {
   display: none;
+}
+
+.install svg {
+  width: 36px;
+  height: 36px;
+  flex: none;
 }
 
 /* ---------- Creatures ---------- */
@@ -295,6 +353,36 @@ body {
 .bestiary-button svg {
   width: 38px;
   height: 38px;
+}
+
+/* Short landscape screens: tuck everything closer to the edges to leave the map some room. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .hud {
+    top: calc(var(--safe-top) + 6px);
+    gap: 4px;
+  }
+
+  .title-ribbon {
+    margin-top: -4px;
+  }
+
+  /* Clear two columns of rail buttons on each side. */
+  .banners {
+    left: 152px;
+    right: 152px;
+  }
+
+  .rail {
+    bottom: calc(var(--safe-bottom) + 12px);
+    gap: 8px;
+  }
+
+  .bestiary-button {
+    bottom: calc(var(--safe-bottom) + 8px);
+    width: 64px;
+    height: 64px;
+    padding-top: 6px;
+  }
 }
 
 /* ---------- Sheets ---------- */
@@ -477,12 +565,6 @@ body {
 }
 
 .toast {
-  position: fixed;
-  z-index: 20;
-  left: 16px;
-  right: 16px;
-  top: calc(var(--safe-top) + 84px);
-  margin: 0 auto;
   max-width: 420px;
   padding: 10px 14px;
   border: 2px solid var(--leather-dark);
@@ -1158,8 +1240,7 @@ body {
 }
 
 /* Banners from elsewhere in the game drop below the scene's title card instead of covering it. */
-body:has(.catch-scene) .toast,
-body:has(.catch-scene) .deed-banner {
+body:has(.catch-scene) .banners {
   top: calc(var(--safe-top) + 112px);
 }
 
@@ -1529,9 +1610,6 @@ body:has(.catch-scene) .deed-banner {
 
 /* ---- Satchel ---- */
 .satchel-open {
-  position: fixed;
-  left: 16px;
-  bottom: calc(var(--safe-bottom) + 48px);
   width: 56px;
   height: 56px;
   padding: 9px;
@@ -1691,9 +1769,6 @@ body:has(.catch-scene) .deed-banner {
 
 /* ---- Hearthstead ---- */
 .hearthstead-open {
-  position: fixed;
-  left: 16px;
-  bottom: calc(var(--safe-bottom) + 116px);
   width: 56px;
   height: 56px;
   padding: 9px;
@@ -2385,9 +2460,6 @@ body:has(.catch-scene) .deed-banner {
 /* ---------- Deeds and titles ---------- */
 
 .deeds-button {
-  position: fixed;
-  right: 16px;
-  bottom: calc(var(--safe-bottom) + 248px);
   width: 56px;
   height: 56px;
   padding: 8px;
@@ -2441,16 +2513,10 @@ body:has(.catch-scene) .deed-banner {
 }
 
 .deed-banner {
-  position: fixed;
-  z-index: 25;
-  top: calc(var(--safe-top) + 84px);
-  left: 16px;
-  right: 16px;
   display: flex;
   align-items: center;
   gap: 12px;
   max-width: 420px;
-  margin: 0 auto;
   padding: 10px 14px;
   border: 2px solid var(--gold);
   border-radius: 12px;
@@ -2649,9 +2715,6 @@ body:has(.catch-scene) .deed-banner {
 
 /* ---- Glyphwalking and the Inked Demesne ---- */
 .demesne-open {
-  position: fixed;
-  left: 16px;
-  bottom: calc(var(--safe-bottom) + 184px);
   width: 56px;
   height: 56px;
   padding: 8px;

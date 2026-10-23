@@ -1,6 +1,7 @@
 import './hunt.css';
 import type { Map } from 'maplibre-gl';
 import { sound } from '../audio/sound';
+import { railButtons } from './layout';
 import type { Fix } from '../geo/distance';
 import type { GameState } from '../game/state';
 import { MATERIALS, REALMS, type MaterialId, type RealmId } from '../game/realms';
@@ -76,7 +77,8 @@ export class HuntController {
     this.button = h('button', { class: 'hunt-button', type: 'button', 'aria-label': 'Treasure hunt', onclick: () => this.open() });
     this.button.innerHTML = SCROLL_ICON;
     this.button.append(this.label);
-    document.body.append(this.button);
+    // Sits just under the deeds medal in the right-hand rail.
+    railButtons('right').insertBefore(this.button, document.getElementById('deeds'));
     this.render();
   }
 

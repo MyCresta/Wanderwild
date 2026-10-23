@@ -1,4 +1,5 @@
 import { sound } from '../audio/sound';
+import { bannerStack } from './layout';
 import type { Collection } from '../creatures/collection';
 import { loadHuntLog } from '../hunts/hunt';
 import {
@@ -162,7 +163,7 @@ export class DeedKeeper {
           h('span', {}, `+${reward.coin} coin, +${reward.xp} XP${deed.title ? ` · Title: ${deed.title}` : ''}`),
         ),
       );
-      document.body.appendChild(banner);
+      bannerStack().appendChild(banner);
       sound.play('levelUp');
       await new Promise((r) => setTimeout(r, 3400));
       banner.classList.add('deed-banner-out');
