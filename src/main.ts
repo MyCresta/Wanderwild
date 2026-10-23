@@ -43,6 +43,7 @@ import { DemesnePanel } from './hud/demesnePanel';
 import { walkInRealm } from './creatures/evolution';
 import { creatureReach } from './geo/reach';
 import { setupRailMenu, watchLayout } from './ui/layout';
+import { installOrbitCamera } from './map/orbitCamera';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -86,6 +87,7 @@ const map = new Map({
 });
 installFantasyImages(map);
 map.addControl(new AttributionControl({ compact: true }), 'bottom-left');
+const orbit = installOrbitCamera(map);
 
 installProbeLayers(map);
 
@@ -113,8 +115,7 @@ function setFollowing(value: boolean): void {
   if (value && lastFix) map.easeTo({ center: [lastFix.lng, lastFix.lat], zoom: Math.max(map.getZoom(), 15) });
 }
 
-// Panning by hand stops following; the compass button resumes it.
-map.on('dragstart', () => setFollowing(false));
+// Dragging orbits rather than pans, so only looking at a Waymark or a hunt stops following; the compass button resumes it.
 recenterEl.addEventListener('click', () => setFollowing(true));
 
 function useShrine(shrine: Shrine): void {
@@ -359,6 +360,7 @@ function onFix(fix: Fix): void {
   if (fix.accuracy <= 40) game.visit(fix.lat, fix.lng);
 
   if (firstFix) map.jumpTo({ center: [fix.lng, fix.lat], zoom: PLAY_ZOOM });
+  else if (following && orbit.orbiting()) map.jumpTo({ center: [fix.lng, fix.lat] });
   else if (following) map.easeTo({ center: [fix.lng, fix.lat], duration: 800 });
   refreshWorld();
 }
