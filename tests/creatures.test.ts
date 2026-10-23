@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Battle, makeFighter, victoryRewards } from '../src/creatures/battle';
 import { addPet, emptyCollection, METRES_PER_SEAL, walkRewards } from '../src/creatures/collection';
 import { mulberry32 } from '../src/creatures/rng';
-import { spawnsNear } from '../src/creatures/spawning';
+import { spawnsNear } from '../src/game/spawns';
 import { ALL_SPECIES, getSpecies, MONSTERS, PETS } from '../src/creatures/species';
 import { addXp, catchChance, creatureForSpawn, effectiveness, individualFromSeed, MAX_LEVEL, statsAt, xpToNext } from '../src/creatures/stats';
 import { PET_ART } from '../src/creatures/art/pets';
