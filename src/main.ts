@@ -4,6 +4,8 @@ import { AttributionControl, Map, setWorkerUrl } from 'maplibre-gl';
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { registerSW } from 'virtual:pwa-register';
 import { createFantasyStyle } from './map/fantasyStyle';
+import { installFantasyImages } from './map/fantasyImages';
+import { transformGlyphRequest } from './map/glyphs';
 import { PlayerMarker } from './map/player';
 import { WalkTracker, type Fix } from './geo/distance';
 import { watchLocation } from './geo/location';
@@ -56,7 +58,9 @@ const map = new Map({
   maxPitch: 60,
   minZoom: 3,
   attributionControl: false,
+  transformRequest: transformGlyphRequest,
 });
+installFantasyImages(map);
 map.addControl(new AttributionControl({ compact: true }), 'bottom-left');
 
 const player = new PlayerMarker(map);

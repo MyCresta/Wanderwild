@@ -25,10 +25,10 @@ export const palette = {
   rock: '#c2b49a',
   ice: '#eef0ea',
   settlement: '#dcc79c',
-  building: '#c7ad80',
-  buildingEdge: '#9c8158',
-  road: '#f3e8cc',
-  roadCasing: '#8a6c47',
+  building: '#d2b183',
+  buildingEdge: '#8c6a45',
+  road: '#efdfb8',
+  roadCasing: '#7a5b3a',
   path: '#7a5b3a',
   rail: '#5a4632',
   border: '#7b3f3f',
@@ -40,9 +40,10 @@ const SOURCE = 'openmaptiles';
 // Layers are written loosely and checked against the style spec in tests/fantasyStyle.test.ts;
 // the spec's TypeScript types are too strict for the shared expression helpers below.
 type Layer = Record<string, unknown>;
-const FONT_REGULAR = ['Noto Sans Regular'];
-const FONT_BOLD = ['Noto Sans Bold'];
-const FONT_ITALIC = ['Noto Sans Italic'];
+// Storybook fonts, served from public/fonts with a Noto Sans fallback (see glyphs.ts).
+const FONT_REGULAR = ['IM Fell English Regular'];
+const FONT_ITALIC = ['IM Fell English Italic'];
+const FONT_CAPS = ['IM Fell English SC Regular'];
 
 const fill = (
   id: string,
@@ -59,7 +60,17 @@ const fill = (
   paint: { 'fill-color': color, ...extra },
 });
 
-const classIn = (...classes: string[]) => ['match', ['get', 'class'], classes, true, false];
+/** A patterned fill that fades in from `minzoom`, drawn over the flat colour below it. */
+const pattern = (id: string, sourceLayer: string, filter: unknown, image: string, minzoom: number): Layer => ({
+  ...fill(id, sourceLayer, filter, ''),
+  minzoom,
+  paint: {
+    'fill-pattern': image,
+    'fill-opacity': ['interpolate', ['linear'], ['zoom'], minzoom, 0, minzoom + 1.5, 1],
+  },
+});
+
+const classIn =(...classes: string[]) => ['match', ['get', 'class'], classes, true, false];
 
 /** Line width that scales smoothly with zoom: [zoom, width] stops. */
 const widthByZoom = (...stops: [number, number][]) => [
@@ -109,6 +120,25 @@ const layers: Layer[] = [
     'fill-outline-color': palette.forestDark,
   }),
 
+  // Hand-drawn texture over the flat colours: tree stands, grass tufts, reeds, furrows, stipple
+  // and little hatched mountains. Faded in so far-out views stay calm.
+  pattern('texture-farmland', 'landcover', classIn('farmland'), 'pattern-farmland', 12),
+  pattern('texture-grass', 'landcover', classIn('grass'), 'pattern-meadow', 12),
+  pattern('texture-wetland', 'landcover', classIn('wetland'), 'pattern-marsh', 11),
+  pattern('texture-sand', 'landcover', classIn('sand'), 'pattern-sand', 11),
+  pattern('texture-rock', 'landcover', classIn('rock'), 'pattern-rock', 9),
+  pattern('texture-wood', 'landcover', classIn('wood'), 'pattern-forest', 9),
+  {
+    // An inked edge around woodland, like the outline of a drawn forest.
+    id: 'wood-edge',
+    type: 'line',
+    source: SOURCE,
+    'source-layer': 'landcover',
+    filter: classIn('wood'),
+    minzoom: 11,
+    paint: { 'line-color': palette.forestDark, 'line-width': widthByZoom([11, 0.5], [17, 1.6]), 'line-opacity': 0.7 },
+  },
+
   // Settlements read as warm, slightly darker parchment.
   fill(
     'landuse-settlement',
@@ -118,10 +148,12 @@ const layers: Layer[] = [
     { 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.4, 14, 0.7] },
   ),
   fill('landuse-cemetery', 'landuse', classIn('cemetery'), palette.wetland, { 'fill-opacity': 0.6 }),
+  pattern('texture-cemetery', 'landuse', classIn('cemetery'), 'pattern-graves', 14),
   fill('park', 'park', true, palette.meadow, {
     'fill-opacity': 0.6,
     'fill-outline-color': palette.forestDark,
   }),
+  pattern('texture-park', 'park', true, 'pattern-meadow', 13),
 
   // Water: lakes and seas with an inked shoreline.
   fill('water', 'water', ['!=', ['get', 'brunnel'], 'tunnel'], palette.water),
@@ -132,24 +164,29 @@ const layers: Layer[] = [
     'source-layer': 'water',
     paint: {
       'line-color': palette.waterInk,
-      'line-width': widthByZoom([6, 0.4], [16, 1.6]),
-      'line-opacity': 0.6,
+      'line-width': widthByZoom([6, 0.6], [16, 2.2]),
+      'line-opacity': 0.85,
     },
   },
-  {
-    // A faint second shoreline, offset into the water, like hand-drawn ripples.
-    id: 'water-ripple',
+  pattern('texture-water', 'water', ['!=', ['get', 'brunnel'], 'tunnel'], 'pattern-waves', 10),
+  // Fading ripple lines echoing the shore out into the water, the classic drawn-coast look.
+  ...[
+    [1.5, 4, 0.4],
+    [3.5, 10, 0.25],
+    [6, 17, 0.14],
+  ].map(([near, far, opacity], i) => ({
+    id: `water-ripple-${i + 1}`,
     type: 'line',
     source: SOURCE,
     'source-layer': 'water',
     minzoom: 10,
     paint: {
       'line-color': palette.waterInk,
-      'line-width': 0.6,
-      'line-offset': widthByZoom([10, 1.5], [18, 6]),
-      'line-opacity': 0.3,
+      'line-width': 0.7,
+      'line-offset': widthByZoom([10, near], [18, far]),
+      'line-opacity': opacity,
     },
-  },
+  })),
   {
     id: 'waterway',
     type: 'line',
@@ -173,7 +210,20 @@ const layers: Layer[] = [
     },
   },
 
-  // Buildings as small inked blocks once you are close enough to see them.
+  // Buildings as small inked blocks once you are close enough to see them: a dark offset
+  // copy underneath fakes the drop shadow of a hand-drawn roof.
+  {
+    id: 'building-shadow',
+    type: 'fill',
+    source: SOURCE,
+    'source-layer': 'building',
+    minzoom: 14,
+    paint: {
+      'fill-color': palette.buildingEdge,
+      'fill-translate': [1.5, 1.5],
+      'fill-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 15.5, 0.8],
+    },
+  },
   {
     id: 'building',
     type: 'fill',
@@ -182,8 +232,19 @@ const layers: Layer[] = [
     minzoom: 14,
     paint: {
       'fill-color': palette.building,
-      'fill-outline-color': palette.buildingEdge,
-      'fill-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 15.5, 0.9],
+      'fill-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 15.5, 1],
+    },
+  },
+  {
+    id: 'building-ink',
+    type: 'line',
+    source: SOURCE,
+    'source-layer': 'building',
+    minzoom: 15,
+    paint: {
+      'line-color': palette.ink,
+      'line-width': widthByZoom([15, 0.5], [18, 1.2]),
+      'line-opacity': ['interpolate', ['linear'], ['zoom'], 15, 0, 16, 0.75],
     },
   },
 
@@ -296,11 +357,29 @@ const layers: Layer[] = [
     minzoom: 14,
     layout: {
       'text-field': ['get', 'name'],
-      'text-font': FONT_ITALIC,
+      'text-font': FONT_REGULAR,
       'text-size': widthByZoom([14, 10], [18, 14]),
       'symbol-placement': 'line',
     },
     paint: { 'text-color': palette.inkSoft, 'text-halo-color': palette.halo, 'text-halo-width': 1.2 },
+  },
+  {
+    // Named parks and woods, lettered in italics like the forests on an old map.
+    id: 'park-name',
+    type: 'symbol',
+    source: SOURCE,
+    'source-layer': 'park',
+    // The park layer carries a label point per park alongside its polygons.
+    filter: ['all', ['has', 'name'], ['==', ['geometry-type'], 'Point']],
+    minzoom: 13,
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-font': FONT_ITALIC,
+      'text-size': 13,
+      'text-letter-spacing': 0.05,
+      'text-max-width': 7,
+    },
+    paint: { 'text-color': palette.forestDark, 'text-halo-color': palette.halo, 'text-halo-width': 1.2 },
   },
   {
     id: 'peak',
@@ -309,9 +388,13 @@ const layers: Layer[] = [
     'source-layer': 'mountain_peak',
     minzoom: 10,
     layout: {
-      'text-field': ['concat', '▲ ', ['get', 'name']],
+      'icon-image': 'icon-peak',
+      'text-field': ['get', 'name'],
       'text-font': FONT_ITALIC,
-      'text-size': 11,
+      'text-size': 12,
+      'text-anchor': 'top',
+      'text-offset': [0, 0.9],
+      'text-optional': true,
     },
     paint: { 'text-color': palette.inkSoft, 'text-halo-color': palette.halo, 'text-halo-width': 1 },
   },
@@ -323,11 +406,14 @@ const layers: Layer[] = [
     filter: classIn('village', 'hamlet', 'suburb', 'neighbourhood', 'quarter', 'isolated_dwelling'),
     minzoom: 11,
     layout: {
+      'icon-image': ['match', ['get', 'class'], ['village', 'hamlet'], 'icon-village', ''],
       'text-field': ['get', 'name'],
-      'text-font': FONT_REGULAR,
-      'text-size': ['match', ['get', 'class'], 'village', 13, 11],
-      'text-transform': 'uppercase',
-      'text-letter-spacing': 0.2,
+      'text-font': FONT_CAPS,
+      'text-size': ['match', ['get', 'class'], 'village', 15, 13],
+      'text-letter-spacing': 0.08,
+      'text-anchor': ['match', ['get', 'class'], ['village', 'hamlet'], 'top', 'center'],
+      'text-offset': ['match', ['get', 'class'], ['village', 'hamlet'], ['literal', [0, 0.7]], ['literal', [0, 0]]],
+      'text-max-width': 8,
     },
     paint: { 'text-color': palette.inkSoft, 'text-halo-color': palette.halo, 'text-halo-width': 1.5 },
   },
@@ -340,10 +426,14 @@ const layers: Layer[] = [
     minzoom: 8,
     layout: {
       'text-field': ['get', 'name'],
-      'text-font': FONT_BOLD,
-      'text-size': widthByZoom([8, 11], [14, 16]),
-      'text-transform': 'uppercase',
-      'text-letter-spacing': 0.25,
+      'text-font': FONT_CAPS,
+      'icon-image': 'icon-town',
+      'icon-anchor': 'bottom',
+      'text-size': widthByZoom([8, 13], [14, 19]),
+      'text-letter-spacing': 0.12,
+      'text-anchor': 'top',
+      'text-offset': [0, 0.2],
+      'text-max-width': 8,
     },
     paint: { 'text-color': palette.ink, 'text-halo-color': palette.halo, 'text-halo-width': 1.5 },
   },
@@ -355,10 +445,15 @@ const layers: Layer[] = [
     filter: classIn('city'),
     layout: {
       'text-field': ['get', 'name'],
-      'text-font': FONT_BOLD,
-      'text-size': widthByZoom([4, 12], [12, 22]),
-      'text-transform': 'uppercase',
-      'text-letter-spacing': 0.3,
+      'text-font': FONT_CAPS,
+      'icon-image': 'icon-city',
+      'icon-anchor': 'bottom',
+      'icon-size': widthByZoom([4, 0.8], [12, 1.3]),
+      'text-size': widthByZoom([4, 14], [12, 26]),
+      'text-letter-spacing': 0.15,
+      'text-anchor': 'top',
+      'text-offset': [0, 0.2],
+      'text-max-width': 8,
     },
     paint: { 'text-color': palette.ink, 'text-halo-color': palette.halo, 'text-halo-width': 2 },
   },
