@@ -3,6 +3,7 @@ import { Marker, type GeoJSONSource, type Map } from 'maplibre-gl';
 import type { Fix } from '../geo/distance';
 
 const ACCURACY_SOURCE = 'player-accuracy';
+const REACH_SOURCE = 'player-reach';
 
 /** Polygon approximating a circle of `radiusM` metres around a point. */
 function circle(lng: number, lat: number, radiusM: number, steps = 48): Feature<Polygon> {
@@ -38,6 +39,8 @@ function createTokenElement(): HTMLElement {
 export class PlayerMarker {
   private readonly marker: Marker;
   private placed = false;
+  private last: Fix | null = null;
+  private reachM = 0;
 
   constructor(private readonly map: Map) {
     this.marker = new Marker({ element: createTokenElement(), anchor: 'bottom' });
@@ -56,6 +59,15 @@ export class PlayerMarker {
         source: ACCURACY_SOURCE,
         paint: { 'line-color': '#a8772e', 'line-width': 1, 'line-dasharray': [2, 2], 'line-opacity': 0.6 },
       });
+      // How far the player can reach creatures and shrines, so "near" on screen matches the game.
+      map.addSource(REACH_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'player-reach-edge',
+        type: 'line',
+        source: REACH_SOURCE,
+        paint: { 'line-color': '#6b3fa0', 'line-width': 2.5, 'line-dasharray': [3, 2], 'line-opacity': 0.75 },
+      });
+      if (this.last) this.update(this.last);
     };
     if (map.isStyleLoaded()) addLayers();
     else map.once('load', addLayers);
@@ -69,7 +81,15 @@ export class PlayerMarker {
     el.classList.toggle('has-lantern', !!look.lantern);
   }
 
+  /** Radius of the reach ring in metres; 0 hides it. */
+  setReach(metres: number): void {
+    if (metres === this.reachM) return;
+    this.reachM = metres;
+    if (this.last) this.update(this.last);
+  }
+
   update(fix: Fix): void {
+    this.last = fix;
     this.marker.setLngLat([fix.lng, fix.lat]);
     if (!this.placed) {
       this.marker.addTo(this.map);
@@ -77,5 +97,8 @@ export class PlayerMarker {
     }
     const source = this.map.getSource<GeoJSONSource>(ACCURACY_SOURCE);
     source?.setData(circle(fix.lng, fix.lat, fix.accuracy));
+    this.map
+      .getSource<GeoJSONSource>(REACH_SOURCE)
+      ?.setData(this.reachM > 0 ? circle(fix.lng, fix.lat, this.reachM, 72) : { type: 'FeatureCollection', features: [] });
   }
 }
