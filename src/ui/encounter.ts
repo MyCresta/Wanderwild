@@ -5,6 +5,7 @@ import { createCreatureSvg } from '../creatures/view';
 import { elementBadge, rarityBadge, SEAL_SVG } from './badges';
 import type { GameContext } from './context';
 import { h, openSheet, toast, wait } from './dom';
+import { sound } from '../audio/sound';
 
 const TARGET_R = 34;
 const CATCH_XP = 10;
@@ -33,8 +34,10 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
   let finished = false;
   let caught = false;
   let fled = false;
+  const endMusic = sound.scene('wonder');
   sheet.onClose(() => {
     running = false;
+    endMusic();
     if (!finished) onDone(caught, fled);
   });
 
@@ -100,6 +103,7 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
     message.textContent = qualityWord(quality);
 
     seal.classList.add('seal-fly');
+    sound.play('throw');
     await wait(550);
     creature.classList.add('creature-bound');
     seal.classList.add('seal-landed');
@@ -107,6 +111,7 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
       seal.classList.remove('seal-wobble');
       void seal.offsetWidth;
       seal.classList.add('seal-wobble');
+      sound.play('wobble');
       message.textContent = '.'.repeat(i + 1);
       await wait(650);
     }
@@ -119,6 +124,7 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
         toast(`${getSpecies(helper.speciesId).name} grew to level ${helper.level}!`);
       ctx.changed();
       seal.classList.add('seal-glow');
+      sound.play('bind');
       stage.classList.add('stage-success');
       message.textContent = `Bound! ${species.name} joins your bestiary.`;
       finished = true;
@@ -149,12 +155,14 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
     if (Math.random() < fleeChance(species.rarity)) {
       fled = true;
       creature.classList.add('creature-flee');
+      sound.play('flee');
       message.textContent = `The seal cracked and ${species.name} slipped back into the margins.`;
       finished = true;
       onDone(false, true);
       actions.replaceChildren(h('button', { class: 'btn', type: 'button', onclick: () => sheet.close() }, 'Oh well'));
       return;
     }
+    sound.play('breakFree');
     message.textContent = `${species.name} broke free! Try again.`;
     frozen = false;
     leaveBtn.disabled = false;

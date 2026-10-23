@@ -17,6 +17,7 @@ import type { Encounter } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
 import type { GameContext } from './context';
 import { h, openSheet, wait } from './dom';
+import { sound } from '../audio/sound';
 
 const RING_MS = 1100;
 const RING_FROM = 2.4;
@@ -106,7 +107,11 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     reported = true;
     onDone(won);
   };
-  sheet.onClose(() => finish(false));
+  const endMusic = sound.scene('battle');
+  sheet.onClose(() => {
+    endMusic();
+    finish(false);
+  });
 
   const foeSvg = createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 170, facing: -1 });
   const foeSpot = h('div', { class: 'fighter fighter-foe' }, foeSvg);
@@ -220,8 +225,10 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       const attacker = e.attacker === 'pet' ? petSpot : foeSpot;
       const target = e.attacker === 'pet' ? foeSpot : petSpot;
       attacker.classList.add(e.action === 'move' ? 'cast' : 'lunge');
+      sound.play(e.action === 'move' ? 'spell' : 'strike');
       await wait(260);
       target.classList.add('hit');
+      sound.play(e.crit ? 'crit' : e.effectiveness > 1 ? 'weakHit' : 'hit');
       floatText(target, `-${e.damage}`, e.effectiveness > 1 || e.crit ? 'big' : 'dmg');
       refresh();
       await wait(420);
@@ -230,18 +237,21 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       await wait(200);
     } else if (e.kind === 'fireball') {
       foeSpot.classList.add('hit', 'burn');
+      sound.play('crit');
       floatText(foeSpot, `-${e.damage}`, 'big');
       refresh();
       await wait(650);
       foeSpot.classList.remove('hit', 'burn');
     } else if (e.kind === 'heal') {
       petSpot.classList.add('healed');
+      sound.play('reward');
       floatText(petSpot, `+${e.amount}`, 'heal');
       refresh();
       await wait(600);
       petSpot.classList.remove('healed');
     } else if (e.kind === 'swap') {
       petSpot.classList.add('swap-out');
+      sound.play('tap');
       await wait(220);
       showPet();
       petSpot.classList.remove('swap-out');
@@ -257,6 +267,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   const end = () => {
     if (battle.winner === 'pet') {
       foeSpot.classList.add('dissolve');
+      sound.play('victory');
       const reward = victoryRewards(battle.foe);
       const shares = shareXp(battle, reward.xp);
       const grew: string[] = [];
@@ -275,6 +286,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
         ...grew.map((g) => h('strong', { class: 'level-up' }, ` ${g}`)),
       );
     } else {
+      sound.play('defeat');
       finish(false);
       sheet.setTitle('Driven back');
       log.textContent = 'Your party is worn out and retreats to rest. Level up, brew tonics and charge spells by walking, then try again.';
