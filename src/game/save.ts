@@ -1,3 +1,4 @@
+import { newDeeds, parseDeeds, type DeedsState } from './deeds';
 import type { Egg, Hatchling } from './eggs';
 import { BUILDING_IDS, newHearthstead, type HearthsteadState, type SupplyId } from './hearthstead';
 import type { Expedition } from './expeditions';
@@ -47,6 +48,8 @@ export interface SaveData {
   expeditions: Expedition[];
   /** Realms the Wayfarer has stood in, for expeditions. */
   realmsVisited: RealmId[];
+  /** Achievements, their counters and the worn title; see deeds.ts. */
+  deeds: DeedsState;
 }
 
 export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
@@ -75,6 +78,7 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     runes: [],
     expeditions: [],
     realmsVisited: [],
+    deeds: newDeeds(),
   };
 }
 
@@ -162,6 +166,7 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
       boostMs: num(e.boostMs),
     })),
     realmsVisited: strings(raw.realmsVisited).filter(isRealm),
+    deeds: parseDeeds(raw.deeds),
   };
 }
 

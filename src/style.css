@@ -2176,3 +2176,268 @@ body {
   background: var(--parchment);
   font: inherit;
 }
+
+/* ---------- Deeds and titles ---------- */
+
+.deeds-button {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--safe-bottom) + 248px);
+  width: 56px;
+  height: 56px;
+  padding: 8px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 50%;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.deeds-button svg {
+  width: 100%;
+  height: 100%;
+}
+
+.deeds-button:not([data-unseen=''])[data-unseen]::after {
+  content: attr(data-unseen);
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border: 2px solid var(--parchment);
+  border-radius: 999px;
+  background: #8e2b22;
+  color: #fdf6e3;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 18px;
+  text-align: center;
+}
+
+.title-ribbon {
+  margin-top: -8px;
+  padding: 2px 14px 3px;
+  border: 1px solid var(--leather-dark);
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+  background: linear-gradient(#8e2b22, #6a1d16);
+  color: var(--gold);
+  font-size: 12px;
+  font-style: italic;
+  letter-spacing: 0.05em;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.title-ribbon[hidden] {
+  display: none;
+}
+
+.deed-banner {
+  position: fixed;
+  z-index: 25;
+  top: calc(var(--safe-top) + 84px);
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 10px 14px;
+  border: 2px solid var(--gold);
+  border-radius: 12px;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  font: inherit;
+  text-align: left;
+  box-shadow: 0 0 0 3px rgba(243, 210, 122, 0.25), 0 6px 18px rgba(0, 0, 0, 0.5);
+  animation: deed-unroll 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
+  transition: opacity 0.4s, transform 0.4s;
+  cursor: pointer;
+}
+
+.deed-banner .deed-medal {
+  width: 48px;
+  height: 48px;
+  animation: deed-spin 0.9s ease-out;
+}
+
+.deed-banner-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.deed-banner-text small {
+  font-size: 11px;
+  font-variant: small-caps;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
+}
+
+.deed-banner-text b {
+  font-size: 18px;
+}
+
+.deed-banner-text span {
+  color: #f0e4c4;
+  font-size: 13px;
+}
+
+.deed-banner-out {
+  opacity: 0;
+  transform: translateY(-12px);
+}
+
+@keyframes deed-unroll {
+  from {
+    transform: scaleY(0.2) translateY(-20px);
+    opacity: 0;
+  }
+}
+
+@keyframes deed-spin {
+  from {
+    transform: rotateY(540deg) scale(0.4);
+  }
+}
+
+.deed-medal {
+  flex: none;
+  width: 40px;
+  height: 40px;
+}
+
+.deed-medal svg {
+  width: 100%;
+  height: 100%;
+}
+
+.deeds-summary {
+  margin: 0 0 8px;
+  font-style: italic;
+}
+
+.deeds-hint {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.title-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.title-chip {
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid var(--leather);
+  border-radius: 999px;
+  background: rgba(255, 250, 235, 0.6);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-style: italic;
+  cursor: pointer;
+}
+
+.title-chip[aria-checked='true'] {
+  border-color: var(--leather-dark);
+  background: linear-gradient(#8e2b22, #6a1d16);
+  color: var(--gold);
+}
+
+.deed-group h3 {
+  margin: 14px 0 6px;
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+}
+
+.deed-group h3 small {
+  font-weight: normal;
+  opacity: 0.7;
+}
+
+.deed-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(74, 51, 32, 0.3);
+}
+
+.deed:not(.deed-earned) .deed-text b {
+  opacity: 0.75;
+}
+
+.deed-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.deed-text small {
+  opacity: 0.75;
+}
+
+.deed-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.deed-track {
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgba(74, 51, 32, 0.2);
+}
+
+.deed-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #9a7212, var(--gold));
+}
+
+.deed-reward {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  max-width: 34%;
+  text-align: right;
+}
+
+.deed-reward small {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.deed-title-tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #8e2b22;
+  color: #fdf6e3;
+  font-size: 11px;
+  font-style: italic;
+}
+
+.deed-secret .deed-text {
+  font-style: italic;
+  opacity: 0.7;
+}
