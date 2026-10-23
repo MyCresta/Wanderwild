@@ -15,6 +15,8 @@ export interface Collection {
   version: 1;
   pets: OwnedPet[];
   companionUid: string | null;
+  /** Up to two more pets that join the companion in battle, by uid. */
+  party: string[];
   /** Binding seals, spent to catch Wildlings and earned by walking and battles. */
   seals: number;
   /** Species met at least once, for the bestiary. */
@@ -39,6 +41,7 @@ export function emptyCollection(): Collection {
     version: 1,
     pets: [],
     companionUid: null,
+    party: [],
     seals: STARTING_SEALS,
     seen: [],
     cleared: {},
@@ -74,6 +77,31 @@ const newUid = () => `${Date.now().toString(36)}${(uidCounter++).toString(36)}${
 
 export function companion(c: Collection): OwnedPet | null {
   return c.pets.find((p) => p.uid === c.companionUid) ?? c.pets[0] ?? null;
+}
+
+/** The battle party: the companion first, then up to two chosen pets. */
+export function partyPets(c: Collection): OwnedPet[] {
+  const lead = companion(c);
+  if (!lead) return [];
+  const rest = c.party
+    .filter((uid) => uid !== lead.uid)
+    .map((uid) => c.pets.find((p) => p.uid === uid))
+    .filter((p): p is OwnedPet => !!p);
+  return [lead, ...rest].slice(0, 3);
+}
+
+/** Adds a pet to the party, or takes it out. Returns whether it is now in the party. */
+export function togglePartyMember(c: Collection, uid: string): boolean {
+  const lead = companion(c);
+  if (uid === lead?.uid) return true;
+  const i = c.party.indexOf(uid);
+  if (i >= 0) {
+    c.party.splice(i, 1);
+    return false;
+  }
+  c.party = c.party.filter((u) => u !== lead?.uid && c.pets.some((p) => p.uid === u)).slice(-1);
+  c.party.push(uid);
+  return true;
 }
 
 export function markSeen(c: Collection, speciesId: string): void {

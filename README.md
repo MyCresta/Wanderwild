@@ -21,6 +21,10 @@ A mobile-first, location-based fantasy game: explore the real world on a fantasy
   - Six **Wildlings** to bind and raise: Bramblet, Driftfin, Emberkit, Cragmite, Wisplume and Lumoth. Each one is an individual with its own colouring and temperament, and about 1 in 48 is Gilded.
   - Four **Blotspawn** to drive off with your companion: Smudgeling, Murkwing, Thornmaw and Wickwraith. Each is weak to one element.
   - Pick a starter, catch Wildlings by timing a binding seal against a closing ring, fight Blotspawn in turn-based battles, and level companions up to 30. Walking earns a seal every 100 m and gives your companion 1 XP every 25 m.
+  - **Party battles.** Your companion leads a party of up to three (pick them in the satchel). Swap pets mid-fight, and send in another when one is worn out. Pets that fought get full XP, the bench half.
+  - **Timing strikes.** Each attack shows a rune circle closing on the foe; tap as the rings meet for a critical hit.
+  - **Wayfarer spells** charged by walking: Fireball after 300 m (damage grows with your level, ignores defence) and Mending after 500 m (heals the party). **Tonics** from the Herb Garden heal the active pet.
+  - Eggs that hatch join the bestiary as new Wildlings.
   - Each creature leans towards its realm: Bramble kin in the Wildwood, Tide kin by water, and more Blotspawn in the Barrows.
 
 ## Run it

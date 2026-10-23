@@ -18,9 +18,10 @@ import { installProbeLayers, realmAt, shrinesNear } from './map/realmProbe';
 import { ShrineLayer } from './map/shrineLayer';
 import { Hud } from './hud/hud';
 import { HearthsteadPanel } from './hud/hearthsteadPanel';
+import { renderParty } from './hud/partyPanel';
 import { formatWait } from './hud/format';
 import { CompanionMarker, CreatureMarkers } from './map/creatures';
-import { companion, loadCollection, saveCollection, walkRewards } from './creatures/collection';
+import { addPet, companion, loadCollection, saveCollection, walkRewards } from './creatures/collection';
 import { spawnsNear, type Spawn } from './game/spawns';
 import { getSpecies } from './creatures/species';
 import { creatureForSpawn, type Encounter } from './creatures/stats';
@@ -125,8 +126,34 @@ const creatureGame: GameContext = {
     deeds?.check();
   },
 };
+creatureGame.wayfarer = {
+  level: () => game.level.level,
+  tonics: () => game.save.supplies.tonic,
+  useTonic: () => game.useTonic(),
+  spellMetres: () => game.save.spellChargeM,
+  spendSpell: (m) => game.spendSpell(m),
+};
 creatureGame.changed();
 deeds = new DeedKeeper(game, collection, $('deeds'), $('wayfarer-title'));
+$('satchel-open').addEventListener('click', () => renderParty($('satchel-party'), creatureGame));
+
+/** Hatched eggs join the collection as Wildlings (re-rolling past any Blotspawn the seed picks). */
+function claimHatchlings(): void {
+  const level = companion(collection)?.level ?? 1;
+  for (const h of game.save.hatchlings.splice(0)) {
+    for (let i = 0; i < 20; i++) {
+      const encounter = creatureForSpawn({ seed: (h.seed + i * 7919) >>> 0, rarity: h.rarity }, level);
+      if (encounter.species.kind !== 'pet') continue;
+      addPet(collection, { ...encounter, level: Math.max(1, Math.min(level, encounter.level)) });
+      toast(`A ${encounter.species.name} hatched and joined your bestiary!`);
+      break;
+    }
+  }
+  game.changed();
+  creatureGame.changed();
+}
+game.on((event) => event.kind === 'hatch' && claimHatchlings());
+if (game.save.hatchlings.length) claimHatchlings();
 
 /** Removes a spawn that was caught, beaten or fled; only the first two earn Wayfarer XP. */
 function clearSpawn(spawn: Spawn, won: boolean, kind: 'pet' | 'monster'): void {
