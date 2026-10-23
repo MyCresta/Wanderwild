@@ -111,8 +111,8 @@ describe('evolution', () => {
     for (const e of EVOLVED) expect(EVOLVED_ART[e.id]).toBeTypeOf('function');
   });
 
-  it('needs the level and the walk in the home realm, then keeps level and seed', async () => {
-    const { evolve, evolutionStatus, walkInRealm } = await import('../src/creatures/evolution');
+  it('needs the level, the walk and a Ring in the home realm, then keeps level and seed', async () => {
+    const { evolve, evolutionStatus, ringInRealm, walkInRealm } = await import('../src/creatures/evolution');
     const c = emptyCollection();
     const pet = addPet(c, { species: getSpecies('bramblet'), level: 9, seed: 5 });
     expect(walkInRealm(c, 5000, 'tidemere')).toBeNull();
@@ -120,9 +120,14 @@ describe('evolution', () => {
     expect(walkInRealm(c, 5000, 'wildwood')).toBeNull(); // walked enough, but only level 9
     expect(evolve(c, pet)).toBeNull();
     pet.level = 10;
+    expect(evolutionStatus(pet)!.ready).toBe(false); // still needs a Ring at home
+    expect(ringInRealm(c, 'tidemere')).toBeNull();
+    expect(ringInRealm(c, 'wildwood')).toEqual({ pet, ready: true });
+    expect(ringInRealm(c, 'wildwood')).toBeNull(); // only counts once
     expect(evolutionStatus(pet)!.ready).toBe(true);
     expect(evolve(c, pet)!.id).toBe('thornwarden');
     expect(pet).toMatchObject({ speciesId: 'thornwarden', level: 10, seed: 5 });
+    expect(pet.homeRing).toBeUndefined();
     expect(c.seen).toContain('thornwarden');
     expect(evolutionStatus(pet)).toBeNull();
   });

@@ -97,7 +97,7 @@ function evolutionPanel(ctx: GameContext, sheet: Sheet, pet: OwnedPet) {
     const species = getSpecies(pet.speciesId);
     return species.kind === 'pet' && species.stage === 2 ? h('p', { class: 'hint' }, '✦ Fully evolved.') : '';
   }
-  const { evolution, walked, ready } = status;
+  const { evolution, walked, ringed, ready } = status;
   const km = (m: number) => (m / 1000).toFixed(m < 1000 ? 2 : 1);
   return h(
     'div',
@@ -108,7 +108,9 @@ function evolutionPanel(ctx: GameContext, sheet: Sheet, pet: OwnedPet) {
       {},
       `Reach level ${evolution.level} `,
       pet.level >= evolution.level ? '✓' : `(now ${pet.level})`,
-      ` and walk ${km(evolution.metres)} km in ${REALMS[evolution.realm].name} as your companion.`,
+      `, walk ${km(evolution.metres)} km in ${REALMS[evolution.realm].name} as your companion, and walk a Ring there together `,
+      ringed ? '✓' : '(not yet)',
+      '.',
     ),
     h('div', { class: 'xp' }, h('span', { class: 'xp-track' }, h('span', { class: 'xp-fill evo-fill', style: { width: `${(walked / evolution.metres) * 100}%` } })), h('small', {}, `${km(walked)} / ${km(evolution.metres)} km walked there`)),
     ready &&
