@@ -3222,9 +3222,6 @@ body:has(.catch-scene) .banners {
 /* The ⚔ map button and the Blotspawn board. */
 
 .fight-button {
-  width: 56px;
-  height: 56px;
-  padding: 8px;
   border: 2px solid var(--leather-dark);
   border-radius: 50%;
   background: linear-gradient(var(--leather), var(--leather-dark));
