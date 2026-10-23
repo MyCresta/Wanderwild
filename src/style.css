@@ -501,94 +501,6 @@ body {
   margin-top: 0;
 }
 
-.bind-ring {
-  position: absolute;
-  inset: 10px;
-  width: 220px;
-  height: 220px;
-  pointer-events: none;
-}
-
-.bind-target {
-  fill: none;
-  stroke: var(--leather);
-  stroke-width: 2;
-  stroke-dasharray: 4 4;
-  opacity: 0.6;
-}
-
-.bind-closing {
-  fill: none;
-  stroke: #c9a24a;
-  stroke-width: 3;
-  opacity: 0.85;
-}
-
-.bind-good {
-  stroke: #f3d27a;
-  stroke-width: 5;
-  filter: drop-shadow(0 0 4px #f3d27a);
-}
-
-.creature-bound {
-  transform: scale(0.05);
-  opacity: 0;
-}
-
-.creature-flee {
-  transform: translateY(-40px) scale(0.6);
-  opacity: 0;
-  transition: transform 0.8s ease-out, opacity 0.8s ease-out;
-}
-
-.seal-throw {
-  position: absolute;
-  left: 50%;
-  bottom: -60px;
-  width: 52px;
-  height: 52px;
-  margin-left: -26px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.seal-fly {
-  opacity: 1;
-  transform: translateY(-150px) rotate(540deg);
-  transition: transform 0.55s cubic-bezier(0.2, 0.7, 0.3, 1), opacity 0.1s;
-}
-
-.seal-wobble svg {
-  animation: seal-wobble 0.6s ease-in-out;
-}
-
-.seal-glow svg {
-  filter: drop-shadow(0 0 10px #f3d27a);
-  animation: seal-pop 0.5s ease-out;
-}
-
-@keyframes seal-wobble {
-  25% {
-    transform: rotate(-18deg);
-  }
-  75% {
-    transform: rotate(18deg);
-  }
-}
-
-@keyframes seal-pop {
-  50% {
-    transform: scale(1.35);
-  }
-}
-
-.encounter-message {
-  min-height: 1.4em;
-  margin: 4px 0;
-  text-align: center;
-  font-weight: bold;
-}
-
 /* ---------- Battle ---------- */
 
 .arena {
@@ -898,9 +810,447 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .sheet,
   .sheet-backdrop,
-  .fighter,
-  .seal-fly {
+  .fighter {
     animation: none;
     transition: none;
+  }
+}
+
+/* ---------- Catch scene ---------- */
+
+.catch-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow: hidden;
+  background: var(--parchment);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  animation: catch-in 0.35s ease-out;
+}
+
+.catch-out {
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+@keyframes catch-in {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+}
+
+.catch-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  filter: sepia(0.22);
+}
+
+/* The same paper grain as the map, over the scene. */
+.catch-scene::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(74, 46, 20, 0.35) 100%);
+}
+
+.catch-field {
+  position: absolute;
+  inset: 0;
+}
+
+.catch-top {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--safe-top) + 10px);
+  left: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 14px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 12px;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--parchment);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+
+.catch-title {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.catch-title strong {
+  color: var(--gold);
+  font-size: 19px;
+}
+
+.catch-seals {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gold);
+  font-size: 18px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+.catch-seals svg {
+  width: 26px;
+  height: 26px;
+}
+
+.catch-run {
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 1px solid rgba(243, 210, 122, 0.5);
+  border-radius: 8px;
+  background: none;
+  color: var(--parchment);
+  font: inherit;
+  cursor: pointer;
+}
+
+.catch-creature {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+.catch-platform {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 2%;
+  height: 16%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255, 248, 225, 0.75), rgba(255, 248, 225, 0) 70%);
+}
+
+.catch-creature-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.45s ease-in, opacity 0.45s ease-in, filter 0.45s;
+}
+
+.catch-creature-inner .creature {
+  width: 100%;
+  height: 100%;
+}
+
+.catch-sucked {
+  transform: scale(0.04) rotate(200deg);
+  opacity: 0;
+  filter: brightness(3) sepia(1);
+}
+
+.catch-flee {
+  transform: translateY(-60px) scale(0.5);
+  opacity: 0;
+  filter: blur(6px) brightness(0.2);
+  transition-duration: 1s;
+}
+
+.catch-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.catch-ring-hidden {
+  opacity: 0;
+}
+
+.catch-ring-outer {
+  fill: none;
+  stroke: rgba(255, 248, 225, 0.85);
+  stroke-width: 2.5;
+  stroke-dasharray: 6 5;
+}
+
+.catch-ring-closing {
+  fill: none;
+  stroke-width: 5;
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.8));
+}
+
+.catch-seal {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 64px;
+  height: 64px;
+  cursor: grab;
+  touch-action: none;
+  will-change: transform;
+  filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.4));
+}
+
+.catch-seal svg {
+  width: 100%;
+  height: 100%;
+}
+
+.catch-seal::before {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border: 2px dashed rgba(243, 210, 122, 0.8);
+  border-radius: 50%;
+  animation: seal-idle 2s ease-in-out infinite;
+}
+
+.catch-seal-held,
+.catch-seal-empty {
+  cursor: grabbing;
+}
+
+.catch-seal-held::before,
+.catch-seal-empty::before {
+  display: none;
+}
+
+.catch-seal-empty {
+  opacity: 0.35;
+}
+
+@keyframes seal-idle {
+  50% {
+    transform: scale(1.15);
+    opacity: 0.4;
+  }
+}
+
+.catch-seal-fall svg {
+  animation: seal-fall 0.5s ease-in forwards;
+}
+
+@keyframes seal-fall {
+  to {
+    transform: translateY(60px) rotate(120deg);
+    opacity: 0;
+  }
+}
+
+.catch-seal-burst svg {
+  animation: seal-burst 0.45s ease-out forwards;
+}
+
+@keyframes seal-burst {
+  40% {
+    transform: scale(1.4);
+  }
+  to {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+}
+
+.catch-seal-glow svg {
+  filter: drop-shadow(0 0 14px #f3d27a) drop-shadow(0 0 4px #fff);
+  animation: seal-pop 0.6s ease-out;
+}
+
+@keyframes seal-pop {
+  50% {
+    transform: scale(1.5);
+  }
+}
+
+.catch-press {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  border: 4px solid #f3d27a;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(243, 210, 122, 0.8);
+}
+
+.catch-press[hidden] {
+  display: none;
+}
+
+.catch-press-now {
+  border-color: #fff8e6;
+  box-shadow: 0 0 16px #f3d27a, inset 0 0 10px #f3d27a;
+}
+
+.catch-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.catch-popup {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  color: #fff8e6;
+  font-size: 26px;
+  font-weight: bold;
+  font-variant: small-caps;
+  white-space: nowrap;
+  text-shadow: 0 2px 0 var(--leather-dark), 0 0 8px rgba(0, 0, 0, 0.6);
+  animation: popup 1.2s ease-out forwards;
+}
+
+.catch-popup-grade {
+  color: #f3d27a;
+  font-size: 32px;
+}
+
+.catch-popup-miss {
+  color: #f0c8bf;
+  font-size: 22px;
+}
+
+@keyframes popup {
+  0% {
+    transform: translate(-50%, -30%) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, -110%) scale(1);
+    opacity: 0;
+  }
+}
+
+.catch-particle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  animation: particle 0.9s ease-out forwards;
+}
+
+.catch-particle-star {
+  width: auto;
+  height: auto;
+  margin: -10px 0 0 -6px;
+  font-size: 18px;
+  text-shadow: 0 0 6px currentColor;
+}
+
+@keyframes particle {
+  to {
+    transform: translate(var(--dx), var(--dy)) scale(0.3);
+    opacity: 0;
+  }
+}
+
+.catch-bottom {
+  position: absolute;
+  z-index: 2;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--safe-bottom) + 14px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.catch-bottom > * {
+  pointer-events: auto;
+}
+
+.catch-hint {
+  max-width: 360px;
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(232, 217, 181, 0.88);
+  text-align: center;
+  font-size: 14px;
+}
+
+.catch-hint:empty {
+  display: none;
+}
+
+.catch-throw {
+  min-height: 40px;
+  padding: 4px 14px;
+  font-size: 14px;
+  font-weight: normal;
+  opacity: 0.85;
+}
+
+.catch-result {
+  position: absolute;
+  z-index: 3;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--safe-bottom) + 12px);
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 12px 16px 16px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 16px;
+  background: linear-gradient(var(--parchment), var(--parchment-dark));
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.45);
+  text-align: center;
+  animation: sheet-up 0.35s ease-out;
+}
+
+.catch-result h2 {
+  margin: 0;
+  color: #8e2b22;
+  font-size: 28px;
+  font-variant: small-caps;
+}
+
+.catch-result .creature {
+  margin: 0 auto;
+}
+
+.catch-result-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.catch-result-name small {
+  font-weight: normal;
+  font-size: 14px;
+}
+
+.catch-rewards {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  color: #4b6a3c;
+  font-weight: bold;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .catch-scene,
+  .catch-seal::before {
+    animation: none;
   }
 }

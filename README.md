@@ -12,7 +12,7 @@ A mobile-first, location-based fantasy game: explore the real world on a fantasy
 - **The Inkbound Bestiary.** Creatures that wandered off the margins of old maps now roam the streets around you, all drawn and animated in code with SVG and trigonometry (no image files).
   - Six **Wildlings** to bind and raise: Bramblet, Driftfin, Emberkit, Cragmite, Wisplume and Lumoth. Each one is an individual with its own colouring and temperament, and about 1 in 48 is Gilded.
   - Four **Blotspawn** to drive off with your companion: Smudgeling, Murkwing, Thornmaw and Wickwraith. Each is weak to one element.
-  - Pick a starter, catch Wildlings by timing a binding seal against a closing ring, fight Blotspawn in turn-based battles, and level companions up to 30. Walking earns a seal every 100 m and gives your companion 1 XP every 25 m.
+  - Pick a starter, catch Wildlings in a full-screen scene (flick a binding seal at a creature that wanders and dodges, time it to the closing ring whose colour shows your odds, then tap in time to hold the seal shut as it wobbles), fight Blotspawn in turn-based battles, and level companions up to 30. Walking earns a seal every 100 m and gives your companion 1 XP every 25 m.
   - Spawns are deterministic per ~130 m cell and 15-minute window. Everything is saved on the device.
 
 ## Run it
