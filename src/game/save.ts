@@ -1,3 +1,4 @@
+import { newDeeds, parseDeeds, type DeedsState } from './deeds';
 import type { MaterialId } from './realms';
 
 /**
@@ -30,6 +31,8 @@ export interface SaveData {
   /** Owned by the creatures code; its shape is defined there. */
   pets: unknown[];
   gear: unknown[];
+  /** Achievements, their counters and the worn title; see deeds.ts. */
+  deeds: DeedsState;
 }
 
 export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
@@ -49,6 +52,7 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     visitedCells: [],
     pets: [],
     gear: [],
+    deeds: newDeeds(),
   };
 }
 
@@ -86,6 +90,7 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
     visitedCells: strings(raw.visitedCells),
     pets: Array.isArray(raw.pets) ? raw.pets : [],
     gear: Array.isArray(raw.gear) ? raw.gear : [],
+    deeds: parseDeeds(raw.deeds),
   };
 }
 

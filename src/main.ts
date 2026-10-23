@@ -28,6 +28,7 @@ import { openBattle } from './ui/battle';
 import { openBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
 import { openEncounter } from './ui/encounter';
+import { DeedKeeper } from './ui/deeds';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -107,18 +108,22 @@ const shrines = new ShrineLayer(map, useShrine);
 // Creatures: the collection, wild spawns around the player, and the companion at their side.
 const collection = loadCollection();
 const companionMarker = new CompanionMarker(map);
+// Deeds read the collection, so they are set up just after it.
+let deeds: DeedKeeper | undefined;
 const creatureGame: GameContext = {
   collection,
   changed() {
     saveCollection(collection);
     sealsEl.textContent = String(collection.seals);
     companionMarker.setPet(companion(collection));
+    deeds?.check();
   },
 };
 creatureGame.changed();
+deeds = new DeedKeeper(game, collection, $('deeds'), $('wayfarer-title'));
 
 /** Removes a spawn that was caught, beaten or fled; only the first two earn Wayfarer XP. */
-function clearSpawn(spawn: Spawn, won: boolean): void {
+function clearSpawn(spawn: Spawn, won: boolean, kind: 'pet' | 'monster'): void {
   collection.cleared[spawn.id] = spawn.expiresAt;
   creatures.remove(spawn.id);
   if (won) {
@@ -126,6 +131,7 @@ function clearSpawn(spawn: Spawn, won: boolean): void {
     game.changed();
   }
   creatureGame.changed();
+  if (won) deeds?.win(kind, spawn.rarity);
 }
 
 function meet(spawn: Spawn, encounter: Encounter): void {
@@ -136,11 +142,11 @@ function meet(spawn: Spawn, encounter: Encounter): void {
     return;
   }
   if (encounter.species.kind === 'pet') {
-    openEncounter(creatureGame, encounter, (caught, fled) => (caught || fled) && clearSpawn(spawn, caught));
+    openEncounter(creatureGame, encounter, (caught, fled) => (caught || fled) && clearSpawn(spawn, caught, 'pet'));
   } else if (!companion(collection)) {
     toast('You need a companion to face Blotspawn.');
   } else {
-    openBattle(creatureGame, encounter, (won) => won && clearSpawn(spawn, true));
+    openBattle(creatureGame, encounter, (won) => won && clearSpawn(spawn, true, 'monster'));
   }
 }
 
@@ -181,6 +187,7 @@ function refreshWorld(): void {
   if (realm) {
     currentRealm = realm;
     hud.setRealm(realm);
+    deeds?.enterRealm(realm);
   }
   const now = Date.now();
   const near = shrinesNear(map, lastFix.lng, lastFix.lat, SHRINE_SHOW_M);
@@ -218,6 +225,7 @@ function onFix(fix: Fix): void {
     if (pet && reward.levels > 0 && before !== pet.level) toast(`${getSpecies(pet.speciesId).name} grew to level ${pet.level} on the road!`);
     if (reward.seals > 0) toast(`Found ${reward.seals > 1 ? `${reward.seals} binding seals` : 'a binding seal'} along the way.`);
     creatureGame.changed();
+    deeds?.walk(metres, fix.time);
   }
   refreshSpawns(firstFix);
   if (fix.accuracy <= 40) game.visit(fix.lat, fix.lng);
