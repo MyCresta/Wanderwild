@@ -43,6 +43,11 @@ export class CreatureMarkers {
     }
   }
 
+  /** Dims creatures the player cannot reach yet, so near-looking ones are not a surprise. */
+  markReach(inReach: (spawn: Spawn) => boolean): void {
+    for (const { marker, spawn } of this.placed.values()) marker.getElement().classList.toggle('out-of-reach', !inReach(spawn));
+  }
+
   remove(id: string): void {
     this.placed.get(id)?.marker.remove();
     this.placed.delete(id);
