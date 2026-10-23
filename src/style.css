@@ -1257,11 +1257,195 @@ body {
   border: 1px solid #2a1d10;
 }
 
+/* ---- Hearthstead ---- */
+.hearthstead-open {
+  position: fixed;
+  left: 16px;
+  bottom: calc(var(--safe-bottom) + 116px);
+  width: 56px;
+  height: 56px;
+  padding: 9px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 50%;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.hearthstead-open[hidden] {
+  display: none;
+}
+
+.hearthstead-open svg {
+  width: 100%;
+  height: 100%;
+}
+
+.hearthstead-open.ready {
+  box-shadow: 0 0 0 3px var(--gold), 0 0 14px var(--gold);
+}
+
+.hud-distance {
+  position: relative;
+}
+
+.stride-pop {
+  position: absolute;
+  top: 100%;
+  font-size: 12px;
+  font-weight: bold;
+  color: #9fe3d0;
+  white-space: nowrap;
+  opacity: 0;
+}
+
+.stride-pop.show {
+  animation: stride-pop 2.2s ease-out;
+}
+
+@keyframes stride-pop {
+  15%,
+  70% {
+    opacity: 1;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.stride-note {
+  margin: 6px 0 12px !important;
+  padding: 8px 10px;
+  border-left: 3px solid #2f6b55;
+  background: rgba(47, 107, 85, 0.1);
+}
+
+.buildings,
+.eggs {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.building {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--parchment-dark);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.building.locked {
+  opacity: 0.6;
+}
+
+.building-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.building-head small {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--leather);
+}
+
+.building-level {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: bold;
+  color: #2f6b55;
+}
+
+.building-bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(59, 42, 26, 0.18);
+  overflow: hidden;
+}
+
+.building-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #6f8455, #c99a3a);
+}
+
+.building-stats,
+.building-lock {
+  font-size: 13px !important;
+}
+
+.building-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.building button,
+.building-actions button {
+  flex: 1;
+  padding: 8px 10px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 8px;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  font: inherit;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.building-actions button:last-child {
+  flex: 2;
+}
+
+.building button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.eggs li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 14px;
+}
+
+.eggs .building-bar {
+  grid-column: 2;
+}
+
+.egg {
+  grid-row: span 2;
+  width: 24px;
+  height: 30px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  border: 2px solid var(--leather-dark);
+  background: radial-gradient(circle at 35% 30%, #fff, #e8d9b5 60%);
+}
+
+.egg-5 {
+  background: radial-gradient(circle at 35% 30%, #fff, #9fe3d0 60%);
+}
+
+.egg-10 {
+  background: radial-gradient(circle at 35% 30%, #fff, #c9a0e8 60%);
+}
+
 /* ---------- Deeds and titles ---------- */
 
 .deeds-button {
   position: fixed;
-  left: 16px;
+  right: 16px;
   bottom: calc(var(--safe-bottom) + 116px);
   width: 56px;
   height: 56px;
