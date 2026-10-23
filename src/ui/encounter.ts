@@ -28,6 +28,7 @@ import {
 } from './catch/physics';
 import type { GameContext } from './context';
 import { h, toast, wait } from './dom';
+import { sound } from '../audio/sound';
 
 const CATCH_XP = 10;
 const NEW_SPECIES_SEALS = 2;
@@ -101,6 +102,7 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
   const hint = h('p', { class: 'catch-hint' }, 'Flick the seal up at the creature when the ring is small. Its colour shows your odds.');
   const throwBtn = h('button', { class: 'btn catch-throw', type: 'button' }, 'Throw straight');
   const bottom = h('footer', { class: 'catch-bottom' }, hint, throwBtn);
+  const endMusic = sound.scene('wonder');
   const scene = h('div', { class: 'catch-scene', role: 'dialog', 'aria-modal': 'true', 'aria-label': `A wild ${species.name}` }, backdrop.svg, field, top, bottom);
   document.body.appendChild(scene);
 
@@ -174,6 +176,7 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
   const close = () => {
     if (!scene.isConnected) return;
     running = false;
+    endMusic();
     state = 'done';
     window.removeEventListener('resize', layout);
     scene.classList.add('catch-out');
@@ -232,6 +235,7 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
     state = 'flight';
     updateSeals();
     vibrate(15);
+    sound.play('throw');
     const to = landingPoint(from, velocity, maxReach);
     flight = { from, to, at: performance.now() };
     if (Math.random() < dodgeChance(species.rarity, wariness)) dodge = { at: clock() + 0.12, dir: to.x <= creaturePos.x ? 1 : -1 };
@@ -242,6 +246,7 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
       state = 'capture';
       const word = landed.y < creaturePos.y - size * 0.4 ? 'Too far!' : landed.y > creaturePos.y + size * 0.4 ? 'Too short!' : 'Missed!';
       popup(word, landed, 'catch-popup-miss');
+      sound.play('error');
       burst(landed, '#8e2b22', 8, 40);
       sealEl.classList.add('catch-seal-fall');
       await wait(500);
@@ -301,6 +306,7 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
         } else popup(s < PRESS_AT ? 'Too soon' : 'Too late', { x: at.x, y: at.y - 56 }, 'catch-popup-miss');
       };
       scene.addEventListener('pointerdown', onPress);
+      sound.play('wobble');
       void tween(WOBBLE_S * 1000, (p) => {
         const s = p * WOBBLE_S;
         // The press ring closes in and meets the seal's edge at PRESS_AT.
@@ -327,6 +333,7 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
     sealEl.classList.remove('catch-seal-burst');
     if (Math.random() < fleeChance(species.rarity) + 0.05 * wariness) {
       creatureInner.classList.add('catch-flee');
+      sound.play('flee');
       burst(at, '#2a1d3a', 18, 110);
       hint.textContent = `The seal cracked and ${species.name} slipped back into the margins of the map.`;
       finished = true;
@@ -336,6 +343,7 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
       bottom.appendChild(h('button', { class: 'btn btn-primary', type: 'button', onclick: close }, 'Back to the map'));
       return;
     }
+    sound.play('breakFree');
     popup('It broke free!', { x: at.x, y: at.y - size * 0.55 }, 'catch-popup-miss');
     hint.textContent = wariness > 1 ? `${species.name} is getting wary and will dodge more.` : 'So close! Try again.';
     frozen = false;
@@ -354,6 +362,7 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
     onDone(true, false);
     vibrate([20, 60, 20, 60, 80]);
     sealEl.classList.add('catch-seal-glow');
+    sound.play('bind');
     burst(sealPos, '#f3d27a', 24, 140, 'star');
     hint.textContent = '';
     throwBtn.remove();
