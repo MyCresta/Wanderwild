@@ -28,7 +28,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2,pbf}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // Branch previews live under /preview/ on the same site; let them load their own pages.
         navigateFallbackDenylist: [/\/preview\//],
