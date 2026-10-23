@@ -24,6 +24,8 @@ Browsers only share GPS with secure pages, so to try it on a phone use the GitHu
 
 `.github/workflows/deploy.yml` tests and builds every push and pull request, and publishes `main` to GitHub Pages. Turn it on once under **Settings > Pages > Source: GitHub Actions**; the game is then at `https://<owner>.github.io/Wanderwild/`.
 
+Every `claude/*` branch also gets a preview build on the same site, so work in progress can be tried on a phone before it is merged: `https://<owner>.github.io/Wanderwild/preview/<branch name with / replaced by ->/`. The list of live previews is at `/Wanderwild/preview/`. Pushing to a preview branch rebuilds the whole site from `main` (only `main` may deploy to Pages), and deleting the branch removes its preview. Previews share the main game's saved progress on the device, since they are on the same site.
+
 ## Layout
 
 - `src/map/fantasyStyle.ts`: the parchment map style (OpenMapTiles schema).
