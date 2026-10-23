@@ -1,0 +1,185 @@
+:root {
+  --parchment: #e8d9b5;
+  --parchment-dark: #d9c59a;
+  --ink: #3b2a1a;
+  --leather: #4a3320;
+  --leather-dark: #2f2014;
+  --gold: #f3d27a;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+  font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--parchment);
+  color: var(--ink);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#map {
+  position: fixed;
+  inset: 0;
+}
+
+/* Paper grain and a burnt vignette over the whole map. Never blocks touches. */
+.parchment-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(74, 46, 20, 0.35) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.25 0 0 0 0 0.12 0 0 0 0.22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
+
+.hud {
+  position: fixed;
+  top: calc(var(--safe-top) + 12px);
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.hud-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 20px 10px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 10px;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(243, 210, 122, 0.35);
+  color: var(--parchment);
+}
+
+.hud-label {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.hud-value {
+  font-size: 22px;
+  font-weight: bold;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.notice {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--safe-bottom) + 120px);
+  margin: 0 auto;
+  max-width: 420px;
+  padding: 10px 14px;
+  border: 1px solid var(--leather);
+  border-radius: 8px;
+  background: rgba(232, 217, 181, 0.95);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  text-align: center;
+  font-size: 15px;
+}
+
+.recenter {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--safe-bottom) + 48px);
+  width: 56px;
+  height: 56px;
+  padding: 8px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 50%;
+  background: var(--parchment);
+  color: var(--leather);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.recenter[aria-pressed='true'] {
+  background: var(--leather);
+  color: var(--gold);
+}
+
+.recenter svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Player token: a hooded wanderer standing on a glowing rune ring. */
+.player-token {
+  position: relative;
+  width: 40px;
+  height: 48px;
+  pointer-events: none;
+}
+
+.player-figure {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
+}
+
+.player-rune {
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 44px;
+  height: 18px;
+  margin-left: -22px;
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--gold);
+  animation: rune-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes rune-pulse {
+  50% {
+    transform: scale(1.25);
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-rune {
+    animation: none;
+  }
+}
+
+.maplibregl-ctrl-attrib {
+  font-family: system-ui, sans-serif;
+}
+
+.install {
+  position: fixed;
+  left: 16px;
+  bottom: calc(var(--safe-bottom) + 56px);
+  padding: 10px 16px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 999px;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  font: inherit;
+  font-size: 15px;
+  font-weight: bold;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.install[hidden] {
+  display: none;
+}
