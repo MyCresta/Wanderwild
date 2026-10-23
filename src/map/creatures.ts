@@ -30,9 +30,11 @@ export class CreatureMarkers {
       if (this.placed.has(spawn.id)) continue;
       const el = document.createElement('button');
       el.type = 'button';
-      el.className = `map-creature map-creature-${encounter.species.kind} map-creature-${encounter.species.rarity}`;
+      const rank = encounter.rank && encounter.rank !== 'normal' ? ` map-creature-rank-${encounter.rank}` : '';
+      el.className = `map-creature map-creature-${encounter.species.kind} map-creature-${encounter.species.rarity}${rank}`;
       el.dataset.lngLat = `${spawn.lng},${spawn.lat}`;
-      el.setAttribute('aria-label', `${encounter.species.kind === 'pet' ? 'Wild' : 'Hostile'} ${encounter.species.name}, level ${encounter.level}`);
+      const rankName = encounter.rank === 'elite' ? 'Elite ' : encounter.rank === 'rare' ? 'Rare ' : '';
+      el.setAttribute('aria-label', `${encounter.species.kind === 'pet' ? 'Wild' : `Hostile ${rankName}`}${encounter.species.name}, level ${encounter.level}`);
       el.appendChild(createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 64 }));
       el.addEventListener('click', (event) => {
         event.stopPropagation();

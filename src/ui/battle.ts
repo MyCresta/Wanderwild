@@ -1,4 +1,5 @@
 import {
+  ARTS,
   Battle,
   CRIT_QUALITY,
   makeFighter,
@@ -6,19 +7,23 @@ import {
   SPELLS,
   victoryRewards,
   type Action,
+  type Attack,
   type BattleEvent,
   type Fighter,
   type SpellId,
 } from '../creatures/battle';
+import { STRONG } from '../creatures/elements';
+import { FOE_TRAITS, RANKS } from '../creatures/foes';
 import { grantPetXp, markSeen, MAX_SEALS, partyPets } from '../creatures/collection';
 import { ELEMENTS, getSpecies } from '../creatures/species';
 import type { Encounter } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
 import type { GameContext } from './context';
 import { h, openSheet, wait } from './dom';
+import { elementTag, wheelHelp } from './wheel';
 import { sound } from '../audio/sound';
 
-const RING_MS = 1100;
+const RING_MS = 900;
 const RING_FROM = 2.4;
 const RING_TO = 0.55;
 
@@ -43,6 +48,13 @@ function floatText(host: HTMLElement, text: string, kind: string) {
   const node = h('span', { class: `float-text float-${kind}` }, text);
   host.appendChild(node);
   setTimeout(() => node.remove(), 1100);
+}
+
+/** "Strong ×1.5", "Weak ×0.6" or nothing, for a button or a bench pet. */
+function edgeTag(edge: number): HTMLElement | null {
+  if (edge > 1) return h('span', { class: 'edge edge-strong' }, `Strong ×${STRONG}`);
+  if (edge < 1) return h('span', { class: 'edge edge-weak' }, 'Weak ×0.6');
+  return null;
 }
 
 /**
@@ -86,20 +98,32 @@ function timingRing(host: HTMLElement, over: HTMLElement): Promise<number> {
   });
 }
 
-/** A turn-based fight between the party and a Blotspawn. */
-export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won: boolean) => void): void {
+export interface BattleOpts {
+  /** A practice bout: no rewards and nothing at stake. */
+  practice?: boolean;
+}
+
+/** A quick turn-based fight between the party and a Blotspawn. */
+export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won: boolean) => void, opts: BattleOpts = {}): void {
   const owned = partyPets(ctx.collection);
   if (!owned.length) return;
-  markSeen(ctx.collection, encounter.species.id);
-  ctx.changed();
+  const practice = !!opts.practice;
+  if (!practice) {
+    markSeen(ctx.collection, encounter.species.id);
+    ctx.changed();
+  }
 
   const way = ctx.wayfarer;
   const battle = new Battle(
     owned.map((p) => makeFighter(getSpecies(p.speciesId), p.level, p.seed, p.uid)),
-    makeFighter(encounter.species, encounter.level, encounter.seed),
+    makeFighter(encounter.species, encounter.level, encounter.seed, undefined, encounter),
     { wayfarerLevel: way?.level() ?? 1, petDamage: way?.gear().petDamage, petHealth: way?.gear().petHealth },
   );
-  const sheet = openSheet(`${encounter.species.name} blocks the way`, { className: 'sheet-battle' });
+  const foe = battle.foe;
+  const rankName = foe.rank === 'normal' ? '' : `${RANKS[foe.rank].name} `;
+  const sheet = openSheet(practice ? 'Practice bout' : `${rankName}${encounter.species.name} blocks the way`, {
+    className: `sheet-battle battle-rank-${foe.rank}`,
+  });
   let reported = false;
   const finish = (won: boolean) => {
     if (reported) return;
@@ -112,63 +136,116 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     finish(false);
   });
 
-  const foeSvg = createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 170, facing: -1 });
-  const foeSpot = h('div', { class: 'fighter fighter-foe' }, foeSvg);
+  const foeSvg = createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 150, facing: -1 });
+  const intent = h('div', { class: 'intent', 'aria-live': 'polite' });
+  const foeSpot = h('div', { class: `fighter fighter-foe fighter-${foe.rank}` }, foeSvg, intent);
   const petSpot = h('div', { class: 'fighter fighter-pet' });
+  const petStatus = h('div', { class: 'status-row' });
   const showPet = () => {
     const p = owned[battle.active];
     petSpot.classList.remove('faint');
-    petSpot.replaceChildren(createCreatureSvg({ speciesId: p.speciesId, seed: p.seed, size: 170 }));
+    petSpot.replaceChildren(createCreatureSvg({ speciesId: p.speciesId, seed: p.seed, size: 150 }));
   };
   showPet();
   const foeHp = hpBar(() => battle.foe);
   const petHp = hpBar(() => battle.pet);
+  const foeTags = h(
+    'div',
+    { class: 'status-row' },
+    foe.rank !== 'normal' && h('span', { class: `rank-chip rank-${foe.rank}` }, foe.rank === 'elite' ? '♛ Elite' : '✦ Rare'),
+    elementTag(foe.species.element),
+    ...foe.traits.map((t) => h('span', { class: 'trait-chip', title: FOE_TRAITS[t].blurb }, `${FOE_TRAITS[t].glyph} ${FOE_TRAITS[t].name}`)),
+  );
+  const wardChip = foe.traits.includes('warded') ? foeTags.querySelectorAll('.trait-chip')[foe.traits.indexOf('warded')] : null;
   const arena = h(
     'div',
     { class: 'arena' },
-    h('div', { class: 'arena-row' }, foeHp.bar, foeSpot),
-    h('div', { class: 'arena-row arena-row-pet' }, petSpot, petHp.bar),
+    h('div', { class: 'arena-row' }, h('div', { class: 'arena-info' }, foeHp.bar, foeTags), foeSpot),
+    h('div', { class: 'arena-row arena-row-pet' }, petSpot, h('div', { class: 'arena-info' }, petHp.bar, petStatus)),
   );
-  const foeSpecies = encounter.species;
-  const hint = foeSpecies.kind === 'monster' ? ` Weak to ${ELEMENTS[foeSpecies.weakTo].glyph} ${ELEMENTS[foeSpecies.weakTo].name}.` : '';
-  const log = h('p', { class: 'battle-log' }, `${foeSpecies.epithet}.${hint} Tap the rune as the rings meet for a critical hit.`);
+  const weakness = foe.species.kind === 'monster' ? foe.species.weakTo : null;
+  const opening = [
+    practice ? 'A training blot made of practice ink. No rewards, nothing lost.' : `${foe.species.epithet}.`,
+    weakness ? ` Weak to ${ELEMENTS[weakness].glyph} ${ELEMENTS[weakness].name}.` : '',
+    foe.traits.length ? ` ${foe.traits.map((t) => `${FOE_TRAITS[t].name}: ${FOE_TRAITS[t].blurb.toLowerCase()}`).join(' ')}` : '',
+  ].join('');
+  const log = h('p', { class: 'battle-log' }, opening);
 
-  const strikeBtn = h('button', { class: 'btn btn-primary', type: 'button' }, 'Strike');
-  const moveBtn = h('button', { class: 'btn btn-move', type: 'button' });
-  const fleeBtn = h('button', { class: 'btn', type: 'button', onclick: () => sheet.close() }, 'Flee');
-  const actions = h('div', { class: 'actions' }, strikeBtn, moveBtn, fleeBtn);
+  const attackBtn = (attack: Attack) => {
+    const btn = h('button', { class: `btn attack attack-${attack}`, type: 'button' });
+    btn.addEventListener('click', () => act({ kind: attack }));
+    return btn;
+  };
+  const attacks: Record<Attack, HTMLButtonElement> = { strike: attackBtn('strike'), move: attackBtn('move'), art: attackBtn('art') };
+  const attackRow = h('div', { class: 'attacks' }, attacks.strike, attacks.move, attacks.art);
 
   const bench = h('div', { class: 'party-bench', role: 'group', 'aria-label': 'Party' });
   const tonicBtn = h('button', { class: 'btn btn-small', type: 'button' });
   const spellBtns = (Object.keys(SPELLS) as SpellId[]).map((id) => ({ id, el: h('button', { class: 'btn btn-small btn-spell', type: 'button' }) }));
-  const extras = h('div', { class: 'battle-extras' }, tonicBtn, ...spellBtns.map((s) => s.el));
-  sheet.body.append(arena, log, actions, bench, extras);
+  const fleeBtn = h('button', { class: 'btn btn-small', type: 'button', onclick: () => sheet.close() }, practice ? 'Stop' : 'Flee');
+  const extras = h('div', { class: 'battle-extras' }, tonicBtn, ...spellBtns.map((s) => s.el), fleeBtn);
+  const help = wheelHelp(foe.species.element);
+  sheet.body.append(arena, log, attackRow, bench, extras, help);
 
   let busy = false;
-  const all = () => [strikeBtn, moveBtn, fleeBtn, tonicBtn, ...spellBtns.map((s) => s.el), ...bench.querySelectorAll('button')];
+  const all = () => [...Object.values(attacks), fleeBtn, tonicBtn, ...spellBtns.map((s) => s.el), ...bench.querySelectorAll('button')];
 
   const refresh = () => {
     const pet = battle.pet;
-    const species = pet.species;
-    moveBtn.replaceChildren(`${ELEMENTS[species.element].glyph} ${species.move}`, battle.moveReady ? '' : h('small', {}, ` (${battle.charge})`));
+    const element = pet.species.element;
+    const cd = battle.cooldowns[battle.active];
     const forced = battle.mustSwap;
-    strikeBtn.disabled = busy || forced;
-    moveBtn.disabled = busy || forced || !battle.moveReady;
-    fleeBtn.disabled = busy;
+    const label = (attack: Attack, name: string, blurb: string, wait: number) => {
+      const btn = attacks[attack];
+      btn.replaceChildren(
+        h('span', { class: 'attack-name' }, name),
+        h('span', { class: 'attack-blurb' }, wait > 0 ? `Ready in ${wait}` : blurb),
+        (attack !== 'strike' && wait === 0 && edgeTag(battle.edge(attack))) || '',
+      );
+      btn.disabled = busy || forced || wait > 0;
+      btn.classList.toggle('attack-strong', wait === 0 && battle.edge(attack) > 1);
+      btn.style.setProperty('--el', attack === 'strike' ? 'var(--leather)' : ELEMENTS[element].color);
+    };
+    label('strike', '⚔ Strike', 'Always ready', 0);
+    label('move', `${ELEMENTS[element].glyph} ${pet.species.move}`, 'Big hit · time the rune', cd.move);
+    label('art', `${ELEMENTS[element].glyph} ${ARTS[element].name}`, ARTS[element].blurb, cd.art);
+
+    const next = battle.intent;
+    const threat = next.big ? battle.threat(battle.active) : 1;
+    intent.className = `intent${next.big ? ' intent-big' : ''}`;
+    intent.replaceChildren(
+      next.big ? `⚠ ${next.element ? ELEMENTS[next.element].glyph : ''} ${next.name}` : 'Next: Strike',
+      threat > 1 ? h('small', {}, ' strong vs you!') : '',
+    );
+    intent.hidden = !!battle.winner;
+
+    petStatus.replaceChildren(
+      ...[
+        elementTag(element),
+        battle.guard && h('span', { class: 'trait-chip chip-good' }, `⛨ Guard ${battle.guard.turns}`),
+        battle.dodge && h('span', { class: 'trait-chip chip-good' }, '❂ Dodge'),
+        battle.focus && h('span', { class: 'trait-chip chip-good' }, '✦ Weak spot marked'),
+      ].filter((n): n is HTMLSpanElement => !!n),
+    );
+    if (wardChip) wardChip.classList.toggle('chip-broken', !battle.wardUp);
+    foeSpot.classList.toggle('burning', battle.burn > 0);
 
     bench.replaceChildren(
       ...battle.party.map((f, i) => {
         const p = owned[i];
+        const edge = battle.edge('move', f);
+        const threatened = battle.threat(i) > 1;
         const btn = h(
           'button',
           {
             class: `bench-pet${i === battle.active ? ' bench-active' : ''}${f.hp <= 0 ? ' bench-down' : ''}`,
             type: 'button',
-            'aria-label': `${f.species.name}, ${f.hp} of ${f.maxHp} health${i === battle.active ? ', fighting' : ''}`,
+            'aria-label': `${f.species.name}, ${f.hp} of ${f.maxHp} health${i === battle.active ? ', fighting' : ''}${edge > 1 ? ', strong against this foe' : ''}`,
             onclick: () => act({ kind: 'swap', to: i }),
           },
           createCreatureSvg({ speciesId: p.speciesId, seed: p.seed, size: 44 }),
           h('span', { class: 'bench-hp' }, h('span', { style: { width: `${(100 * f.hp) / f.maxHp}%` } })),
+          edge > 1 ? h('span', { class: 'bench-edge edge-strong', title: 'Strong against this foe' }, '▲') : threatened ? h('span', { class: 'bench-edge edge-weak', title: 'Weak to this foe' }, '▼') : null,
         );
         btn.disabled = busy || !battle.canSwapTo(i);
         return btn;
@@ -192,6 +269,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       el.disabled = busy || forced || !ready;
       el.hidden = !way;
     }
+    fleeBtn.disabled = busy;
     foeHp.update();
     petHp.update();
   };
@@ -201,16 +279,44 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       case 'hit': {
         const who = e.attacker === 'pet' ? battle.pet.species.name : battle.foe.species.name;
         let text = `${who} used ${e.name}`;
-        if (e.effectiveness > 1) text += '. It hits the weak spot!';
-        else if (e.effectiveness < 1) text += '. It barely lands.';
+        if (e.effectiveness > 1) text += '. Strong hit!';
+        else if (e.effectiveness < 1) text += '. Weak hit.';
         else text += '.';
-        if (e.crit) text += e.attacker === 'pet' ? ' Perfect timing, a critical blow!' : ' A critical blow!';
+        if (e.warded) text += ' The ward soaks half.';
+        if (e.guarded) text += ' Guarded!';
+        if (e.crit) text += e.attacker === 'pet' ? ' Critical!' : ' A critical blow!';
         return text;
       }
+      case 'miss':
+        return `${battle.foe.species.name}'s ${e.name} whiffs past!`;
+      case 'status':
+        switch (e.status) {
+          case 'guard':
+            return `${battle.pet.species.name} raises ${e.name}.`;
+          case 'dodge':
+            return `${battle.pet.species.name} rides an ${e.name}, ready to dodge.`;
+          case 'focus':
+            return `${e.name}! The weak spot glows. Next attack is critical.`;
+          case 'burn':
+            return `${battle.foe.species.name} catches fire!`;
+          case 'ward-break':
+            return 'The ward shatters!';
+        }
+        return '';
+      case 'burn':
+        return `${battle.foe.species.name} burns for ${e.damage}.`;
+      case 'reflect':
+        return `Thorns throw ${e.damage} back!`;
+      case 'leech':
+        return `${battle.foe.species.name} drinks ${e.amount} health back.`;
       case 'swap':
         return `${battle.party[e.to].species.name}, you're up!`;
       case 'heal':
-        return e.source === 'tonic' ? `A tonic restores ${e.amount} health.` : `Mending light washes over the party (+${e.amount}).`;
+        return e.source === 'tonic'
+          ? `A tonic restores ${e.amount} health.`
+          : e.source === 'art'
+            ? `${battle.pet.species.name} draws on a Wellspring (+${e.amount}).`
+            : `Mending light washes over the party (+${e.amount}).`;
       case 'fireball':
         return `You hurl a Fireball for ${e.damage}!`;
       case 'faint':
@@ -223,76 +329,111 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     if (e.kind === 'hit') {
       const attacker = e.attacker === 'pet' ? petSpot : foeSpot;
       const target = e.attacker === 'pet' ? foeSpot : petSpot;
-      attacker.classList.add(e.action === 'move' ? 'cast' : 'lunge');
-      sound.play(e.action === 'move' ? 'spell' : 'strike');
-      await wait(260);
+      const elemental = e.action !== 'strike';
+      attacker.classList.add(elemental ? 'cast' : 'lunge');
+      sound.play(elemental ? 'spell' : 'strike');
+      await wait(200);
       target.classList.add('hit');
       sound.play(e.crit ? 'crit' : e.effectiveness > 1 ? 'weakHit' : 'hit');
-      floatText(target, `-${e.damage}`, e.effectiveness > 1 || e.crit ? 'big' : 'dmg');
+      floatText(target, `-${e.damage}`, e.effectiveness > 1 || e.crit ? 'big' : e.effectiveness < 1 ? 'small' : 'dmg');
+      if (e.effectiveness > 1) floatText(target, 'Strong!', 'word');
       refresh();
-      await wait(420);
+      await wait(340);
       attacker.classList.remove('lunge', 'cast');
       target.classList.remove('hit');
-      await wait(200);
+      await wait(120);
+    } else if (e.kind === 'miss') {
+      foeSpot.classList.add('lunge');
+      petSpot.classList.add('dodging');
+      sound.play('strike');
+      floatText(petSpot, 'Miss', 'word');
+      await wait(420);
+      foeSpot.classList.remove('lunge');
+      petSpot.classList.remove('dodging');
+    } else if (e.kind === 'status') {
+      const spot = e.target === 'pet' ? petSpot : foeSpot;
+      spot.classList.add(e.target === 'pet' ? 'healed' : 'hit');
+      sound.play(e.status === 'ward-break' ? 'crit' : 'spell');
+      refresh();
+      await wait(420);
+      spot.classList.remove('healed', 'hit');
+    } else if (e.kind === 'burn' || e.kind === 'reflect') {
+      foeSpot.classList.add('hit', 'burn');
+      sound.play('hit');
+      floatText(foeSpot, `-${e.damage}`, 'dmg');
+      refresh();
+      await wait(420);
+      foeSpot.classList.remove('hit', 'burn');
+    } else if (e.kind === 'leech') {
+      floatText(foeSpot, `+${e.amount}`, 'heal');
+      refresh();
+      await wait(360);
     } else if (e.kind === 'fireball') {
       foeSpot.classList.add('hit', 'burn');
       sound.play('crit');
       floatText(foeSpot, `-${e.damage}`, 'big');
       refresh();
-      await wait(650);
+      await wait(550);
       foeSpot.classList.remove('hit', 'burn');
     } else if (e.kind === 'heal') {
       petSpot.classList.add('healed');
       sound.play('reward');
       floatText(petSpot, `+${e.amount}`, 'heal');
       refresh();
-      await wait(600);
+      await wait(480);
       petSpot.classList.remove('healed');
     } else if (e.kind === 'swap') {
       petSpot.classList.add('swap-out');
       sound.play('tap');
-      await wait(220);
+      await wait(200);
       showPet();
       petSpot.classList.remove('swap-out');
       refresh();
-      await wait(300);
+      await wait(240);
     } else if (e.kind === 'faint') {
       petSpot.classList.add('faint');
       refresh();
-      await wait(500);
+      await wait(450);
     }
   };
 
   const end = () => {
+    intent.hidden = true;
     if (battle.winner === 'pet') {
       foeSpot.classList.add('dissolve');
       sound.play('victory');
-      const reward = victoryRewards(battle.foe);
-      const shares = shareXp(battle, reward.xp);
-      const grew: string[] = [];
-      owned.forEach((p, i) => {
-        if (grantPetXp(p, shares[i]) > 0) grew.push(`${getSpecies(p.speciesId).name} grew to level ${p.level}!`);
-      });
-      ctx.collection.seals = Math.min(MAX_SEALS, ctx.collection.seals + reward.seals);
-      ctx.changed();
       finish(true);
       sheet.setTitle('Victory');
-      log.replaceChildren(
-        `${encounter.species.name} dissolves into a puddle of harmless ink. `,
-        h('strong', {}, `+${reward.xp} XP`),
-        owned.length > 1 ? ' to each pet that fought (half to the rest)' : '',
-        `, +${reward.seals} seal${reward.seals > 1 ? 's' : ''}.`,
-        ...grew.map((g) => h('strong', { class: 'level-up' }, ` ${g}`)),
-      );
+      if (practice) {
+        log.textContent = 'The practice blot splatters. Ready for the real thing? Look for the ⚔ Fight button on the map.';
+      } else {
+        const reward = victoryRewards(battle.foe);
+        const shares = shareXp(battle, reward.xp);
+        const grew: string[] = [];
+        owned.forEach((p, i) => {
+          if (grantPetXp(p, shares[i]) > 0) grew.push(`${getSpecies(p.speciesId).name} grew to level ${p.level}!`);
+        });
+        ctx.collection.seals = Math.min(MAX_SEALS, ctx.collection.seals + reward.seals);
+        ctx.changed();
+        log.replaceChildren(
+          `${encounter.species.name} dissolves into a puddle of harmless ink. `,
+          h('strong', {}, `+${reward.xp} XP`),
+          owned.length > 1 ? ' to each pet that fought (half to the rest)' : '',
+          `, +${reward.seals} seal${reward.seals > 1 ? 's' : ''}.`,
+          ...grew.map((g) => h('strong', { class: 'level-up' }, ` ${g}`)),
+        );
+      }
     } else {
       sound.play('defeat');
       finish(false);
       sheet.setTitle('Driven back');
-      log.textContent = 'Your party is worn out and retreats to rest. Level up, brew tonics and charge spells by walking, then try again.';
+      log.textContent = practice
+        ? 'Worn out, but it was only practice. Try leading with a pet that is strong against it.'
+        : 'Your party is worn out and retreats to rest. Bring a pet strong against it, brew tonics and charge spells by walking, then try again.';
     }
     bench.hidden = true;
     extras.hidden = true;
-    actions.replaceChildren(h('button', { class: 'btn btn-primary', type: 'button', onclick: () => sheet.close() }, 'Continue'));
+    attackRow.replaceChildren(h('button', { class: 'btn btn-primary', type: 'button', onclick: () => sheet.close() }, 'Continue'));
   };
 
   const act = async (action: Action) => {
@@ -301,16 +442,14 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     if (action.kind === 'spell' && !way?.spendSpell(SPELLS[action.spell].metres)) return;
     busy = true;
     all().forEach((b) => ((b as HTMLButtonElement).disabled = true));
-    if (action.kind === 'strike' || action.kind === 'move') action = { ...action, quality: await timingRing(arena, foeSpot) };
+    if (action.kind === 'move' && battle.ready('move')) action = { ...action, quality: await timingRing(arena, foeSpot) };
     for (const e of battle.turn(action)) await play(e);
     busy = false;
     if (battle.winner) end();
     else refresh();
   };
 
-  strikeBtn.addEventListener('click', () => act({ kind: 'strike' }));
-  moveBtn.addEventListener('click', () => act({ kind: 'move' }));
-  tonicBtn.addEventListener('click', () => act({ kind: 'tonic' }));
   for (const { id, el } of spellBtns) el.addEventListener('click', () => act({ kind: 'spell', spell: id }));
+  tonicBtn.addEventListener('click', () => act({ kind: 'tonic' }));
   refresh();
 }
