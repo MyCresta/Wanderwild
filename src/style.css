@@ -3612,3 +3612,128 @@ body:has(.catch-scene) .banners {
     animation: none;
   }
 }
+
+/* Farsight: the 👁 rail button, the pill that says it is on, and the lantern-eye in the middle of the map. */
+
+.farsight-button {
+  border: 2px solid var(--leather-dark);
+  border-radius: 50%;
+  background: var(--parchment);
+  color: var(--leather);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.farsight-button svg {
+  width: 100%;
+  height: 100%;
+}
+
+.farsight-button[aria-pressed='true'] {
+  background: #4b3b6e;
+  color: var(--gold);
+}
+
+.hud > .farsight-pill {
+  pointer-events: auto;
+}
+
+.farsight-pill {
+  max-width: 360px;
+  padding: 4px 10px;
+  border: 1px solid #4b3b6e;
+  border-radius: 999px;
+  background: rgba(75, 59, 110, 0.92);
+  color: #f3e9cf;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.farsight-pill strong {
+  color: var(--gold);
+}
+
+.farsight-pill-x {
+  margin-left: 6px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.farsight-pill[hidden] {
+  display: none;
+}
+
+.farsight-lens {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  border: 2px dashed rgba(75, 59, 110, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(243, 233, 207, 0.6), inset 0 0 18px rgba(75, 59, 110, 0.35);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.farsight-lens::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: #4b3b6e;
+}
+
+.farsight-on .farsight-lens {
+  opacity: 1;
+  animation: farsight-turn 18s linear infinite;
+}
+
+@keyframes farsight-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A faint violet wash says "this is a vision, not where you stand". */
+.farsight-on .parchment-overlay {
+  box-shadow: inset 0 0 120px rgba(75, 59, 110, 0.45);
+}
+
+.curio-marker {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+  animation: curio-bob 2.4s ease-in-out infinite;
+}
+
+.curio-marker svg {
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes curio-bob {
+  50% {
+    translate: 0 -3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .curio-marker,
+  .farsight-on .farsight-lens {
+    animation: none;
+  }
+}
