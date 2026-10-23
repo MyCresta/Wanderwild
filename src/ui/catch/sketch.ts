@@ -12,7 +12,7 @@ export interface Vec {
 export const OUTLINE_POINTS = 72;
 /** How far (drawing units) a line may stray and still count as on the outline. */
 export const TOLERANCE = 10;
-/** Below this quality the sketch is too rough to bind at all. */
+/** Below this quality a sketch is too rough to keep, whatever the creature. */
 export const MIN_QUALITY = 0.3;
 /** A gilded Wildling only keeps still for a near-perfect line. */
 export const GILDED_QUALITY = 0.85;
@@ -126,6 +126,9 @@ export function sketchGrade(quality: number): Grade {
   return 'Scribble';
 }
 
+/** How true a likeness must be to take, by rarity: rarer creatures are fussier sitters. */
+export const bindQuality = (rarity: Rarity) => (rarity === 'rare' ? 0.5 : rarity === 'uncommon' ? 0.4 : MIN_QUALITY);
+
 /** Levels a finer sketch adds to the bound creature: a careful hand captures more of it. */
 export const gradeLevels = (grade: Grade) => (grade === 'Masterful' ? 2 : grade === 'Fine' ? 1 : 0);
 
@@ -148,17 +151,3 @@ export function creatureOffset(t: number, phase: number, scale: number): Vec {
     y: 4 * Math.sin(t * 1.7 + phase) * scale,
   };
 }
-
-export const WOBBLES = 3;
-export const WOBBLE_S = 1.1;
-/** The moment in each wobble when a press holds the seal shut, and how forgiving it is. */
-export const PRESS_AT = 0.7;
-export const PRESS_WINDOW = 0.16;
-export const PRESS_BONUS = 0.15;
-
-/** Odds that the seal survives one wobble, given the whole-catch chance. */
-export const wobbleOdds = (chance: number, held: boolean) =>
-  Math.min(0.98, Math.pow(chance, 1 / WOBBLES) + (held ? PRESS_BONUS : 0));
-
-/** Whether a press `s` seconds into a wobble lands in the window. */
-export const pressInWindow = (s: number) => Math.abs(s - PRESS_AT) <= PRESS_WINDOW;

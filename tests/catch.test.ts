@@ -1,19 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bindQuality,
   coveredPoints,
   GILDED_QUALITY,
   gradeLevels,
   MIN_QUALITY,
   oddsColor,
   patienceSeconds,
-  pressInWindow,
-  PRESS_AT,
   radialOutline,
   scoreSketch,
   sketchGrade,
   TOLERANCE,
-  wobbleOdds,
-  WOBBLES,
   type Vec,
 } from '../src/ui/catch/sketch';
 
@@ -100,6 +97,12 @@ describe('grades', () => {
     expect(gradeLevels('Rough')).toBe(0);
   });
 
+  it('rarer creatures need a truer likeness', () => {
+    expect(bindQuality('common')).toBe(MIN_QUALITY);
+    expect(bindQuality('rare')).toBeGreaterThan(bindQuality('uncommon'));
+    expect(bindQuality('rare')).toBeLessThan(GILDED_QUALITY);
+  });
+
   it('rare and wary creatures hold a pose for less time', () => {
     expect(patienceSeconds('rare', 0)).toBeLessThan(patienceSeconds('common', 0));
     expect(patienceSeconds('common', 2)).toBeLessThan(patienceSeconds('common', 0));
@@ -109,18 +112,5 @@ describe('grades', () => {
   it('colours slim odds red and good odds green', () => {
     expect(oddsColor(0)).toBe('hsl(0 75% 45%)');
     expect(oddsColor(0.9)).toBe('hsl(120 75% 45%)');
-  });
-});
-
-describe('wobbles', () => {
-  it('multiply back to the catch chance, and a held seal does better', () => {
-    expect(Math.pow(wobbleOdds(0.5, false), WOBBLES)).toBeCloseTo(0.5);
-    expect(wobbleOdds(0.5, true)).toBeGreaterThan(wobbleOdds(0.5, false));
-    expect(wobbleOdds(0.99, true)).toBeLessThanOrEqual(0.98);
-  });
-
-  it('only counts a press near the moment the ring meets the seal', () => {
-    expect(pressInWindow(PRESS_AT)).toBe(true);
-    expect(pressInWindow(PRESS_AT - 0.4)).toBe(false);
   });
 });
