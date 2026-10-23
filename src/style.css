@@ -3087,64 +3087,6 @@ body:has(.catch-scene) .banners {
   }
 }
 
-.attacks {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.attacks > .btn-primary {
-  grid-column: 1 / -1;
-}
-
-.attack {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  min-height: 72px;
-  padding: 6px;
-  border-left: 6px solid var(--el, var(--leather));
-  text-align: left;
-}
-
-.attack-name {
-  font-size: 14px;
-  line-height: 1.15;
-}
-
-.attack-blurb {
-  font-size: 11px;
-  font-weight: normal;
-  line-height: 1.2;
-  opacity: 0.8;
-}
-
-.attack:disabled {
-  opacity: 0.55;
-}
-
-.attack-strong:not(:disabled) {
-  box-shadow: 0 2px 0 var(--leather-dark), 0 0 0 2px #4b6a3c;
-}
-
-.edge {
-  align-self: flex-start;
-  padding: 0 5px;
-  border-radius: 6px;
-  font-size: 11px;
-}
-
-.edge-strong {
-  background: #4b6a3c;
-  color: #fff8e6;
-}
-
-.edge-weak {
-  background: #8e2b22;
-  color: #fff8e6;
-}
-
 .bench-pet {
   position: relative;
 }
@@ -3359,7 +3301,7 @@ body:has(.catch-scene) .banners {
 }
 
 @media (max-width: 360px) {
-  .attack-blurb {
+  .cmd-sub {
     font-size: 10px;
   }
 
@@ -3392,6 +3334,281 @@ body:has(.catch-scene) .banners {
 
 @media (prefers-reduced-motion: reduce) {
   .map-resident .creature {
+    animation: none;
+  }
+}
+
+/* ---------- Battle command panel, timing sweep and turns ---------- */
+
+.cmd-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  transition: opacity 0.2s;
+}
+
+.cmd-panel.cmd-waiting {
+  opacity: 0.6;
+}
+
+.cmd-section[hidden] {
+  display: none;
+}
+
+.cmd-title {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.cmd-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.cmd {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 2px;
+  min-height: 64px;
+  padding: 6px 6px 6px 9px;
+  overflow: hidden;
+  border: 2px solid var(--leather-dark);
+  border-left: 6px solid var(--el, var(--leather));
+  border-radius: 12px;
+  background: var(--parchment);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  box-shadow: 0 2px 0 var(--leather-dark);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.cmd:active:not(:disabled) {
+  translate: 0 2px;
+  box-shadow: none;
+}
+
+.cmd:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.cmd-way {
+  --el: #b8902a;
+  background: linear-gradient(#f6e7c4, #ead6a6);
+}
+
+.cmd-name {
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1.15;
+}
+
+.cmd-sub {
+  font-size: 11px;
+  line-height: 1.2;
+  opacity: 0.8;
+}
+
+.cmd-strong:not(:disabled) {
+  box-shadow: 0 2px 0 var(--leather-dark), 0 0 0 2px #4b6a3c;
+}
+
+/* The timing sweep runs inside the very button you pressed. */
+.cmd.sweeping {
+  opacity: 1;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(243, 210, 122, 0.7);
+}
+
+.sweep-track {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  height: 12px;
+  border-radius: 6px;
+  background: rgba(59, 42, 26, 0.25);
+}
+
+.sweep-zone {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: calc(var(--sweet) - 9%);
+  width: 18%;
+  border-radius: 6px;
+  background: var(--gold);
+  box-shadow: 0 0 8px var(--gold);
+}
+
+.sweep-needle {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: 0;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: #8e2b22;
+}
+
+.sweeping .cmd-name,
+.sweeping .cmd-sub,
+.sweeping .edge {
+  visibility: hidden;
+}
+
+.sweep-hint {
+  position: absolute;
+  inset: 0 0 auto;
+  padding: 8px 6px;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.sweep-perfect .sweep-zone {
+  background: #fff4c2;
+  box-shadow: 0 0 16px #f3d27a;
+}
+
+.sweep-miss .sweep-zone {
+  opacity: 0.35;
+}
+
+.battle-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.battle-footer .wheel-help {
+  flex: 1;
+  margin-top: 8px;
+}
+
+.btn-flee[hidden] {
+  display: none;
+}
+
+.btn-continue {
+  width: 100%;
+}
+
+/* Whose turn it is: a banner over the arena and a glow under whoever acts. */
+.turn-banner {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  z-index: 1;
+  translate: -50% 0;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: #4b6a3c;
+  color: #fff8e6;
+  font-size: 13px;
+  font-weight: bold;
+  white-space: nowrap;
+  animation: turn-in 0.25s ease-out;
+}
+
+.turn-banner-foe {
+  background: #8e2b22;
+}
+
+.turn-banner[hidden] {
+  display: none;
+}
+
+@keyframes turn-in {
+  from {
+    opacity: 0;
+    scale: 0.8;
+  }
+}
+
+.arena-row-foe {
+  margin-top: 22px;
+}
+
+.fighter::after {
+  content: '';
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  bottom: 2px;
+  z-index: -1;
+  height: 18px;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.turn-pet .fighter-pet::after {
+  opacity: 1;
+  background: radial-gradient(ellipse, rgba(75, 106, 60, 0.6), transparent 70%);
+}
+
+.turn-foe .fighter-foe::after {
+  opacity: 1;
+  background: radial-gradient(ellipse, rgba(142, 43, 34, 0.6), transparent 70%);
+}
+
+/* Lunges peak at the moment of impact, when the target's health drops. */
+.fighter-pet.lunge,
+.fighter-foe.lunge,
+.fighter.cast {
+  transform: none;
+}
+
+.fighter-pet.lunge {
+  animation: lunge-pet 0.42s ease-in-out;
+}
+
+.fighter-foe.lunge {
+  animation: lunge-foe 0.42s ease-in-out;
+}
+
+.fighter.cast {
+  animation: cast 0.42s ease-in-out;
+}
+
+@keyframes lunge-pet {
+  45% {
+    transform: translate(56px, -34px);
+  }
+}
+
+@keyframes lunge-foe {
+  45% {
+    transform: translate(-56px, 34px);
+  }
+}
+
+@keyframes cast {
+  45% {
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 12px #f3d27a);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fighter-pet.lunge,
+  .fighter-foe.lunge,
+  .fighter.cast {
     animation: none;
   }
 }
