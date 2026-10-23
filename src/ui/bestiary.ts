@@ -5,6 +5,9 @@ import { individualFromSeed, MAX_LEVEL, statsAt, xpToNext } from '../creatures/s
 import { createCreatureSvg } from '../creatures/view';
 import { elementBadge, rarityBadge } from './badges';
 import type { GameContext } from './context';
+import { evolutionStatus } from '../creatures/evolution';
+import { REALMS } from '../game/realms';
+import { openEvolution } from './evolution';
 import { h, openSheet, type Sheet } from './dom';
 
 function petCard(pet: OwnedPet, isCompanion: boolean, onClick: () => void) {
@@ -63,6 +66,7 @@ function petDetail(ctx: GameContext, sheet: Sheet, pet: OwnedPet, back: () => vo
       h('dd', {}, `${ELEMENTS[species.element].glyph} ${species.move}`),
     ),
     h('p', { class: 'lore' }, species.lore),
+    evolutionPanel(ctx, sheet, pet),
     h('p', { class: 'hint' }, 'Your companion walks beside you, earns experience as you walk (1 XP per 25 m) and fights Blotspawn.'),
     h(
       'div',
@@ -83,6 +87,42 @@ function petDetail(ctx: GameContext, sheet: Sheet, pet: OwnedPet, back: () => vo
             'Walk together',
           ),
     ),
+  );
+}
+
+function evolutionPanel(ctx: GameContext, sheet: Sheet, pet: OwnedPet) {
+  const status = evolutionStatus(pet);
+  if (!status) {
+    const species = getSpecies(pet.speciesId);
+    return species.kind === 'pet' && species.stage === 2 ? h('p', { class: 'hint' }, '✦ Fully evolved.') : '';
+  }
+  const { evolution, walked, ready } = status;
+  const km = (m: number) => (m / 1000).toFixed(m < 1000 ? 2 : 1);
+  return h(
+    'div',
+    { class: `evo-panel${ready ? ' evo-panel-ready' : ''}` },
+    h('h3', {}, ready ? `Ready to evolve into ${status.into.name}!` : 'Evolution'),
+    h(
+      'p',
+      {},
+      `Reach level ${evolution.level} `,
+      pet.level >= evolution.level ? '✓' : `(now ${pet.level})`,
+      ` and walk ${km(evolution.metres)} km in ${REALMS[evolution.realm].name} as your companion.`,
+    ),
+    h('div', { class: 'xp' }, h('span', { class: 'xp-track' }, h('span', { class: 'xp-fill evo-fill', style: { width: `${(walked / evolution.metres) * 100}%` } })), h('small', {}, `${km(walked)} / ${km(evolution.metres)} km walked there`)),
+    ready &&
+      h(
+        'button',
+        {
+          class: 'btn btn-primary evo-button',
+          type: 'button',
+          onclick: () => {
+            sheet.close();
+            openEvolution(ctx, pet);
+          },
+        },
+        '✦ Evolve',
+      ),
   );
 }
 
@@ -125,7 +165,7 @@ export function openBestiary(ctx: GameContext): void {
             'div',
             {},
             h('h3', {}, seen ? species.name : '???'),
-            h('p', { class: 'dex-meta' }, species.kind === 'pet' ? 'Wildling' : 'Blotspawn', ' ', elementBadge(species), ' ', rarityBadge(species), owned > 0 && h('span', { class: 'badge badge-companion' }, `×${owned}`)),
+            h('p', { class: 'dex-meta' }, species.kind === 'monster' ? 'Blotspawn' : species.stage === 2 ? 'Evolved Wildling' : 'Wildling', ' ', elementBadge(species), ' ', rarityBadge(species), owned > 0 && h('span', { class: 'badge badge-companion' }, `×${owned}`)),
             h('p', { class: 'lore' }, seen ? species.lore : 'Not yet met. Walk further.'),
           ),
         );

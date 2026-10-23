@@ -5,6 +5,8 @@
  * gone sour: they cannot be bound, only driven back.
  */
 
+import type { RealmId } from '../game/realms';
+
 export type Element = 'grove' | 'tide' | 'ember' | 'stone' | 'gale' | 'lumen';
 export type Rarity = 'common' | 'uncommon' | 'rare';
 
@@ -26,8 +28,20 @@ interface SpeciesBase {
   move: string;
 }
 
+export interface Evolution {
+  into: string;
+  /** Level the pet must reach. */
+  level: number;
+  /** The realm it must walk in as your companion, and how far. */
+  realm: RealmId;
+  metres: number;
+}
+
 export interface PetSpecies extends SpeciesBase {
   kind: 'pet';
+  /** 1 for wild forms, 2 for evolved forms (never found wild). */
+  stage: 1 | 2;
+  evolution?: Evolution;
 }
 
 export interface MonsterSpecies extends SpeciesBase {
@@ -47,9 +61,15 @@ export const ELEMENTS: Record<Element, { name: string; color: string; glyph: str
   lumen: { name: 'Lumen', color: '#b8902a', glyph: '✦' },
 };
 
+export const EVOLVE_LEVEL = 10;
+export const EVOLVE_METRES = 1500;
+
+/** Wild Wildlings, the forms that spawn on the map. */
 export const PETS: readonly PetSpecies[] = [
   {
     kind: 'pet',
+    stage: 1,
+    evolution: { into: 'thornwarden', level: EVOLVE_LEVEL, realm: 'wildwood', metres: EVOLVE_METRES },
     id: 'bramblet',
     name: 'Bramblet',
     epithet: 'the Hedge-Wanderer',
@@ -61,6 +81,8 @@ export const PETS: readonly PetSpecies[] = [
   },
   {
     kind: 'pet',
+    stage: 1,
+    evolution: { into: 'veilwyrm', level: EVOLVE_LEVEL, realm: 'tidemere', metres: EVOLVE_METRES },
     id: 'driftfin',
     name: 'Driftfin',
     epithet: 'the Mist-Swimmer',
@@ -72,6 +94,8 @@ export const PETS: readonly PetSpecies[] = [
   },
   {
     kind: 'pet',
+    stage: 1,
+    evolution: { into: 'pyrevixen', level: EVOLVE_LEVEL, realm: 'hearthfields', metres: EVOLVE_METRES },
     id: 'emberkit',
     name: 'Emberkit',
     epithet: 'the Hearth-Fox',
@@ -83,6 +107,8 @@ export const PETS: readonly PetSpecies[] = [
   },
   {
     kind: 'pet',
+    stage: 1,
+    evolution: { into: 'bastilith', level: EVOLVE_LEVEL, realm: 'stoneward', metres: EVOLVE_METRES },
     id: 'cragmite',
     name: 'Cragmite',
     epithet: 'the Patient Boulder',
@@ -94,6 +120,8 @@ export const PETS: readonly PetSpecies[] = [
   },
   {
     kind: 'pet',
+    stage: 1,
+    evolution: { into: 'stormplume', level: EVOLVE_LEVEL, realm: 'hearthfields', metres: EVOLVE_METRES },
     id: 'wisplume',
     name: 'Wisplume',
     epithet: 'the Hollow-Wind Owl',
@@ -105,6 +133,8 @@ export const PETS: readonly PetSpecies[] = [
   },
   {
     kind: 'pet',
+    stage: 1,
+    evolution: { into: 'gloamwing', level: EVOLVE_LEVEL, realm: 'barrows', metres: EVOLVE_METRES },
     id: 'lumoth',
     name: 'Lumoth',
     epithet: 'the Lantern-Wing',
@@ -113,6 +143,82 @@ export const PETS: readonly PetSpecies[] = [
     rarity: 'rare',
     base: { hp: 40, atk: 16, def: 10 },
     move: 'Gloam Flare',
+  },
+];
+
+/** What a Wildling becomes after walking long enough in its home realm. */
+export const EVOLVED: readonly PetSpecies[] = [
+  {
+    kind: 'pet',
+    stage: 2,
+    id: 'thornwarden',
+    name: 'Thornwarden',
+    epithet: 'Keeper of the Wild Hedge',
+    lore: 'A Bramblet that has walked every path in its wood comes home crowned in briar roses. Old hedgerows grow back wherever it sleeps.',
+    element: 'grove',
+    rarity: 'common',
+    base: { hp: 62, atk: 15, def: 18 },
+    move: 'Briar Bastion',
+  },
+  {
+    kind: 'pet',
+    stage: 2,
+    id: 'veilwyrm',
+    name: 'Veilwyrm',
+    epithet: 'the Tide-Crowned',
+    lore: 'Its veils have grown long enough to hold back a fog bank. Sailors who see its crest at dawn know they will find the harbour.',
+    element: 'tide',
+    rarity: 'common',
+    base: { hp: 56, atk: 17, def: 15 },
+    move: 'Riptide Veil',
+  },
+  {
+    kind: 'pet',
+    stage: 2,
+    id: 'pyrevixen',
+    name: 'Pyrevixen',
+    epithet: 'the Three-Flame Fox',
+    lore: 'Each tail is a hearth it has warmed. A Pyrevixen curled on a doorstep means the house will never go cold.',
+    element: 'ember',
+    rarity: 'uncommon',
+    base: { hp: 52, atk: 21, def: 12 },
+    move: 'Pyre Pounce',
+  },
+  {
+    kind: 'pet',
+    stage: 2,
+    id: 'bastilith',
+    name: 'Bastilith',
+    epithet: 'the Walking Keep',
+    lore: 'A Cragmite that slept long enough in the old town woke with a tower on its back. Pigeons pay it rent.',
+    element: 'stone',
+    rarity: 'uncommon',
+    base: { hp: 78, atk: 14, def: 22 },
+    move: 'Rampart Slam',
+  },
+  {
+    kind: 'pet',
+    stage: 2,
+    id: 'stormplume',
+    name: 'Stormplume',
+    epithet: 'the Thunder-Horned Owl',
+    lore: 'It no longer hoots before the rain; it decides when the rain comes. Farmers leave it the first sheaf of every harvest.',
+    element: 'gale',
+    rarity: 'uncommon',
+    base: { hp: 58, atk: 18, def: 15 },
+    move: 'Thunderclap',
+  },
+  {
+    kind: 'pet',
+    stage: 2,
+    id: 'gloamwing',
+    name: 'Gloamwing',
+    epithet: 'the Lantern of the Barrows',
+    lore: 'It carries a lantern lit from every candle left on an old grave. The dead are said to read their names by its light.',
+    element: 'lumen',
+    rarity: 'rare',
+    base: { hp: 54, atk: 22, def: 14 },
+    move: 'Gloaming Lantern',
   },
 ];
 
@@ -167,7 +273,7 @@ export const MONSTERS: readonly MonsterSpecies[] = [
   },
 ];
 
-export const ALL_SPECIES: readonly Species[] = [...PETS, ...MONSTERS];
+export const ALL_SPECIES: readonly Species[] = [...PETS, ...EVOLVED, ...MONSTERS];
 
 const byId = new Map(ALL_SPECIES.map((s) => [s.id, s]));
 export function getSpecies(id: string): Species {

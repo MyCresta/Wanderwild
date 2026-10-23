@@ -1,3 +1,4 @@
+import { EVOLVED_ART } from './art/evolved';
 import { MONSTER_ART } from './art/monsters';
 import { PET_ART } from './art/pets';
 import type { Art } from './art/types';
@@ -60,7 +61,7 @@ export function createCreatureSvg(options: CreatureOptions): SVGSVGElement {
   const defs = el('defs');
   svg.appendChild(defs);
 
-  const draw = (species.kind === 'pet' ? PET_ART : MONSTER_ART)[species.id];
+  const draw = species.kind === 'pet' ? (PET_ART[species.id] ?? EVOLVED_ART[species.id]) : MONSTER_ART[species.id];
   const shift = individual.hueShift;
   const art = draw({
     rng: mulberry32(seed),
