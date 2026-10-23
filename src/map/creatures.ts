@@ -1,6 +1,6 @@
 import { Marker, type Map } from 'maplibre-gl';
 import type { OwnedPet } from '../creatures/collection';
-import type { Spawn } from '../creatures/spawning';
+import type { Spawn } from '../game/spawns';
 import type { Encounter } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
 
