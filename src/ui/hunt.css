@@ -1,0 +1,190 @@
+/* ---------- Treasure hunts ---------- */
+
+.hunt-button {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--safe-bottom) + 172px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 56px;
+  height: 64px;
+  padding: 6px 0 4px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 28px;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  font: inherit;
+  font-size: 9.5px;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.hunt-button svg {
+  width: 36px;
+  height: 36px;
+  flex: none;
+}
+
+.hunt-button-label {
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 54px;
+  text-overflow: ellipsis;
+}
+
+.hunt-button.hunt-active {
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35), 0 0 0 3px rgba(138, 45, 28, 0.6);
+}
+
+.hunt-button[data-warmth='hot'],
+.hunt-button[data-warmth='warmer'] {
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35), 0 0 0 3px #d9822b;
+}
+
+.hunt-button[data-warmth='burning'] {
+  animation: hunt-pulse 0.9s ease-in-out infinite;
+}
+
+.hunt-button[data-warmth='colder'] {
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35), 0 0 0 3px #5d8aa8;
+}
+
+.hunt-button.hunt-ready {
+  animation: hunt-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes hunt-pulse {
+  50% {
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35), 0 0 0 7px rgba(243, 210, 122, 0.85);
+  }
+}
+
+.hunt-x {
+  width: 40px;
+  height: 40px;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+  animation: hunt-x-ink 0.6s ease-out;
+}
+
+@keyframes hunt-x-ink {
+  from {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.hunt-intro {
+  margin-top: 0;
+}
+
+.hunt-clues {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+
+.hunt-clues li {
+  margin: 8px 0;
+  line-height: 1.4;
+  animation: hunt-clue-in 0.5s ease-out;
+}
+
+.hunt-riddle {
+  font-style: italic;
+  font-size: 17px;
+}
+
+@keyframes hunt-clue-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.hunt-warmth {
+  margin: 8px 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(59, 42, 26, 0.08);
+  font-weight: bold;
+  text-align: center;
+}
+
+.hunt-warmth-burning,
+.hunt-warmth-hot {
+  color: #a1361b;
+}
+
+.hunt-warmth-warmer {
+  color: #b5651d;
+}
+
+.hunt-warmth-colder {
+  color: #3f6f7a;
+}
+
+.hunt-abandon {
+  display: block;
+  margin: 12px auto 0;
+}
+
+.hunt-log {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.hunt-log small {
+  opacity: 0.7;
+}
+
+.hunt-found {
+  text-align: center;
+}
+
+.hunt-chest-stage {
+  display: flex;
+  justify-content: center;
+}
+
+.hunt-chest {
+  width: 160px;
+  height: 134px;
+  overflow: visible;
+}
+
+.hunt-chest-lid {
+  transform-origin: 18px 50px;
+  transition: transform 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.hunt-chest-glow {
+  opacity: 0;
+  transform-origin: 60px 52px;
+  transition: opacity 0.5s, transform 0.8s;
+  transform: scale(0.4);
+}
+
+.hunt-chest-stage.open .hunt-chest-lid {
+  transform: rotate(-28deg) translate(-6px, -10px);
+}
+
+.hunt-chest-stage.open .hunt-chest-glow {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.hunt-loot {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+  text-align: center;
+  font-weight: bold;
+}
+
+.hunt-loot li {
+  padding: 2px 0;
+  animation: hunt-clue-in 0.35s ease-out;
+}
