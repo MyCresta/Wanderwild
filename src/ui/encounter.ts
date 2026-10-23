@@ -1,31 +1,28 @@
 import { addPet, companion, grantPetXp, markSeen, MAX_SEALS } from '../creatures/collection';
 import { getSpecies } from '../creatures/species';
-import { catchChance, fleeChance, individualFromSeed, type Encounter } from '../creatures/stats';
+import { catchChance, fleeChance, individualFromSeed, MAX_LEVEL, type Encounter } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
 import { elementBadge, rarityBadge, SEAL_SVG } from './badges';
 import { createBackdrop } from './catch/backdrop';
+import { creatureOutline } from './catch/outline';
 import {
+  coveredPoints,
   creatureOffset,
-  dodgeChance,
-  flickVelocity,
-  flightPose,
-  FLIGHT_S,
-  isHit,
-  landingPoint,
-  MIN_THROW_SPEED,
+  GILDED_QUALITY,
+  gradeLevels,
+  MIN_QUALITY,
   oddsColor,
+  patienceSeconds,
   PRESS_AT,
   PRESS_WINDOW,
   pressInWindow,
-  ringQuality,
-  ringScale,
-  speedFor,
-  throwGrade,
+  scoreSketch,
+  sketchGrade,
   WOBBLE_S,
   WOBBLES,
   wobbleOdds,
   type Vec,
-} from './catch/physics';
+} from './catch/sketch';
 import type { GameContext } from './context';
 import { h, toast, wait } from './dom';
 import { sound } from '../audio/sound';
@@ -33,8 +30,11 @@ import { sound } from '../audio/sound';
 const CATCH_XP = 10;
 const NEW_SPECIES_SEALS = 2;
 const SEAL_PX = 64;
+/** Lift your finger with this much of the outline traced and the sketch finishes itself. */
+const AUTO_FINISH = 0.97;
+const SVG = 'http://www.w3.org/2000/svg';
 
-type State = 'aim' | 'drag' | 'flight' | 'capture' | 'done';
+type State = 'watch' | 'sketch' | 'bind' | 'done';
 
 const vibrate = (pattern: number | number[]) => {
   try {
@@ -58,9 +58,14 @@ function tween(ms: number, fn: (p: number) => void): Promise<void> {
   });
 }
 
+const pathOf = (points: readonly Vec[], closed: boolean) =>
+  points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('') + (closed ? 'Z' : '');
+
 /**
- * The catch scene: flick a binding seal at a wild Wildling as it wanders and dodges, then
- * hold the seal shut with well-timed taps while it wobbles.
+ * The Sketching scene. A wild Wildling wanders until you ask it to pose; then you trace its
+ * outline with a finger before its patience runs out. The truer the line, the better the odds,
+ * and the finer the creature that steps off the page. A seal then binds the sketch, held shut
+ * with well-timed taps while it wobbles.
  */
 export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (caught: boolean, fled: boolean) => void): void {
   const { species, level, seed } = encounter;
@@ -70,20 +75,28 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
   ctx.changed();
 
   const backdrop = createBackdrop(species.element, seed);
-  const creatureSvg = createCreatureSvg({ speciesId: species.id, seed, size: 240 });
-  const ring = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  ring.setAttribute('viewBox', '0 0 200 200');
-  ring.setAttribute('class', 'catch-ring');
-  ring.innerHTML = '<circle cx="100" cy="108" r="78" class="catch-ring-outer"/><circle cx="100" cy="108" r="78" class="catch-ring-closing"/>';
-  const closing = ring.lastElementChild as SVGCircleElement;
-  const creatureInner = h('div', { class: 'catch-creature-inner' }, creatureSvg);
-  const creatureEl = h('div', { class: 'catch-creature' }, h('div', { class: 'catch-platform' }), creatureInner, ring);
+  const liveSvg = createCreatureSvg({ speciesId: species.id, seed, size: 240 });
+  const poseSvg = createCreatureSvg({ speciesId: species.id, seed, size: 240, still: true });
+  const creatureInner = h('div', { class: 'catch-creature-inner' }, liveSvg);
+  const creatureEl = h('div', { class: 'catch-creature' }, h('div', { class: 'catch-platform' }), creatureInner);
 
-  const sealEl = h('div', { class: 'catch-seal', role: 'presentation' });
+  // The sketching layer sits over the creature, in its drawing units, with room to stray past the edges.
+  const layer = document.createElementNS(SVG, 'svg');
+  layer.setAttribute('viewBox', '-40 -40 280 280');
+  layer.setAttribute('class', 'sketch-layer');
+  const guide = document.createElementNS(SVG, 'path');
+  guide.setAttribute('class', 'sketch-guide');
+  const marks = document.createElementNS(SVG, 'g');
+  marks.setAttribute('class', 'sketch-marks');
+  const ink = document.createElementNS(SVG, 'g');
+  ink.setAttribute('class', 'sketch-ink');
+  layer.append(guide, marks, ink);
+
+  const sealEl = h('div', { class: 'catch-seal', role: 'presentation', hidden: true });
   sealEl.innerHTML = SEAL_SVG;
   const pressRing = h('div', { class: 'catch-press', hidden: true });
   const fx = h('div', { class: 'catch-fx' });
-  const field = h('div', { class: 'catch-field' }, creatureEl, pressRing, sealEl, fx);
+  const field = h('div', { class: 'catch-field' }, creatureEl, layer, pressRing, sealEl, fx);
 
   const sealCount = h('span', { class: 'catch-seals' });
   const runBtn = h('button', { class: 'catch-run', type: 'button', 'aria-label': 'Run away' }, 'Run');
@@ -99,43 +112,56 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
     sealCount,
     runBtn,
   );
-  const hint = h('p', { class: 'catch-hint' }, 'Flick the seal up at the creature when the ring is small. Its colour shows your odds.');
-  const throwBtn = h('button', { class: 'btn catch-throw', type: 'button' }, 'Throw straight');
-  const bottom = h('footer', { class: 'catch-bottom' }, hint, throwBtn);
+  const patienceFill = h('span', { class: 'sketch-patience-fill' });
+  const patience = h('div', { class: 'sketch-patience', hidden: true, 'aria-hidden': 'true' }, patienceFill);
+  const odds = h('span', { class: 'sketch-odds', hidden: true });
+  const hint = h(
+    'p',
+    { class: 'catch-hint' },
+    individual.gilded
+      ? 'A Gilded Wildling! The gold only takes to a near-perfect line.'
+      : 'Ask it to pose, then trace its outline with your finger. A truer line binds a finer creature.',
+  );
+  const actBtn = h('button', { class: 'btn btn-primary catch-throw', type: 'button' }, 'Sketch it');
+  const bottom = h('footer', { class: 'catch-bottom' }, patience, h('div', { class: 'sketch-row' }, hint, odds), actBtn);
   const endMusic = sound.scene('wonder');
   const scene = h('div', { class: 'catch-scene', role: 'dialog', 'aria-modal': 'true', 'aria-label': `A wild ${species.name}` }, backdrop.svg, field, top, bottom);
   document.body.appendChild(scene);
 
-  let state: State = 'aim';
+  let state: State = 'watch';
   let finished = false;
   let running = true;
   let wariness = 0;
   let size = 200;
   let home: Vec = { x: 0, y: 0 };
-  let sealHome: Vec = { x: 0, y: 0 };
-  let maxReach = 500;
   let creaturePos: Vec = { x: 0, y: 0 };
   let sealPos: Vec = { x: 0, y: 0 };
-  let sealScale = 1;
   let sealSpin = 0;
-  let dodge: { at: number; dir: 1 | -1 } | null = null;
-  let frozen = false;
-  let ringNow = 1;
-  let flight: { from: Vec; to: Vec; at: number } | null = null;
+  let posed = false;
+  let poseEnds = 0;
+  let poseLength = 1;
+  let outline: Vec[] = [];
+  let strokes: Vec[][] = [];
+  let covered: boolean[] = [];
+  let segments: SVGLineElement[] = [];
+  const outlineReady = creatureOutline(poseSvg).then((points) => (outline = points));
   const phase = Math.random() * 6;
   const start = performance.now();
   const clock = () => (performance.now() - start) / 1000;
 
   const layout = () => {
     const r = field.getBoundingClientRect();
-    size = Math.min(240, r.width * 0.6, r.height * 0.32);
-    home = { x: r.width / 2, y: r.height * 0.43 };
-    sealHome = { x: r.width / 2, y: r.height - 190 };
-    maxReach = r.height * 0.55;
+    size = Math.min(260, r.width * 0.72, r.height * 0.4);
+    home = { x: r.width / 2, y: r.height * 0.44 };
     creatureEl.style.width = creatureEl.style.height = `${size}px`;
-    creatureSvg.setAttribute('width', String(size));
-    creatureSvg.setAttribute('height', String(size));
-    if (state === 'aim') sealPos = { ...sealHome };
+    for (const svg of [liveSvg, poseSvg]) {
+      svg.setAttribute('width', String(size));
+      svg.setAttribute('height', String(size));
+    }
+    const layerSize = (size * 280) / 200;
+    layer.style.width = layer.style.height = `${layerSize}px`;
+    layer.style.left = `${home.x - layerSize / 2}px`;
+    layer.style.top = `${home.y - layerSize / 2}px`;
   };
   layout();
   window.addEventListener('resize', layout);
@@ -143,9 +169,10 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
   const updateSeals = () => {
     sealCount.innerHTML = `${SEAL_SVG}<span>${ctx.collection.seals}</span>`;
     const none = ctx.collection.seals <= 0;
-    throwBtn.disabled = none || state !== 'aim';
-    sealEl.classList.toggle('catch-seal-empty', none);
-    if (none && state === 'aim') hint.textContent = 'Out of seals. Walking earns one every 100 m.';
+    if (state === 'watch') {
+      actBtn.disabled = none;
+      if (none) hint.textContent = 'Out of seals. Walking earns one every 100 m.';
+    }
   };
   updateSeals();
 
@@ -173,6 +200,12 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
     }
   };
 
+  /** Pointer position in the creature's drawing units. */
+  const toDrawing = (e: PointerEvent): Vec => {
+    const r = layer.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * 280 - 40, y: ((e.clientY - r.top) / r.height) * 280 - 40 };
+  };
+
   const close = () => {
     if (!scene.isConnected) return;
     running = false;
@@ -188,103 +221,218 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
   };
   runBtn.addEventListener('click', close);
 
-  // The frame loop: creature wander, the closing ring, the seal's pose, and the backdrop.
+  const coverage = () => (covered.length ? covered.filter(Boolean).length / covered.length : 0);
+
+  // The frame loop: the creature's wander, the patience bar, the seal, and the backdrop.
   const loop = () => {
     if (!running) return;
     const t = clock();
     backdrop.tick(t);
-    if (!frozen) {
-      const off = creatureOffset(t, phase, dodge, size / 220);
+    if (!posed) {
+      const off = creatureOffset(t, phase, size / 220);
       creaturePos = { x: home.x + off.x, y: home.y + off.y };
-      ringNow = ringScale(t);
     }
     creatureEl.style.transform = `translate(${(creaturePos.x - size / 2).toFixed(1)}px, ${(creaturePos.y - size / 2).toFixed(1)}px)`;
-    closing.setAttribute('r', (78 * ringNow).toFixed(1));
-    closing.style.stroke = oddsColor(catchChance(species.rarity, level, ringQuality(ringNow)));
-    ring.classList.toggle('catch-ring-hidden', frozen);
-
-    if (flight && state === 'flight') {
-      const p = Math.min(1, (performance.now() - flight.at) / (FLIGHT_S * 1000));
-      const pose = flightPose(flight.from, flight.to, p);
-      sealPos = { x: pose.x, y: pose.y };
-      sealScale = pose.scale;
-      sealSpin = pose.spin;
-      if (p >= 1) {
-        const landed = flight.to;
-        flight = null;
-        void resolveThrow(landed);
-      }
+    if (state === 'sketch') {
+      const left = Math.max(0, poseEnds - performance.now()) / poseLength;
+      patienceFill.style.transform = `scaleX(${left.toFixed(3)})`;
+      patience.classList.toggle('sketch-patience-low', left < 0.3);
+      if (left <= 0) void finishSketch(true);
     }
-    sealEl.style.transform = `translate(${(sealPos.x - SEAL_PX / 2).toFixed(1)}px, ${(sealPos.y - SEAL_PX / 2).toFixed(1)}px) scale(${sealScale.toFixed(3)}) rotate(${sealSpin.toFixed(1)}deg)`;
+    sealEl.style.transform = `translate(${(sealPos.x - SEAL_PX / 2).toFixed(1)}px, ${(sealPos.y - SEAL_PX / 2).toFixed(1)}px) rotate(${sealSpin.toFixed(1)}deg)`;
     requestAnimationFrame(loop);
   };
   requestAnimationFrame(loop);
 
-  const backToAim = () => {
-    sealPos = { ...sealHome };
-    sealScale = 1;
-    sealSpin = 0;
-    state = 'aim';
+  const setPosed = (on: boolean) => {
+    posed = on;
+    creatureInner.replaceChildren(on ? poseSvg : liveSvg);
+    creatureInner.classList.toggle('catch-posed', on);
+  };
+
+  const clearSketch = () => {
+    strokes = [];
+    ink.replaceChildren();
+    marks.replaceChildren();
+    segments = [];
+    covered = [];
+    guide.classList.remove('sketch-guide-show', 'sketch-guide-faded');
+    layer.classList.remove('sketch-active');
+  };
+
+  const backToWatch = () => {
+    clearSketch();
+    setPosed(false);
+    sealEl.hidden = true;
+    patience.hidden = true;
+    odds.hidden = true;
+    actBtn.textContent = 'Sketch it';
+    state = 'watch';
     updateSeals();
   };
 
-  const throwSeal = (from: Vec, velocity: Vec) => {
-    if (ctx.collection.seals <= 0) return;
+  const beginSketch = async () => {
+    if (state !== 'watch' || ctx.collection.seals <= 0) return;
     ctx.collection.seals--;
     ctx.changed();
-    state = 'flight';
+    state = 'bind';
     updateSeals();
-    vibrate(15);
+    actBtn.disabled = true;
     sound.play('throw');
-    const to = landingPoint(from, velocity, maxReach);
-    flight = { from, to, at: performance.now() };
-    if (Math.random() < dodgeChance(species.rarity, wariness)) dodge = { at: clock() + 0.12, dir: to.x <= creaturePos.x ? 1 : -1 };
+    vibrate(15);
+    await outlineReady;
+    if (!running) return;
+    // It trots back to the middle of the page and holds still.
+    const from = { ...creaturePos };
+    posed = true;
+    await tween(260, (p) => (creaturePos = { x: from.x + (home.x - from.x) * p, y: from.y + (home.y - from.y) * p }));
+    setPosed(true);
+
+    covered = outline.map(() => false);
+    segments = outline.map((p, i) => {
+      const q = outline[(i + 1) % outline.length];
+      const line = document.createElementNS(SVG, 'line');
+      line.setAttribute('x1', p.x.toFixed(1));
+      line.setAttribute('y1', p.y.toFixed(1));
+      line.setAttribute('x2', q.x.toFixed(1));
+      line.setAttribute('y2', q.y.toFixed(1));
+      return line;
+    });
+    marks.replaceChildren(...segments);
+    guide.setAttribute('d', pathOf(outline, true));
+    guide.classList.add('sketch-guide-show');
+    setTimeout(() => state === 'sketch' && guide.classList.add('sketch-guide-faded'), 1600);
+    layer.classList.add('sketch-active');
+
+    poseLength = patienceSeconds(species.rarity, wariness) * 1000;
+    poseEnds = performance.now() + poseLength;
+    patience.hidden = false;
+    odds.hidden = false;
+    updateOdds();
+    hint.textContent = 'Trace around the outline. Lift and carry on if you need to.';
+    actBtn.textContent = 'Finish sketch';
+    actBtn.disabled = false;
+    state = 'sketch';
   };
 
-  const resolveThrow = async (landed: Vec) => {
-    if (!isHit(landed, creaturePos, size * 0.36)) {
-      state = 'capture';
-      const word = landed.y < creaturePos.y - size * 0.4 ? 'Too far!' : landed.y > creaturePos.y + size * 0.4 ? 'Too short!' : 'Missed!';
-      popup(word, landed, 'catch-popup-miss');
-      sound.play('error');
-      burst(landed, '#8e2b22', 8, 40);
-      sealEl.classList.add('catch-seal-fall');
-      await wait(500);
-      sealEl.classList.remove('catch-seal-fall');
-      backToAim();
-      return;
-    }
-
-    // Struck: freeze the creature and ring where they were and draw it into the seal.
-    frozen = true;
-    state = 'capture';
-    const quality = ringQuality(ringNow);
-    const grade = throwGrade(quality);
+  const updateOdds = () => {
+    const { quality } = scoreSketch(outline, strokes);
     const chance = catchChance(species.rarity, level, quality);
-    if (grade) popup(grade, { x: creaturePos.x, y: creaturePos.y - size * 0.5 }, 'catch-popup-grade');
-    vibrate(30);
-    const target = { ...creaturePos };
-    burst(target, '#f3d27a', 12, 70, 'star');
-    creatureInner.classList.add('catch-sucked');
-    const from = { ...sealPos };
-    await tween(380, (p) => {
-      sealPos = { x: from.x + (target.x - from.x) * p, y: from.y + (target.y - from.y) * p };
-      sealScale = 0.6 + 0.2 * p;
-      sealSpin = 0;
-    });
-    const ground = { x: target.x, y: target.y + size * 0.32 };
-    await tween(320, (p) => {
-      sealPos = { x: ground.x, y: target.y + (ground.y - target.y) * p * p };
-    });
-    vibrate(20);
+    const traced = coverage();
+    odds.textContent = !strokes.length ? 'Trace it' : traced < 0.9 ? `${Math.round(traced * 100)}% traced` : sketchGrade(quality);
+    odds.style.background = strokes.length ? oddsColor(quality < MIN_QUALITY ? 0 : chance) : '';
+  };
 
+  // Drawing: each touch starts a stroke; the outline inks in where the line passes close.
+  let drawing: { stroke: Vec[]; path: SVGPathElement; id: number } | null = null;
+  let oddsFrame = 0;
+  layer.addEventListener('pointerdown', (e) => {
+    if (state !== 'sketch' || drawing) return;
+    e.preventDefault();
+    layer.setPointerCapture(e.pointerId);
+    const path = document.createElementNS(SVG, 'path');
+    ink.appendChild(path);
+    const p = toDrawing(e);
+    drawing = { stroke: [p], path, id: e.pointerId };
+    strokes.push(drawing.stroke);
+    mark(p);
+  });
+  const mark = (p: Vec) => {
+    if (!drawing) return;
+    const last = drawing.stroke[drawing.stroke.length - 1];
+    if (drawing.stroke.length > 1 && Math.hypot(p.x - last.x, p.y - last.y) < 1.5) return;
+    if (p !== last) drawing.stroke.push(p);
+    drawing.path.setAttribute('d', pathOf(drawing.stroke, false));
+    const recent = drawing.stroke.slice(-2);
+    coveredPoints(outline, [recent]).forEach((hit, i) => {
+      if (hit && !covered[i]) {
+        covered[i] = true;
+        segments[i]?.classList.add('sketch-inked');
+      }
+    });
+    if (!oddsFrame)
+      oddsFrame = requestAnimationFrame(() => {
+        oddsFrame = 0;
+        updateOdds();
+      });
+  };
+  layer.addEventListener('pointermove', (e) => {
+    if (state !== 'sketch' || !drawing || e.pointerId !== drawing.id) return;
+    for (const ev of e.getCoalescedEvents?.() ?? [e]) mark(toDrawing(ev));
+  });
+  const lift = (e: PointerEvent) => {
+    if (!drawing || e.pointerId !== drawing.id) return;
+    drawing = null;
+    if (state === 'sketch' && coverage() >= AUTO_FINISH) void finishSketch(false);
+  };
+  layer.addEventListener('pointerup', lift);
+  layer.addEventListener('pointercancel', lift);
+
+  const failSketch = async (message: string, center: Vec) => {
+    popup(message, { x: center.x, y: center.y - size * 0.55 }, 'catch-popup-miss');
+    sound.play('error');
+    vibrate([40, 40, 40]);
+    wariness++;
+    layer.classList.add('sketch-smudge');
+    await wait(700);
+    layer.classList.remove('sketch-smudge');
+    if (!running) return;
+    if (Math.random() < fleeChance(species.rarity) + 0.05 * wariness) return flee(center);
+    hint.textContent = wariness > 1 ? `${species.name} is getting restless and won't hold a pose as long.` : 'Try again with a steadier line.';
+    backToWatch();
+  };
+
+  const finishSketch = async (outOfTime: boolean) => {
+    if (state !== 'sketch') return;
+    state = 'bind';
+    drawing = null;
+    actBtn.disabled = true;
+    patience.hidden = true;
+    guide.classList.add('sketch-guide-faded');
+    const center = { ...creaturePos };
+    if (!strokes.length) {
+      setPosed(false);
+      return failSketch('It wandered off its pose', center);
+    }
+    const { quality } = scoreSketch(outline, strokes);
+    const grade = sketchGrade(quality);
+    if (outOfTime) popup('Time!', { x: center.x, y: center.y - size * 0.75 });
+    if (quality < MIN_QUALITY) return failSketch('Too rough to bind', center);
+    if (individual.gilded && quality < GILDED_QUALITY) return failSketch("The gold won't take", center);
+    popup(`${grade}!`, { x: center.x, y: center.y - size * 0.55 }, 'catch-popup-grade');
+    sound.play('discover');
+    vibrate(30);
+    // The traced line glows and the outline fills in.
+    layer.classList.add('sketch-done');
+    for (const s of segments) s.classList.add('sketch-inked');
+    burst(center, '#f3d27a', 12, 70, 'star');
+    await wait(650);
+    if (!running) return;
+    return bind(quality, grade, center);
+  };
+
+  /** The seal comes down on the finished sketch and must be held shut. */
+  const bind = async (quality: number, grade: ReturnType<typeof sketchGrade>, center: Vec) => {
+    const chance = catchChance(species.rarity, level, quality);
+    creatureInner.classList.add('catch-sucked');
+    sealEl.hidden = false;
+    const ground = { x: center.x, y: center.y + size * 0.32 };
+    const from = { x: center.x, y: center.y - size * 0.9 };
+    await tween(380, (p) => {
+      sealPos = { x: from.x, y: from.y + (ground.y - from.y) * p * p };
+      sealSpin = (1 - p) * 180;
+    });
+    clearSketch();
+    vibrate(20);
+    sound.play('bind');
     hint.textContent = 'Tap when the golden ring meets the seal to hold it shut!';
+    odds.hidden = true;
     for (let i = 0; i < WOBBLES; i++) {
       const held = await wobble(ground);
       if (!running) return;
-      if (Math.random() >= wobbleOdds(chance, held)) return breakFree(target);
+      if (Math.random() >= wobbleOdds(chance, held)) return breakFree(center);
     }
-    caught();
+    caught(grade);
   };
 
   /** One wobble of the seal. Resolves whether the player held it at the right moment. */
@@ -323,6 +471,22 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
       });
     });
 
+  const flee = (at: Vec) => {
+    setPosed(false);
+    creatureInner.classList.add('catch-flee');
+    sound.play('flee');
+    burst(at, '#2a1d3a', 18, 110);
+    hint.textContent = `${species.name} shook off the ink and slipped back into the margins of the map.`;
+    finished = true;
+    onDone(false, true);
+    actBtn.remove();
+    patience.hidden = true;
+    odds.hidden = true;
+    sealEl.hidden = true;
+    clearSketch();
+    bottom.appendChild(h('button', { class: 'btn btn-primary', type: 'button', onclick: close }, 'Back to the map'));
+  };
+
   const breakFree = async (at: Vec) => {
     vibrate([40, 40, 40]);
     burst(sealPos, '#2a1d3a', 14, 80);
@@ -331,27 +495,17 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
     wariness++;
     await wait(450);
     sealEl.classList.remove('catch-seal-burst');
-    if (Math.random() < fleeChance(species.rarity) + 0.05 * wariness) {
-      creatureInner.classList.add('catch-flee');
-      sound.play('flee');
-      burst(at, '#2a1d3a', 18, 110);
-      hint.textContent = `The seal cracked and ${species.name} slipped back into the margins of the map.`;
-      finished = true;
-      onDone(false, true);
-      throwBtn.remove();
-      sealEl.hidden = true;
-      bottom.appendChild(h('button', { class: 'btn btn-primary', type: 'button', onclick: close }, 'Back to the map'));
-      return;
-    }
+    if (Math.random() < fleeChance(species.rarity) + 0.05 * wariness) return flee(at);
     sound.play('breakFree');
     popup('It broke free!', { x: at.x, y: at.y - size * 0.55 }, 'catch-popup-miss');
-    hint.textContent = wariness > 1 ? `${species.name} is getting wary and will dodge more.` : 'So close! Try again.';
-    frozen = false;
-    backToAim();
+    hint.textContent = wariness > 1 ? `${species.name} is getting restless and won't hold a pose as long.` : 'So close! Sketch it again.';
+    backToWatch();
   };
 
-  const caught = () => {
-    const pet = addPet(ctx.collection, encounter);
+  const caught = (grade: ReturnType<typeof sketchGrade>) => {
+    const bonus = gradeLevels(grade);
+    const pet = addPet(ctx.collection, { ...encounter, level: Math.min(MAX_LEVEL, level + bonus) });
+    pet.sketch = grade;
     finished = true;
     const helper = companion(ctx.collection);
     const helping = helper && helper.uid !== pet.uid ? helper : null;
@@ -362,12 +516,13 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
     onDone(true, false);
     vibrate([20, 60, 20, 60, 80]);
     sealEl.classList.add('catch-seal-glow');
-    sound.play('bind');
+    sound.play('achievement');
     burst(sealPos, '#f3d27a', 24, 140, 'star');
     hint.textContent = '';
-    throwBtn.remove();
+    actBtn.remove();
 
     const rewards = h('ul', { class: 'catch-rewards' });
+    rewards.append(h('li', {}, `${grade} sketch${bonus ? `: steps off the page ${bonus} level${bonus > 1 ? 's' : ''} stronger` : ''}`));
     if (firstOfKind) rewards.append(h('li', {}, `New bestiary entry! +${NEW_SPECIES_SEALS} seals`));
     if (helping)
       rewards.append(h('li', {}, `${getSpecies(helping.speciesId).name} +${CATCH_XP} XP${helperLevels ? `, now level ${helping.level}!` : ''}`));
@@ -376,7 +531,7 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
       { class: 'catch-result' },
       h('h2', {}, 'Bound!'),
       createCreatureSvg({ speciesId: species.id, seed, size: 140 }),
-      h('p', { class: 'catch-result-name' }, `${individual.gilded ? '✦ Gilded ' : ''}${species.name}`, h('small', {}, ` Lv ${level} · ${individual.trait.name}`)),
+      h('p', { class: 'catch-result-name' }, `${individual.gilded ? '✦ Gilded ' : ''}${species.name}`, h('small', {}, ` Lv ${pet.level} · ${individual.trait.name}`)),
       rewards,
       h(
         'div',
@@ -403,47 +558,9 @@ export function openEncounter(ctx: GameContext, encounter: Encounter, onDone: (c
     setTimeout(() => scene.isConnected && scene.appendChild(panel), 700);
   };
 
-  // Dragging and flicking the seal.
-  let samples: { x: number; y: number; t: number }[] = [];
-  const local = (e: PointerEvent): Vec => {
-    const r = field.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  };
-  sealEl.addEventListener('pointerdown', (e) => {
-    if (state !== 'aim' || ctx.collection.seals <= 0) return;
-    state = 'drag';
-    sealEl.setPointerCapture(e.pointerId);
-    samples = [{ ...local(e), t: performance.now() }];
-    sealEl.classList.add('catch-seal-held');
+  actBtn.addEventListener('click', () => {
+    if (state === 'watch') void beginSketch();
+    else if (state === 'sketch') void finishSketch(false);
   });
-  sealEl.addEventListener('pointermove', (e) => {
-    if (state !== 'drag') return;
-    const p = local(e);
-    sealPos = p;
-    samples.push({ ...p, t: performance.now() });
-    if (samples.length > 12) samples.shift();
-  });
-  const release = (e: PointerEvent) => {
-    if (state !== 'drag') return;
-    sealEl.classList.remove('catch-seal-held');
-    samples.push({ ...local(e), t: performance.now() });
-    const v = flickVelocity(samples);
-    if (-v.y >= MIN_THROW_SPEED) {
-      throwSeal({ ...sealPos }, v);
-      return;
-    }
-    state = 'capture';
-    const from = { ...sealPos };
-    void tween(240, (p) => {
-      sealPos = { x: from.x + (sealHome.x - from.x) * p, y: from.y + (sealHome.y - from.y) * p };
-    }).then(backToAim);
-  };
-  sealEl.addEventListener('pointerup', release);
-  sealEl.addEventListener('pointercancel', release);
-
-  // Keyboard and accessibility: a straight throw aimed where the creature rests.
-  throwBtn.addEventListener('click', () => {
-    if (state !== 'aim') return;
-    throwSeal({ ...sealHome }, { x: 0, y: -speedFor(sealHome.y - home.y, maxReach) });
-  });
+  creatureEl.addEventListener('click', () => state === 'watch' && void beginSketch());
 }

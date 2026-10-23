@@ -991,78 +991,24 @@ body {
   transition-duration: 1s;
 }
 
-.catch-ring {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-  transition: opacity 0.2s;
-}
-
-.catch-ring-hidden {
-  opacity: 0;
-}
-
-.catch-ring-outer {
-  fill: none;
-  stroke: rgba(255, 248, 225, 0.85);
-  stroke-width: 2.5;
-  stroke-dasharray: 6 5;
-}
-
-.catch-ring-closing {
-  fill: none;
-  stroke-width: 5;
-  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.8));
-}
-
 .catch-seal {
   position: absolute;
   left: 0;
   top: 0;
   width: 64px;
   height: 64px;
-  cursor: grab;
-  touch-action: none;
+  pointer-events: none;
   will-change: transform;
   filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.4));
+}
+
+.catch-seal[hidden] {
+  display: none;
 }
 
 .catch-seal svg {
   width: 100%;
   height: 100%;
-}
-
-.catch-seal::before {
-  content: '';
-  position: absolute;
-  inset: -14px;
-  border: 2px dashed rgba(243, 210, 122, 0.8);
-  border-radius: 50%;
-  animation: seal-idle 2s ease-in-out infinite;
-}
-
-.catch-seal-held,
-.catch-seal-empty {
-  cursor: grabbing;
-}
-
-.catch-seal-held::before,
-.catch-seal-empty::before {
-  display: none;
-}
-
-.catch-seal-empty {
-  opacity: 0.35;
-}
-
-@keyframes seal-idle {
-  50% {
-    transform: scale(1.15);
-    opacity: 0.4;
-  }
 }
 
 .catch-seal-fall svg {
@@ -1222,11 +1168,129 @@ body {
 }
 
 .catch-throw {
-  min-height: 40px;
-  padding: 4px 14px;
-  font-size: 14px;
-  font-weight: normal;
+  min-width: 160px;
+}
+
+/* Sketching: trace the creature's outline before it loses patience. */
+.sketch-layer {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.sketch-active {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+.sketch-guide {
+  fill: none;
+  stroke: rgba(255, 248, 225, 0.95);
+  stroke-width: 2;
+  stroke-dasharray: 3 5;
+  filter: drop-shadow(0 0 1.5px rgba(42, 29, 58, 0.9));
+  opacity: 0;
+  transition: opacity 0.9s;
+}
+
+.sketch-guide-show {
+  opacity: 1;
+  animation: sketch-guide-in 1.2s ease-out;
+}
+
+.sketch-guide-faded {
+  opacity: 0.22;
+}
+
+@keyframes sketch-guide-in {
+  from {
+    stroke-dashoffset: 400;
+    opacity: 0;
+  }
+}
+
+.sketch-marks line {
+  stroke: transparent;
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke 0.2s;
+}
+
+.sketch-marks line.sketch-inked {
+  stroke: rgba(243, 210, 122, 0.85);
+}
+
+.sketch-ink path {
+  fill: none;
+  stroke: #2a1d3a;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   opacity: 0.85;
+}
+
+.sketch-done .sketch-ink path {
+  stroke: #f3d27a;
+  filter: drop-shadow(0 0 3px rgba(243, 210, 122, 0.9));
+  transition: stroke 0.3s;
+}
+
+.sketch-smudge {
+  animation: sketch-smudge 0.7s ease-in forwards;
+}
+
+@keyframes sketch-smudge {
+  to {
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
+
+.catch-posed .creature {
+  filter: saturate(0.85) brightness(1.05);
+}
+
+.sketch-patience {
+  width: min(320px, 100%);
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(42, 29, 58, 0.35);
+  overflow: hidden;
+}
+
+.sketch-patience[hidden],
+.sketch-odds[hidden] {
+  display: none;
+}
+
+.sketch-patience-fill {
+  display: block;
+  height: 100%;
+  background: #f3d27a;
+  transform-origin: left;
+}
+
+.sketch-patience-low .sketch-patience-fill {
+  background: #c0533a;
+}
+
+.sketch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.sketch-odds {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(42, 29, 58, 0.6);
+  color: #fff8e1;
+  font-size: 13px;
+  font-weight: bold;
+  white-space: nowrap;
 }
 
 .catch-result {
@@ -1278,7 +1342,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .catch-scene,
-  .catch-seal::before {
+  .sketch-guide-show {
     animation: none;
   }
 }

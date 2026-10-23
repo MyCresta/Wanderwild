@@ -1,82 +1,114 @@
 import { describe, expect, it } from 'vitest';
 import {
-  creatureOffset,
-  flickVelocity,
-  flightPose,
-  isHit,
-  landingPoint,
+  coveredPoints,
+  GILDED_QUALITY,
+  gradeLevels,
+  MIN_QUALITY,
   oddsColor,
+  patienceSeconds,
   pressInWindow,
   PRESS_AT,
-  ringQuality,
-  ringScale,
-  speedFor,
-  throwGrade,
+  radialOutline,
+  scoreSketch,
+  sketchGrade,
+  TOLERANCE,
   wobbleOdds,
   WOBBLES,
-} from '../src/ui/catch/physics';
+  type Vec,
+} from '../src/ui/catch/sketch';
 
-describe('throwing', () => {
-  it('measures flick speed from the most recent samples', () => {
-    const v = flickVelocity([
-      { x: 0, y: 500, t: 0 },
-      { x: 0, y: 490, t: 200 },
-      { x: 10, y: 440, t: 250 },
-      { x: 20, y: 390, t: 300 },
-    ]);
-    expect(v.y).toBeCloseTo(-1000);
-    expect(v.x).toBeCloseTo(200);
+const circle = (cx: number, cy: number, r: number, n = 72): Vec[] =>
+  Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI * 2;
+    return { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r };
   });
 
-  it('flies from the hand to the landing point in an arc', () => {
-    const start = { x: 200, y: 700 };
-    const land = landingPoint(start, { x: 0, y: -1000 }, 500);
-    expect(land.y).toBeLessThan(start.y);
-    expect(flightPose(start, land, 0)).toMatchObject({ x: 200, y: 700, scale: 1 });
-    const end = flightPose(start, land, 1);
-    expect(end.x).toBeCloseTo(land.x);
-    expect(end.y).toBeCloseTo(land.y);
-    expect(flightPose(start, land, 0.5).y).toBeLessThan((start.y + land.y) / 2);
+describe('finding the outline', () => {
+  it('traces the edge of a filled disc', () => {
+    const outline = radialOutline((x, y) => Math.hypot(x - 100, y - 110) <= 50);
+    expect(outline.length).toBe(72);
+    for (const p of outline) expect(Math.hypot(p.x - 100, p.y - 110)).toBeGreaterThan(44);
+    for (const p of outline) expect(Math.hypot(p.x - 100, p.y - 110)).toBeLessThan(52);
   });
 
-  it('eases off for hard flicks, and speedFor inverts it', () => {
-    const start = { x: 0, y: 0 };
-    const soft = -landingPoint(start, { x: 0, y: -800 }, 500).y;
-    const hard = -landingPoint(start, { x: 0, y: -4000 }, 500).y;
-    expect(hard).toBeGreaterThan(soft);
-    expect(hard).toBeLessThan(500);
-    expect(-landingPoint(start, { x: 0, y: -speedFor(300, 500) }, 500).y).toBeCloseTo(300);
+  it('softens thin spikes so they are fair to trace', () => {
+    const spiky = radialOutline((x, y) => Math.hypot(x - 100, y - 100) <= 40 || (Math.abs(y - 100) < 2 && x > 100 && x < 190));
+    const reach = Math.max(...spiky.map((p) => p.x));
+    expect(reach).toBeLessThan(170);
   });
 
-  it('ignores the pause before the finger lifts', () => {
-    const v = flickVelocity([
-      { x: 0, y: 100, t: 0 },
-      { x: 0, y: 50, t: 50 },
-      { x: 0, y: 50, t: 120 },
-    ]);
-    expect(v.y).toBeCloseTo(-1000);
-  });
-
-  it('hits within the radius only', () => {
-    expect(isHit({ x: 0, y: 0 }, { x: 50, y: 0 }, 50)).toBe(true);
-    expect(isHit({ x: 0, y: 0 }, { x: 51, y: 0 }, 50)).toBe(false);
-    expect(isHit({ x: 0, y: 0 }, { x: 0, y: 75 }, 50)).toBe(true);
+  it('is empty for a blank drawing', () => {
+    expect(radialOutline(() => false)).toEqual([]);
   });
 });
 
-describe('the closing ring', () => {
-  it('sweeps between wide and tight, and tighter is better', () => {
-    const scales = Array.from({ length: 300 }, (_, i) => ringScale(i / 30));
-    expect(Math.max(...scales)).toBeLessThanOrEqual(1);
-    expect(Math.min(...scales)).toBeGreaterThan(0.15);
-    expect(ringQuality(0.2)).toBeGreaterThan(ringQuality(0.8));
-    expect(throwGrade(ringQuality(0.18))).toBe('Excellent!');
-    expect(throwGrade(ringQuality(1))).toBeNull();
+describe('grading a sketch', () => {
+  const outline = circle(100, 100, 60);
+
+  it('scores a perfect trace as masterful', () => {
+    const score = scoreSketch(outline, [circle(100, 100, 60, 200)]);
+    expect(score.coverage).toBe(1);
+    expect(score.quality).toBeGreaterThan(0.95);
+    expect(sketchGrade(score.quality)).toBe('Masterful');
+  });
+
+  it('forgives a little wobble but not a wide miss', () => {
+    const close = scoreSketch(outline, [circle(100, 100, 64, 200)]).quality;
+    const wide = scoreSketch(outline, [circle(100, 100, 60 + TOLERANCE * 2.5, 200)]).quality;
+    expect(close).toBeGreaterThan(0.75);
+    expect(wide).toBeLessThan(MIN_QUALITY);
+  });
+
+  it('needs the whole way round', () => {
+    const half = circle(100, 100, 60, 200).slice(0, 100);
+    const score = scoreSketch(outline, [half]);
+    expect(score.coverage).toBeCloseTo(0.5, 1);
+    expect(score.quality).toBeLessThan(0.35);
+  });
+
+  it('accepts a trace in several strokes', () => {
+    const full = circle(100, 100, 60, 200);
+    expect(scoreSketch(outline, [full.slice(0, 110), full.slice(100)]).quality).toBeGreaterThan(0.95);
+  });
+
+  it('does not reward scribbling all over the page', () => {
+    const scribble: Vec[] = [];
+    for (let i = 0; i < 400; i++) scribble.push({ x: 30 + ((i * 37) % 140), y: 30 + ((i * 53) % 140) });
+    const score = scoreSketch(outline, [scribble]);
+    expect(score.quality).toBeLessThan(MIN_QUALITY);
+  });
+
+  it('marks which parts of the outline the line has passed', () => {
+    const covered = coveredPoints(outline, [[{ x: 160, y: 100 }]]);
+    expect(covered[0]).toBe(true);
+    expect(covered[36]).toBe(false);
+  });
+
+  it('scores nothing for no trace', () => {
+    expect(scoreSketch(outline, []).quality).toBe(0);
+  });
+});
+
+describe('grades', () => {
+  it('rise with quality and give finer specimens', () => {
+    expect(sketchGrade(0.1)).toBe('Scribble');
+    expect(sketchGrade(MIN_QUALITY)).toBe('Rough');
+    expect(sketchGrade(0.7)).toBe('Fine');
+    expect(sketchGrade(GILDED_QUALITY)).toBe('Masterful');
+    expect(gradeLevels('Masterful')).toBe(2);
+    expect(gradeLevels('Fine')).toBe(1);
+    expect(gradeLevels('Rough')).toBe(0);
+  });
+
+  it('rare and wary creatures hold a pose for less time', () => {
+    expect(patienceSeconds('rare', 0)).toBeLessThan(patienceSeconds('common', 0));
+    expect(patienceSeconds('common', 2)).toBeLessThan(patienceSeconds('common', 0));
+    expect(patienceSeconds('rare', 10)).toBe(5);
   });
 
   it('colours slim odds red and good odds green', () => {
-    expect(oddsColor(0.05)).toContain('hsl(0 ');
-    expect(oddsColor(0.9)).toContain('hsl(120 ');
+    expect(oddsColor(0)).toBe('hsl(0 75% 45%)');
+    expect(oddsColor(0.9)).toBe('hsl(120 75% 45%)');
   });
 });
 
@@ -90,14 +122,5 @@ describe('wobbles', () => {
   it('only counts a press near the moment the ring meets the seal', () => {
     expect(pressInWindow(PRESS_AT)).toBe(true);
     expect(pressInWindow(PRESS_AT - 0.4)).toBe(false);
-  });
-});
-
-describe('creature movement', () => {
-  it('hops away when dodging and drifts back after', () => {
-    const still = creatureOffset(10, 0, null, 1);
-    const hopping = creatureOffset(10, 0, { at: 9.5, dir: 1 }, 1);
-    expect(hopping.x - still.x).toBeGreaterThan(60);
-    expect(creatureOffset(20, 0, { at: 9.5, dir: 1 }, 1)).toEqual(creatureOffset(20, 0, null, 1));
   });
 });
