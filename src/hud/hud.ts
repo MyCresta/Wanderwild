@@ -3,6 +3,7 @@ import { MATERIALS, REALMS, type MaterialId, type RealmId } from '../game/realms
 import type { GameState } from '../game/state';
 import { nextUnlock, UNLOCKS } from '../game/wayfarer';
 import { sound } from '../audio/sound';
+import { glyphSvg } from '../game/glyphs';
 import { formatCount, formatDistance, formatDuration } from './format';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -50,6 +51,9 @@ export class Hud {
       } else if (event.kind === 'hatch') {
         sound.play('hatch');
         this.toast(`Your ${event.hatchling.fromKm} km egg hatched! A ${event.hatchling.rarity} creature joins you.`, 6000, true);
+      } else if (event.kind === 'glyph') {
+        sound.play('spell');
+        this.toast(event.text, 6000, true, glyphSvg(event.glyph, 44));
       } else if (event.kind === 'levelUp') {
         sound.play('levelUp', 0.3);
         const unlocked = event.unlocks.map((u) => u.what).join('; ');
@@ -97,8 +101,10 @@ export class Hud {
     el.classList.add('show');
   }
 
-  toast(text: string, ms = 3800, grand = false): void {
+  /** Shows a message under the bar; `svg` is trusted markup drawn before the text. */
+  toast(text: string, ms = 3800, grand = false, svg = ''): void {
     this.toastEl.textContent = text;
+    if (svg) this.toastEl.insertAdjacentHTML('afterbegin', `<span class="toast-glyph">${svg}</span>`);
     this.toastEl.classList.toggle('grand', grand);
     this.toastEl.hidden = false;
     clearTimeout(this.toastTimer);

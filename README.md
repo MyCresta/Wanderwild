@@ -16,6 +16,8 @@ A mobile-first, location-based fantasy game: explore the real world on a fantasy
 - **The Hearthstead** (from Wayfarer level 3). Herb Garden, Mine, Lumber Grove and Kennel produce while the app is closed, up to 8 hours of storage (24 hours at building level 9). Upgrade them with coin and materials.
 - **Stride boost.** Every 100 m walked moves all Hearthstead timers forward 10 minutes, up to 8 hours a day.
 - **Wild eggs** (from level 8). Shrines sometimes give a 2, 5 or 10 km egg; walk that far to hatch it. Longer eggs hold rarer creatures.
+- **Glyphwalking.** The shape of your walk is a spell. A Ring (a round loop of 250 m or more) claims land, a Stroke (300 m dead straight) lays a ley line for a day, and a Knot (the same corner three times in 15 minutes) sets a Waymark where a creature always waits. The trail lives in memory only and is never saved.
+- **The Inked Demesne.** Land inside a Ring becomes a parcel that yields the materials of the realms inside it, up to 8 hours of storage, sped up by the stride boost and ley lines. Its ink fades over a week; walking half its border re-inks it. Pets can settle in parcels for +20% yield each. You hold 3 parcels, plus one every 5 levels.
 - **Save system.** All progress is one versioned save in IndexedDB, with export and import as a file from the satchel to move to another phone.
 - **The Inkbound Bestiary.** Creatures that wandered off the margins of old maps now roam the streets around you, all drawn and animated in code with SVG and trigonometry (no image files).
   - Six **Wildlings** to bind and raise: Bramblet, Driftfin, Emberkit, Cragmite, Wisplume and Lumoth. Each one is an individual with its own colouring and temperament, and about 1 in 48 is Gilded.
@@ -57,6 +59,7 @@ Every `claude/*` branch also gets a preview build on the same site, so work in p
 - `src/geo/`: GPS watching and walking-distance filtering.
 - `src/map/realmProbe.ts`: reads loaded vector tiles to find the realm under a point and nearby shrines.
 - `src/map/shrineLayer.ts`: wayshrine pins.
+- `src/map/demesneLayer.ts`: parcels, ley lines, Waymarks and the live ink trail.
 - `src/game/`: game rules with no DOM: save, Wayfarer levels, realms, spawns, shrines, and `state.ts` which ties them together.
 - `src/hud/`: the top bar, realm banner, toasts, satchel and Hearthstead panels.
 - `src/creatures/`: the species roster, procedural SVG art (`art/`), levelling, catching and battle maths, spawns and the saved collection.

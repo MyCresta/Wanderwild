@@ -87,6 +87,22 @@
       </svg>
     </button>
 
+    <button class="demesne-open" id="demesne-open" type="button" aria-label="Open your Demesne">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M10 14q14-8 28 0 6 12 0 22-14 8-28 0-6-10 0-22z" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="5 3" />
+        <path d="M24 13v22M17 20h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+        <circle cx="24" cy="30" r="3" fill="#e8d9b5" />
+      </svg>
+    </button>
+
+    <dialog class="satchel" id="demesne" aria-labelledby="demesne-title">
+      <div class="satchel-body">
+        <button class="satchel-close" id="demesne-close" type="button" aria-label="Close">×</button>
+        <h2 id="demesne-title">The Inked Demesne</h2>
+        <div id="demesne-content"></div>
+      </div>
+    </dialog>
+
     <dialog class="satchel" id="hearthstead" aria-labelledby="hearthstead-title">
       <div class="satchel-body">
         <button class="satchel-close" id="hearthstead-close" type="button" aria-label="Close">×</button>

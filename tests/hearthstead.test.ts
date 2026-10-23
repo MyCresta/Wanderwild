@@ -113,7 +113,7 @@ describe('save migration', () => {
   it('upgrades a version 1 save with an empty Hearthstead', () => {
     const v1 = { version: 1, currencies: { coin: 7, wanderlight: 3 }, wayfarer: { xp: 900 } };
     const save = migrate(v1, 10);
-    expect(save.version).toBe(3);
+    expect(save.version).toBe(4);
     expect(save.currencies.coin).toBe(7);
     expect(save.hearthstead).toEqual({ buildings: {}, lastTick: 10, strideDay: '', strideUsedMs: 0 });
     expect(save.eggs).toEqual([]);

@@ -4,6 +4,8 @@ import { BUILDING_IDS, newHearthstead, type HearthsteadState, type SupplyId } fr
 import type { Expedition } from './expeditions';
 import { RUNE_IDS, SLOTS, type GearItem, type GearRarity, type RuneId, type Slot } from './gear';
 import { REALMS, type MaterialId, type RealmId } from './realms';
+import type { LeyLine, Parcel, Waymark } from './demesne';
+import type { GlyphKind, LngLat } from './glyphs';
 
 /**
  * One versioned save holding all progress. It lives in IndexedDB (localStorage as a
@@ -11,7 +13,7 @@ import { REALMS, type MaterialId, type RealmId } from './realms';
  * a phone change before there is any server.
  */
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export interface SaveData {
   version: typeof SAVE_VERSION;
@@ -48,6 +50,11 @@ export interface SaveData {
   expeditions: Expedition[];
   /** Realms the Wayfarer has stood in, for expeditions. */
   realmsVisited: RealmId[];
+  /** The Inked Demesne: parcels claimed by walking Rings. */
+  parcels: Parcel[];
+  leyLines: LeyLine[];
+  waymarks: Waymark[];
+  glyphsCast: Record<GlyphKind, number>;
   /** Achievements, their counters and the worn title; see deeds.ts. */
   deeds: DeedsState;
 }
@@ -78,6 +85,10 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     runes: [],
     expeditions: [],
     realmsVisited: [],
+    parcels: [],
+    leyLines: [],
+    waymarks: [],
+    glyphsCast: { ring: 0, stroke: 0, knot: 0 },
     deeds: newDeeds(),
   };
 }
@@ -86,6 +97,10 @@ const isRune = (v: unknown): v is RuneId => RUNE_IDS.includes(v as RuneId);
 const isRealm = (v: unknown): v is RealmId => typeof v === 'string' && v in REALMS;
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown, fallback = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+const lngLats = (v: unknown): LngLat[] =>
+  Array.isArray(v)
+    ? v.filter((p): p is LngLat => Array.isArray(p) && p.length === 2 && p.every((n) => typeof n === 'number' && Number.isFinite(n)))
+    : [];
 
 /**
  * Turns anything that was once saved (any older version, or a hand-edited file) into a
@@ -97,7 +112,7 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
   if (raw.version > SAVE_VERSION) throw new Error('This save is from a newer version of Wanderwild');
 
   // Version 1 had no Hearthstead, supplies or eggs, and version 2 no gear, runes or
-  // expeditions; the defaults below fill them in.
+  // expeditions, and version 3 no Demesne; the defaults below fill them in.
   // Future migrations that rename or reshape fields go here, one version at a time.
   const fresh = newSave(now);
   const strings = (v: unknown) => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : []);
@@ -166,6 +181,30 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
       boostMs: num(e.boostMs),
     })),
     realmsVisited: strings(raw.realmsVisited).filter(isRealm),
+    parcels: records(raw.parcels)
+      .map((p) => ({
+        id: String(p.id),
+        name: String(p.name ?? 'Nameless Holding'),
+        polygon: lngLats(p.polygon),
+        centroid: (lngLats([p.centroid])[0] ?? [0, 0]) as LngLat,
+        areaM2: num(p.areaM2),
+        perimeterM: num(p.perimeterM),
+        realms: isObject(p.realms) ? Object.fromEntries(Object.entries(numbers(p.realms)).filter(([r]) => isRealm(r))) : {},
+        claimedAt: num(p.claimedAt, now),
+        inkedAt: num(p.inkedAt, now),
+        lastTick: num(p.lastTick, now),
+        stored: numbers(p.stored),
+        residents: strings(p.residents),
+      }))
+      .filter((p) => p.polygon.length >= 3),
+    leyLines: records(raw.leyLines)
+      .map((l) => ({ id: String(l.id), from: lngLats([l.from])[0], to: lngLats([l.to])[0], until: num(l.until) }))
+      .filter((l): l is LeyLine => !!l.from && !!l.to),
+    waymarks: records(raw.waymarks).map((w) => ({ id: String(w.id), lng: num(w.lng), lat: num(w.lat), setAt: num(w.setAt, now) })),
+    glyphsCast: (() => {
+      const g = isObject(raw.glyphsCast) ? raw.glyphsCast : {};
+      return { ring: num(g.ring), stroke: num(g.stroke), knot: num(g.knot) };
+    })(),
     deeds: parseDeeds(raw.deeds),
   };
 }
@@ -188,6 +227,7 @@ export function importSave(text: string, now = Date.now()): SaveData {
 /** Drops cooldowns that have already passed so the save does not grow forever. */
 export function pruneSave(save: SaveData, now = Date.now()): void {
   for (const [id, readyAt] of Object.entries(save.shrineCooldowns)) if (readyAt <= now) delete save.shrineCooldowns[id];
+  save.leyLines = save.leyLines.filter((l) => l.until > now);
 }
 
 // ---- Storage ----

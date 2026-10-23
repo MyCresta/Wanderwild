@@ -34,7 +34,7 @@ export interface Unlock {
 }
 
 export const UNLOCKS: Unlock[] = [
-  { level: 1, what: 'Map, wayshrines and wild creatures' },
+  { level: 1, what: 'Map, wayshrines, wild creatures, Glyphwalking and the Inked Demesne' },
   { level: 3, what: 'The Hearthstead: Herb Garden and Mine' },
   { level: 5, what: 'The Forge and gear upgrades to +5' },
   { level: 8, what: 'Pet expeditions and wild eggs' },
