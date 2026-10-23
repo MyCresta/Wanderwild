@@ -6,6 +6,8 @@ export interface EvolutionStatus {
   evolution: Evolution;
   into: PetSpecies;
   walked: number;
+  /** A Ring walked in the home realm, which finishes the change. */
+  ringed: boolean;
   ready: boolean;
 }
 
@@ -19,7 +21,8 @@ export function evolutionStatus(pet: OwnedPet): EvolutionStatus | null {
     evolution,
     into: getSpecies(evolution.into) as PetSpecies,
     walked,
-    ready: pet.level >= evolution.level && walked >= evolution.metres,
+    ringed: !!pet.homeRing,
+    ready: pet.level >= evolution.level && walked >= evolution.metres && !!pet.homeRing,
   };
 }
 
@@ -37,12 +40,26 @@ export function walkInRealm(c: Collection, metres: number, realm: RealmId | unde
   return after?.ready && !before.ready ? pet : null;
 }
 
+/**
+ * A Ring was walked in `realm`. If that is the companion's home realm, the Ring counts toward
+ * its evolution. Returns the companion if it was not ringed before, and whether it is now ready.
+ */
+export function ringInRealm(c: Collection, realm: RealmId | undefined): { pet: OwnedPet; ready: boolean } | null {
+  const pet = companion(c);
+  if (!pet || !realm) return null;
+  const status = evolutionStatus(pet);
+  if (!status || status.evolution.realm !== realm || status.ringed) return null;
+  pet.homeRing = true;
+  return { pet, ready: evolutionStatus(pet)!.ready };
+}
+
 /** Turns a ready pet into its evolved form, keeping its level, seed and experience. */
 export function evolve(c: Collection, pet: OwnedPet): PetSpecies | null {
   const status = evolutionStatus(pet);
   if (!status?.ready) return null;
   pet.speciesId = status.into.id;
   delete pet.realmWalkM;
+  delete pet.homeRing;
   markSeen(c, pet.speciesId);
   return status.into;
 }

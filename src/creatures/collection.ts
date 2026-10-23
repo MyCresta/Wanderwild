@@ -11,6 +11,8 @@ export interface OwnedPet {
   caughtAt: number;
   /** Metres walked as companion in its home realm, toward evolving. */
   realmWalkM?: number;
+  /** Whether it has walked a Ring in its home realm as companion, the last step to evolving. */
+  homeRing?: boolean;
   /** How well it was sketched when it was bound. */
   sketch?: string;
 }

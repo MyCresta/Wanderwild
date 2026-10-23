@@ -22,7 +22,7 @@ import { HearthsteadPanel } from './hud/hearthsteadPanel';
 import { renderParty } from './hud/partyPanel';
 import { ForgePanel } from './hud/forgePanel';
 import { formatWait } from './hud/format';
-import { CompanionMarker, CreatureMarkers } from './map/creatures';
+import { CompanionMarker, CreatureMarkers, ResidentMarkers } from './map/creatures';
 import { addPet, companion, loadCollection, saveCollection, walkRewards } from './creatures/collection';
 import { spawnsNear, type Spawn } from './game/spawns';
 import { getSpecies } from './creatures/species';
@@ -40,7 +40,7 @@ import { Trace } from './game/glyphs';
 import { realmShares, samplePoints, waymarkSpawn } from './game/demesne';
 import { DemesneLayer } from './map/demesneLayer';
 import { DemesnePanel } from './hud/demesnePanel';
-import { walkInRealm } from './creatures/evolution';
+import { ringInRealm, walkInRealm } from './creatures/evolution';
 import { creatureReach } from './geo/reach';
 import { setupRailMenu, watchLayout } from './ui/layout';
 import { installOrbitCamera } from './map/orbitCamera';
@@ -137,6 +137,8 @@ const collection = loadCollection();
 const companionMarker = new CompanionMarker(map);
 // Deeds read the collection, so they are set up just after it.
 let deeds: DeedKeeper | undefined;
+// The Demesne's residents redraw when pets change; that layer is set up further down.
+let refreshResidents: (() => void) | undefined;
 const creatureGame: GameContext = {
   collection,
   changed() {
@@ -144,6 +146,7 @@ const creatureGame: GameContext = {
     sealsEl.textContent = String(collection.seals);
     companionMarker.setPet(companion(collection));
     deeds?.check();
+    refreshResidents?.();
   },
 };
 creatureGame.wayfarer = {
@@ -175,10 +178,25 @@ const demesnePanel = new DemesnePanel(game, (text) => hud.toast(text), creatureG
 });
 // In practice-walk mode a tap moves the Wayfarer, so parcels open from the panel only.
 const demesneLayer = new DemesneLayer(map, SIMULATE ? undefined : (id) => demesnePanel.open(id));
-const drawDemesne = () => demesneLayer.show(game.save.parcels, game.save.leyLines, game.save.waymarks);
+const residents = new ResidentMarkers(map);
+const drawDemesne = () => {
+  demesneLayer.show(game.save.parcels, game.save.leyLines, game.save.waymarks);
+  residents.show(game.save.parcels, collection.pets);
+};
 game.tickDemesne();
 drawDemesne();
 game.on((e) => e.kind === 'change' && drawDemesne());
+refreshResidents = () => residents.show(game.save.parcels, collection.pets);
+// A Ring walked in the companion's home realm is the last step of its evolution.
+game.on((e) => {
+  if (e.kind !== 'glyph' || e.glyph.kind !== 'ring') return;
+  const rung = ringInRealm(collection, e.realm);
+  if (!rung) return;
+  const name = getSpecies(rung.pet.speciesId).name;
+  sound.play('discover');
+  toast(rung.ready ? `${name} is glowing… it's ready to evolve! Open the bestiary.` : `${name} felt the Ring close around its home. One step nearer to changing.`);
+  creatureGame.changed();
+});
 
 /** Hatched eggs join the collection as Wildlings (re-rolling past any Blotspawn the seed picks). */
 function claimHatchlings(): void {
