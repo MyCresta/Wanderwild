@@ -1,4 +1,3 @@
-import { newDeeds, parseDeeds, type DeedsState } from './deeds';
 import type { Egg, Hatchling } from './eggs';
 import { BUILDING_IDS, newHearthstead, type HearthsteadState, type SupplyId } from './hearthstead';
 import type { Expedition } from './expeditions';
@@ -55,8 +54,6 @@ export interface SaveData {
   leyLines: LeyLine[];
   waymarks: Waymark[];
   glyphsCast: Record<GlyphKind, number>;
-  /** Achievements, their counters and the worn title; see deeds.ts. */
-  deeds: DeedsState;
   /** Curio id → when it expires, for curios already picked up today. */
   curiosFound: Record<string, number>;
 }
@@ -91,7 +88,6 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     leyLines: [],
     waymarks: [],
     glyphsCast: { ring: 0, stroke: 0, knot: 0 },
-    deeds: newDeeds(),
     curiosFound: {},
   };
 }
@@ -208,7 +204,6 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
       const g = isObject(raw.glyphsCast) ? raw.glyphsCast : {};
       return { ring: num(g.ring), stroke: num(g.stroke), knot: num(g.knot) };
     })(),
-    deeds: parseDeeds(raw.deeds),
     curiosFound: numbers(raw.curiosFound) as Record<string, number>,
   };
 }
