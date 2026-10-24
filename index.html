@@ -34,21 +34,12 @@
       <div class="notice" id="notice" role="status" hidden></div>
     </header>
 
-    <button class="bestiary-button" id="bestiary" type="button" aria-label="Open the bestiary">
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M6 10q9-4 18 2v28q-9-6-18-2z" fill="#e8d9b5" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" />
-        <path d="M42 10q-9-4-18 2v28q9-6 18-2z" fill="#e8d9b5" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" />
-        <path d="M11 18q5-2 9 1M11 24q5-2 9 1M28 19q4-3 9-1M28 25q4-3 9-1" stroke="currentColor" stroke-width="1.6" fill="none" />
-      </svg>
-      <span>Bestiary</span>
-    </button>
+    <!-- The hero's portrait, drawn by the hero page; opens the hero, the Bestiary and the rest. -->
+    <button class="journal-open" id="journal-open" type="button" aria-label="Open your hero and bestiary"></button>
 
     <!-- Map buttons stack upward from the bottom corners; the first child sits lowest.
          Buttons marked rail-extra stay folded behind the "more" button until it is opened. -->
-    <nav class="rail rail-left" id="rail-left" aria-label="Wayfarer">
-      <!-- The hero's portrait, drawn by the hero page. -->
-      <button class="journal-open" id="journal-open" type="button" aria-label="Open your hero"></button>
-    </nav>
+    <nav class="rail rail-left" id="rail-left" aria-label="Wayfarer"></nav>
 
     <nav class="rail rail-right" id="rail-right" aria-label="Map tools">
       <!-- Shown only once the camera has left the Wayfarer. -->
@@ -78,8 +69,8 @@
         <button class="satchel-close" id="journal-close" type="button" aria-label="Close">×</button>
         <div class="tabs journal-tabs" role="tablist">
           <button class="tab" id="journal-tab-wayfarer" type="button" role="tab">Hero</button>
+          <button class="tab" id="journal-tab-bestiary" type="button" role="tab">Bestiary</button>
           <button class="tab" id="journal-tab-hearth" type="button" role="tab" hidden>Hearth</button>
-          <button class="tab" id="journal-tab-demesne" type="button" role="tab">Demesne</button>
           <button class="tab" id="journal-tab-settings" type="button" role="tab" aria-label="Settings">⚙</button>
         </div>
       </header>
@@ -95,8 +86,8 @@
           <ol class="satchel-unlocks" id="satchel-unlocks"></ol>
         </details>
       </section>
+      <section class="journal-pane" id="journal-bestiary" role="tabpanel" hidden></section>
       <section class="journal-pane" id="journal-hearth" role="tabpanel" hidden></section>
-      <section class="journal-pane" id="journal-demesne" role="tabpanel" hidden></section>
       <section class="journal-pane" id="journal-settings" role="tabpanel" hidden>
         <h3>Sound</h3>
         <div class="choice-row" id="sound-choice" role="radiogroup" aria-label="Sound">

@@ -6,7 +6,7 @@ import { hashString, seededRandom, weightedPick } from './rng';
  * Farsight: play from the sofa. The Wayfarer's lantern-eye drifts wherever the map is
  * dragged, and there they can sketch Wildlings, fight Blotspawn and pick up curios.
  * Walking stays the better deal: anything done by Farsight pays FARSIGHT_SHARE of what
- * the same deed pays on foot, and glyphs, shrines, the Demesne and hunts still need feet.
+ * the same deed pays on foot, and glyphs, shrines and hunts still need feet.
  */
 
 /** Share of XP and curio loot paid for deeds done by Farsight rather than in person. */

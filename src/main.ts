@@ -26,7 +26,7 @@ import { ForgePanel } from './hud/forgePanel';
 import { HeroPanel, openHeroChoice } from './hud/heroPanel';
 import { heroSvg } from './hud/heroArt';
 import { formatWait } from './hud/format';
-import { CompanionMarker, CreatureMarkers, FollowerMarker, ResidentMarkers } from './map/creatures';
+import { CompanionMarker, CreatureMarkers, FollowerMarker } from './map/creatures';
 import { addPet, companion, loadCollection, saveCollection, walkRewards } from './creatures/collection';
 import { spawnsNear, type Spawn } from './game/spawns';
 import { getSpecies } from './creatures/species';
@@ -35,16 +35,15 @@ import { wildlingWanted } from './creatures/scarcity';
 import type { GameContext } from './ui/context';
 import { openBattle } from './ui/battle';
 import { lairsNear } from './game/lairs';
-import { openBestiary, openStarterChoice } from './ui/bestiary';
+import { renderBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
 import { openJoined, openMeeting } from './ui/meet';
 import { BLOT_TRUST_M, followerTrust, type FollowOutcome } from './creatures/befriend';
 import { sound } from './audio/sound';
 import { HuntController } from './ui/hunt';
 import { Trace } from './game/glyphs';
-import { realmShares, samplePoints, waymarkSpawn } from './game/demesne';
-import { DemesneLayer } from './map/demesneLayer';
-import { DemesnePanel } from './hud/demesnePanel';
+import { waymarkSpawn } from './game/waymarks';
+import { GlyphLayer } from './map/glyphLayer';
 import { ringInRealm, walkInRealm } from './creatures/evolution';
 import { playerReach } from './geo/reach';
 import { watchLayout } from './ui/layout';
@@ -118,7 +117,7 @@ function setFollowing(value: boolean): void {
   if (value && farsight.active) return farsight.set(false);
   following = value;
   recenterEl.setAttribute('aria-pressed', String(value));
-  recenterEl.hidden = value;
+  recenterEl.hidden = value || farsight.active;
   if (value && lastFix) map.easeTo({ center: [lastFix.lng, lastFix.lat], zoom: Math.max(map.getZoom(), 15) });
 }
 
@@ -142,17 +141,12 @@ const curioLayer = new CurioLayer(map, (curio) => takeCurio(curio));
 const collection = loadCollection();
 const companionMarker = new CompanionMarker(map);
 const followerMarker = new FollowerMarker(map);
-// The Demesne's residents redraw when pets change; that layer is set up further down.
-let refreshResidents: (() => void) | undefined;
 const creatureGame: GameContext = {
   collection,
   changed() {
     saveCollection(collection);
     companionMarker.setPet(companion(collection));
     followerMarker.set(collection.follower);
-    // A companion sent back to the wild no longer lives in the Demesne.
-    for (const parcel of game.save.parcels) parcel.residents = parcel.residents.filter((uid) => collection.pets.some((p) => p.uid === uid));
-    refreshResidents?.();
   },
 };
 creatureGame.wayfarer = {
@@ -171,31 +165,17 @@ creatureGame.wayfarer = {
 };
 creatureGame.changed();
 journal.onShow('wayfarer', () => renderParty($('satchel-party'), creatureGame));
+journal.onShow('bestiary', () =>
+  renderBestiary(creatureGame, { body: journal.pane('bestiary'), setTitle: (text) => journal.setTitle(text), close: () => journal.close() }),
+);
 new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame);
 new HeroPanel(game, forge, (text) => hud.toast(text));
 
-// Glyphwalking: the shape of the walk, kept in memory only, and the Demesne it claims.
+// Glyphwalking: the shape of the walk, kept in memory only, and the Waymarks it ties.
 const trace = new Trace();
-const trailMetres = () => {
-  let m = 0;
-  for (let i = 1; i < trace.points.length; i++) m += haversine(trace.points[i - 1], trace.points[i]);
-  return m;
-};
-const demesnePanel = new DemesnePanel(game, (text) => hud.toast(text), creatureGame, trailMetres, (lng, lat) => {
-  setFollowing(false);
-  map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 16) });
-});
-// In practice-walk mode a tap moves the Wayfarer, so parcels open from the panel only.
-const demesneLayer = new DemesneLayer(map, SIMULATE ? undefined : (id) => demesnePanel.open(id));
-const residents = new ResidentMarkers(map);
-const drawDemesne = () => {
-  demesneLayer.show(game.save.parcels, game.save.leyLines, game.save.waymarks);
-  residents.show(game.save.parcels, collection.pets);
-};
-game.tickDemesne();
-drawDemesne();
-game.on((e) => e.kind === 'change' && drawDemesne());
-refreshResidents = () => residents.show(game.save.parcels, collection.pets);
+const glyphLayer = new GlyphLayer(map);
+glyphLayer.showWaymarks(game.save.waymarks);
+game.on((e) => e.kind === 'glyph' && glyphLayer.showWaymarks(game.save.waymarks));
 // A Ring walked in the companion's home realm is the last step of its evolution.
 game.on((e) => {
   if (e.kind !== 'glyph' || e.glyph.kind !== 'ring') return;
@@ -203,7 +183,7 @@ game.on((e) => {
   if (!rung) return;
   const name = getSpecies(rung.pet.speciesId).name;
   sound.play('discover');
-  toast(rung.ready ? `${name} is glowing… it's ready to evolve! Open the bestiary.` : `${name} felt the Ring close around its home. One step nearer to changing.`);
+  toast(rung.ready ? `${name} is glowing… it's ready to evolve! Open its page in the Bestiary.` : `${name} felt the Ring close around its home. One step nearer to changing.`);
   creatureGame.changed();
 });
 
@@ -299,9 +279,10 @@ function seenFarsightHint(): boolean {
 // Farsight: drag the map freely and play wherever the lens in the middle looks.
 const farsight = new Farsight({
   enter() {
+    // The eye button is the only way home from Farsight, so the compass stays hidden.
     following = false;
     recenterEl.setAttribute('aria-pressed', 'false');
-    recenterEl.hidden = false;
+    recenterEl.hidden = true;
     orbit.setFree(true);
     if (!seenFarsightHint()) {
       hud.toast(`Farsight: drag to explore and play from here for ${Math.round(FARSIGHT_SHARE * 100)}% rewards. Walking pays full.`, 5000);
@@ -424,7 +405,6 @@ function refreshAround(force = false): void {
 }
 map.on('moveend', () => farsight.active && refreshAround());
 
-$('bestiary').addEventListener('click', () => openBestiary(creatureGame));
 // First play: who the hero is, then the first companion.
 const meetCompanion = () => {
   if (!collection.pets.length) openStarterChoice(creatureGame);
@@ -495,19 +475,16 @@ function onFix(fix: Fix): void {
     const readyToEvolve = walkInRealm(collection, metres, currentRealm);
     if (readyToEvolve) {
       sound.play('discover');
-      toast(`${getSpecies(readyToEvolve.speciesId).name} is glowing… it's ready to evolve! Open the bestiary.`);
+      toast(`${getSpecies(readyToEvolve.speciesId).name} is glowing… it's ready to evolve! Open its page in the Bestiary.`);
     }
     creatureGame.changed();
   }
-  game.walkBorders(fix.lat, fix.lng, metres);
   if (fix.accuracy <= 30) {
     for (const glyph of trace.add(fix)) {
-      // Ask the map which realms the Ring encloses, so the parcel yields their materials.
-      const shares = glyph.kind === 'ring' ? realmShares(samplePoints(glyph.path).map(([lng, lat]) => realmAt(map, lng, lat)), currentRealm ?? 'hearthfields') : {};
-      game.castGlyph(glyph, shares, currentRealm);
+      game.castGlyph(glyph, currentRealm);
       if (glyph.kind === 'knot') refreshSpawns(true);
     }
-    demesneLayer.showTrace(trace.line);
+    glyphLayer.showTrace(trace.line);
   }
   refreshSpawns(firstFix);
   showReach();

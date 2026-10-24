@@ -2,8 +2,8 @@
  * Glyphwalking: the shape of a walk is a spell. The live trace is kept in memory only
  * (never saved, never sent anywhere) and is checked for three glyphs as it grows:
  *
- * - Ring: a closed loop of at least 250 m that is round enough. Claims a Demesne parcel.
- * - Stroke: 300 m or more walked almost dead straight. Lays a ley line.
+ * - Ring: a closed loop of at least 250 m that is round enough. Can finish a companion's evolution.
+ * - Stroke: 300 m or more walked almost dead straight.
  * - Knot: the same street corner (a ~25 m square) entered three times. Sets a Waymark.
  */
 
@@ -239,12 +239,12 @@ export const GLYPHS: Record<GlyphKind, { name: string; how: string; effect: stri
   ring: {
     name: 'Ring',
     how: 'Walk a loop of 250 m or more and come back to where you started.',
-    effect: 'Claims the land inside as a parcel of your Demesne.',
+    effect: "Walked in your companion's home realm, it can finish its evolution.",
   },
   stroke: {
     name: 'Stroke',
     how: 'Walk 300 m or more in a straight line.',
-    effect: 'Lays a ley line for a day: parcels near it yield half as much again.',
+    effect: 'Pays XP and Wanderlight.',
   },
   knot: {
     name: 'Knot',
@@ -253,7 +253,7 @@ export const GLYPHS: Record<GlyphKind, { name: string; how: string; effect: stri
   },
 };
 
-/** A small drawing of a glyph's shape, for toasts and the Demesne panel. */
+/** A small drawing of a glyph's shape, for toasts. */
 export function glyphSvg(glyph: Pick<Glyph, 'kind' | 'path'>, size = 48): string {
   const stroke = 'stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"';
   if (glyph.kind === 'knot' || glyph.path.length < 2)
