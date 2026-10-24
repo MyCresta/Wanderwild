@@ -6,14 +6,39 @@ import { spawnsNear } from '../src/game/spawns';
 import { ALL_SPECIES, getSpecies, MONSTERS, PETS } from '../src/creatures/species';
 import { addXp, creatureForSpawn, effectiveness, individualFromSeed, MAX_LEVEL, statsAt, xpToNext } from '../src/creatures/stats';
 import { PET_ART } from '../src/creatures/art/pets';
+import { WILDLING2_ART } from '../src/creatures/art/wildlings2';
 import { MONSTER_ART } from '../src/creatures/art/monsters';
 
 describe('roster', () => {
   it('has unique ids and names, and art for every species', () => {
     expect(new Set(ALL_SPECIES.map((s) => s.id)).size).toBe(ALL_SPECIES.length);
     expect(new Set(ALL_SPECIES.map((s) => s.name)).size).toBe(ALL_SPECIES.length);
-    for (const pet of PETS) expect(PET_ART[pet.id]).toBeTypeOf('function');
+    for (const pet of PETS) expect(PET_ART[pet.id] ?? WILDLING2_ART[pet.id]).toBeTypeOf('function');
     for (const monster of MONSTERS) expect(MONSTER_ART[monster.id]).toBeTypeOf('function');
+  });
+
+  it('has two Wildlings of every element, and a Taken foe for each', async () => {
+    const { ELEMENTS, TAKEN } = await import('../src/creatures/species');
+    const { beatenBy } = await import('../src/creatures/elements');
+    for (const element of Object.keys(ELEMENTS)) expect(PETS.filter((p) => p.element === element)).toHaveLength(2);
+    expect(TAKEN).toHaveLength(PETS.length);
+    for (const t of TAKEN) {
+      expect(getSpecies(t.id).kind).toBe('monster');
+      expect(t.weakTo).toBe(beatenBy(t.element));
+    }
+  });
+
+  it('turns up Taken foes in the wild, but less often than each old Blotspawn', () => {
+    let taken = 0;
+    let foes = 0;
+    for (let i = 0; i < 4000; i++) {
+      const e = creatureForSpawn({ seed: i * 7919 + 13, rarity: 'common' }, 10);
+      if (e.species.kind !== 'monster') continue;
+      foes++;
+      if (e.species.id.startsWith('taken-')) taken++;
+    }
+    expect(taken / foes).toBeGreaterThan(0.2);
+    expect(taken / foes).toBeLessThan(0.6);
   });
 });
 
@@ -93,12 +118,13 @@ describe('walking', () => {
 describe('evolution', () => {
   it('has art and a home realm for every evolving form', async () => {
     const { EVOLVED_ART } = await import('../src/creatures/art/evolved');
+    const { EVOLVED2_ART } = await import('../src/creatures/art/evolved2');
     const { EVOLVED } = await import('../src/creatures/species');
     for (const pet of PETS) {
       expect(pet.evolution).toBeDefined();
       expect(EVOLVED.some((e) => e.id === pet.evolution!.into)).toBe(true);
     }
-    for (const e of EVOLVED) expect(EVOLVED_ART[e.id]).toBeTypeOf('function');
+    for (const e of EVOLVED) expect(EVOLVED_ART[e.id] ?? EVOLVED2_ART[e.id]).toBeTypeOf('function');
   });
 
   it('needs the level, the walk and a Ring in the home realm, then keeps level and seed', async () => {

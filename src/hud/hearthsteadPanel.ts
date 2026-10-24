@@ -82,7 +82,7 @@ export class HearthsteadPanel {
     const active = s.expeditions
       .map((e) => {
         const pet = c.pets.find((p) => p.uid === e.petUid);
-        const name = pet ? getSpecies(pet.speciesId).name : 'A pet';
+        const name = pet ? getSpecies(pet.speciesId).name : 'A Wildling';
         const done = expeditionProgress(e, now) >= 1;
         return `<li class="building"><div class="building-head"><b>${name}</b><small>Exploring ${REALMS[e.realm].name}</small></div>
           <div class="building-bar"><span style="width:${100 * expeditionProgress(e, now)}%"></span></div>
@@ -92,8 +92,8 @@ export class HearthsteadPanel {
     const free = c.pets.filter((p) => !away.has(p.uid) && !party.has(p.uid));
     let form = '';
     if (s.expeditions.length >= EXPEDITION_SLOTS) form = '<p class="satchel-hint">All expedition slots are in use.</p>';
-    else if (!s.realmsVisited.length) form = '<p class="satchel-hint">Walk into a realm first; pets can only go where you have been.</p>';
-    else if (!free.length) form = '<p class="satchel-hint">Every pet is in your party or away. Pets outside the party can explore.</p>';
+    else if (!s.realmsVisited.length) form = '<p class="satchel-hint">Walk into a realm first; Wildlings can only go where you have been.</p>';
+    else if (!free.length) form = '<p class="satchel-hint">Every Wildling is in your party or away. Those outside the party can explore.</p>';
     else
       form = `<div class="exp-form">
         <label>Realm <select id="exp-realm">${s.realmsVisited.map((r) => `<option value="${r}">${REALMS[r].name}</option>`).join('')}</select></label>
@@ -168,7 +168,7 @@ export class HearthsteadPanel {
     this.body.innerHTML = `
       <p class="stride-note" title="Every 100 m you walk moves all timers forward 10 minutes">Walking skips time: <b>${formatDuration(STRIDE_DAILY_CAP_MS - left)}</b> of ${formatDuration(STRIDE_DAILY_CAP_MS)} today</p>
       <ul class="buildings">${cards}</ul>
-      <p class="satchel-hint">${formatCount(s.supplies.tonic)} Tonic · ${formatCount(s.supplies.petXp)} Pet XP</p>
+      <p class="satchel-hint">${formatCount(s.supplies.tonic)} Tonic · ${formatCount(s.supplies.petXp)} Wildling XP</p>
       <h3>Expeditions</h3>
       ${this.expeditionsHtml()}
       <h3>Incubator</h3>

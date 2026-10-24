@@ -29,7 +29,7 @@ export const PER_POWER = { staff: 0.04, cloak: 0.05, boots: 0.05, lantern: 8, ch
 const pct = (x: number) => `+${Math.round(x * 100)}%`;
 
 export const SLOT_DEFS: Record<Slot, SlotDef> = {
-  staff: { name: 'Staff', material: 'ironbark', effect: (p) => `${pct(p * PER_POWER.staff)} pet damage` },
+  staff: { name: 'Staff', material: 'ironbark', effect: (p) => `${pct(p * PER_POWER.staff)} Wildling damage` },
   cloak: { name: 'Cloak', material: 'mistwool', effect: (p) => `${pct(p * PER_POWER.cloak)} party health` },
   boots: { name: 'Boots', material: 'cobbleOre', effect: (p) => `${pct(p * PER_POWER.boots)} stride boost and Wanderlight` },
   lantern: { name: 'Lantern', material: 'gravemoss', effect: (p) => `+${Math.round(p * PER_POWER.lantern)} m reach` },
@@ -45,7 +45,7 @@ export const RARITIES: Record<GearRarity, { name: string; power: number; color: 
 };
 
 export const RUNES: Record<RuneId, { name: string; blurb: string }> = {
-  nightfang: { name: 'Nightfang', blurb: '+20% pet damage at night' },
+  nightfang: { name: 'Nightfang', blurb: '+20% Wildling damage at night' },
   hatchstone: { name: 'Hatchstone', blurb: 'Eggs hatch 15% sooner' },
   swiftsole: { name: 'Swiftsole', blurb: '+10% stride boost' },
   seer: { name: 'Seer', blurb: '+10 m reach' },
