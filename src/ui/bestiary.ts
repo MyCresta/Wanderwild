@@ -6,6 +6,7 @@ import { createCreatureSvg } from '../creatures/view';
 import { elementBadge, rarityBadge } from './badges';
 import type { GameContext } from './context';
 import { evolutionStatus } from '../creatures/evolution';
+import { bandSize, releasePet } from '../creatures/befriend';
 import { REALMS } from '../game/realms';
 import { openEvolution } from './evolution';
 import { h, openSheet, type Sheet } from './dom';
@@ -46,7 +47,6 @@ function petDetail(ctx: GameContext, sheet: Sheet, pet: OwnedPet, back: () => vo
       individual.gilded && h('span', { class: 'badge badge-gilded' }, '✦ Gilded'),
       ' ',
       h('em', {}, individual.trait.name),
-      pet.sketch && h('small', { class: 'sketch-grade' }, ` · ${pet.sketch} sketch`),
     ),
     h(
       'div',
@@ -72,6 +72,28 @@ function petDetail(ctx: GameContext, sheet: Sheet, pet: OwnedPet, back: () => vo
     h(
       'div',
       { class: 'actions' },
+      ctx.collection.pets.length > 1 &&
+        h(
+          'button',
+          {
+            class: 'btn',
+            type: 'button',
+            onclick: (e: Event) => {
+              const btn = e.currentTarget as HTMLButtonElement;
+              // Ask twice: it cannot be undone.
+              if (!btn.dataset.sure) {
+                btn.dataset.sure = '1';
+                btn.textContent = `Really let ${species.name} go?`;
+                return;
+              }
+              if (releasePet(ctx.collection, pet.uid)) {
+                ctx.changed();
+                back();
+              }
+            },
+          },
+          'Release to the wild',
+        ),
       isCompanion
         ? h('span', { class: 'badge badge-companion' }, 'Walking with you')
         : h(
@@ -139,14 +161,14 @@ export function openBestiary(ctx: GameContext): void {
     const tabs = h(
       'div',
       { class: 'tabs', role: 'tablist' },
-      h('button', { class: 'tab', type: 'button', role: 'tab', 'aria-selected': String(tab === 'pets'), onclick: () => ((tab = 'pets'), render()) }, `Companions (${ctx.collection.pets.length})`),
+      h('button', { class: 'tab', type: 'button', role: 'tab', 'aria-selected': String(tab === 'pets'), onclick: () => ((tab = 'pets'), render()) }, `Band (${ctx.collection.pets.length}/${bandSize(ctx.wayfarer?.level() ?? 1)})`),
       h('button', { class: 'tab', type: 'button', role: 'tab', 'aria-selected': String(tab === 'dex'), onclick: () => ((tab = 'dex'), render()) }, `Bestiary (${ctx.collection.seen.length}/${ALL_SPECIES.length})`),
     );
     sheet.body.replaceChildren(tabs, tab === 'pets' ? petsTab() : dexTab());
   };
 
   const petsTab = () => {
-    if (!ctx.collection.pets.length) return h('p', { class: 'hint' }, 'No companions yet. Find a Wildling on the map and sketch it.');
+    if (!ctx.collection.pets.length) return h('p', { class: 'hint' }, 'No companions yet. Meet a Wildling on the map and ask it to walk with you.');
     const current = companion(ctx.collection);
     const pets = [...ctx.collection.pets].sort((a, b) => Number(b.uid === current?.uid) - Number(a.uid === current?.uid) || b.level - a.level);
     return h('div', { class: 'pet-grid' }, ...pets.map((pet) => petCard(pet, pet.uid === current?.uid, () => petDetail(ctx, sheet, pet, render))));
@@ -156,7 +178,7 @@ export function openBestiary(ctx: GameContext): void {
     h(
       'div',
       { class: 'dex' },
-      h('p', { class: 'hint' }, 'Trace a Wildling\'s outline to sketch it, then bind the sketch with a seal. Blotspawn are spilled ink gone sour: send your companion to drive them off.'),
+      h('p', { class: 'hint' }, 'Wildlings join you after a long walk together. Blotspawn are spilled ink gone sour: send your companion to drive them off.'),
       ...ALL_SPECIES.map((species) => {
         const seen = ctx.collection.seen.includes(species.id);
         const owned = ctx.collection.pets.filter((p) => p.speciesId === species.id).length;

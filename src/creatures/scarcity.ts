@@ -4,7 +4,7 @@ import { PETS } from './species';
 import type { Encounter } from './stats';
 
 /** Share of wild Wildling spawns that actually appear: about one along a typical walk. */
-export const WILDLING_SHARE = 0.2;
+export const WILDLING_SHARE = 0.1;
 /** A Wildling of a kind you already keep must be this many levels above your best one to show. */
 export const STRONGER_BY = 3;
 

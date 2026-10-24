@@ -4,7 +4,7 @@ import { addPet, emptyCollection, METRES_PER_SEAL, walkRewards } from '../src/cr
 import { mulberry32 } from '../src/creatures/rng';
 import { spawnsNear } from '../src/game/spawns';
 import { ALL_SPECIES, getSpecies, MONSTERS, PETS } from '../src/creatures/species';
-import { addXp, catchChance, creatureForSpawn, effectiveness, individualFromSeed, MAX_LEVEL, statsAt, xpToNext } from '../src/creatures/stats';
+import { addXp, creatureForSpawn, effectiveness, individualFromSeed, MAX_LEVEL, statsAt, xpToNext } from '../src/creatures/stats';
 import { PET_ART } from '../src/creatures/art/pets';
 import { MONSTER_ART } from '../src/creatures/art/monsters';
 
@@ -38,14 +38,6 @@ describe('levelling', () => {
     const high = statsAt(base, 10, trait);
     expect(high.hp).toBeGreaterThan(low.hp);
     expect(high.atk).toBeGreaterThan(low.atk);
-  });
-});
-
-describe('catching', () => {
-  it('rewards a well-timed cast and stays within bounds', () => {
-    expect(catchChance('common', 1, 1)).toBeGreaterThan(catchChance('common', 1, 0));
-    expect(catchChance('rare', 30, 0)).toBeGreaterThanOrEqual(0.05);
-    expect(catchChance('common', 1, 1)).toBeLessThanOrEqual(0.95);
   });
 });
 

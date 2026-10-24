@@ -13,8 +13,20 @@ export interface OwnedPet {
   realmWalkM?: number;
   /** Whether it has walked a Ring in its home realm as companion, the last step to evolving. */
   homeRing?: boolean;
-  /** How well it was sketched when it was bound. */
+  /** How well it was sketched when it was bound (from before Wildlings were befriended). */
   sketch?: string;
+}
+
+/** A wild Wildling walking along with the Wayfarer, deciding whether to stay. */
+export interface Follower {
+  spawnId: string;
+  speciesId: string;
+  seed: number;
+  level: number;
+  /** Metres to walk together before it joins. */
+  needM: number;
+  walkedM: number;
+  startedAt: number;
 }
 
 export interface Collection {
@@ -32,6 +44,8 @@ export interface Collection {
   /** Metres walked toward the next seal and the companion's next walking experience. */
   sealProgressM: number;
   xpProgressM: number;
+  /** The Wildling currently walking along to see if it likes you. */
+  follower?: Follower | null;
 }
 
 const KEY = 'wanderwild.bestiary';

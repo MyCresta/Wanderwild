@@ -1,5 +1,5 @@
 import { Marker, type Map } from 'maplibre-gl';
-import type { OwnedPet } from '../creatures/collection';
+import type { Follower, OwnedPet } from '../creatures/collection';
 import { hashString } from '../creatures/rng';
 import { getSpecies } from '../creatures/species';
 import { inkAt, type Parcel } from '../game/demesne';
@@ -78,6 +78,45 @@ export class CompanionMarker {
     this.shownUid = pet?.uid ?? null;
     this.el.replaceChildren();
     if (pet) this.el.appendChild(createCreatureSvg({ speciesId: pet.speciesId, seed: pet.seed, size: 48 }));
+  }
+
+  update(lng: number, lat: number): void {
+    this.marker.setLngLat([lng, lat]);
+    if (!this.placed) {
+      this.marker.addTo(this.map);
+      this.placed = true;
+    }
+  }
+}
+
+/** A wild Wildling trailing the Wayfarer, with how far it still wants to walk. */
+export class FollowerMarker {
+  private readonly marker: Marker;
+  private shown: string | null = null;
+  private placed = false;
+  private readonly el: HTMLElement;
+  private readonly art: HTMLElement;
+  private readonly label: HTMLElement;
+
+  constructor(private readonly map: Map) {
+    this.art = document.createElement('div');
+    this.label = document.createElement('span');
+    this.label.className = 'map-follower-left';
+    this.el = document.createElement('div');
+    this.el.className = 'map-follower';
+    this.el.append(this.art, this.label);
+    this.marker = new Marker({ element: this.el, anchor: 'bottom', offset: [36, 10] });
+  }
+
+  set(follower: Follower | null | undefined): void {
+    const key = follower ? `${follower.spawnId}` : null;
+    if (key !== this.shown) {
+      this.shown = key;
+      this.art.replaceChildren();
+      if (follower) this.art.appendChild(createCreatureSvg({ speciesId: follower.speciesId, seed: follower.seed, size: 42, facing: -1 }));
+    }
+    this.el.hidden = !follower;
+    if (follower) this.label.textContent = `${Math.max(0, Math.ceil(follower.needM - follower.walkedM))} m`;
   }
 
   update(lng: number, lat: number): void {

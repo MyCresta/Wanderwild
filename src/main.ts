@@ -22,7 +22,7 @@ import { HearthsteadPanel } from './hud/hearthsteadPanel';
 import { renderParty } from './hud/partyPanel';
 import { ForgePanel } from './hud/forgePanel';
 import { formatWait } from './hud/format';
-import { CompanionMarker, CreatureMarkers, ResidentMarkers } from './map/creatures';
+import { CompanionMarker, CreatureMarkers, FollowerMarker, ResidentMarkers } from './map/creatures';
 import { addPet, companion, loadCollection, saveCollection, walkRewards } from './creatures/collection';
 import { spawnsNear, type Spawn } from './game/spawns';
 import { getSpecies } from './creatures/species';
@@ -32,7 +32,8 @@ import type { GameContext } from './ui/context';
 import { openBattle } from './ui/battle';
 import { openBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
-import { openEncounter } from './ui/encounter';
+import { openJoined, openMeeting } from './ui/meet';
+import { BLOT_TRUST_M, followerTrust, type FollowOutcome } from './creatures/befriend';
 import { DeedKeeper } from './ui/deeds';
 import { sound } from './audio/sound';
 import { setupSoundButton } from './ui/soundButton';
@@ -141,6 +142,7 @@ const shrines = new ShrineLayer(map, useShrine);
 // Creatures: the collection, wild spawns around the player, and the companion at their side.
 const collection = loadCollection();
 const companionMarker = new CompanionMarker(map);
+const followerMarker = new FollowerMarker(map);
 // Deeds read the collection, so they are set up just after it.
 let deeds: DeedKeeper | undefined;
 // The Demesne's residents redraw when pets change; that layer is set up further down.
@@ -151,6 +153,9 @@ const creatureGame: GameContext = {
     saveCollection(collection);
     sealsEl.textContent = String(collection.seals);
     companionMarker.setPet(companion(collection));
+    followerMarker.set(collection.follower);
+    // A companion sent back to the wild no longer lives in the Demesne.
+    for (const parcel of game.save.parcels) parcel.residents = parcel.residents.filter((uid) => collection.pets.some((p) => p.uid === uid));
     deeds?.check();
     refreshResidents?.();
   },
@@ -234,6 +239,20 @@ function clearSpawn(spawn: Spawn, won: boolean, kind: 'pet' | 'monster', remote 
   if (won) deeds?.win(kind, spawn.rarity);
 }
 
+/** A follower has been won over, or has given up and wandered off. */
+function settleFollower(outcome: FollowOutcome): void {
+  if (outcome?.kind === 'joined') {
+    const rarity = getSpecies(outcome.pet.speciesId).rarity;
+    game.grantXp(CREATURE_XP[rarity]);
+    game.changed();
+    deeds?.win('pet', rarity);
+    openJoined(creatureGame, outcome.pet);
+  } else if (outcome?.kind === 'left') {
+    toast(`${outcome.name} lost interest and wandered back into the margins.`);
+  }
+  creatureGame.changed();
+}
+
 /** Within the purple ring of where the Wayfarer actually stands. */
 const onFoot = (p: { lat: number; lng: number }) => !!lastFix && haversine(lastFix, p) <= creatureReach(lastFix, game.bonuses().reachM);
 
@@ -249,11 +268,20 @@ function meet(spawn: Spawn, encounter: Encounter): void {
     return;
   }
   if (encounter.species.kind === 'pet') {
-    openEncounter(creatureGame, encounter, (caught, fled) => (caught || fled) && clearSpawn(spawn, caught, 'pet', remote));
+    if (remote) {
+      toast(`Wildlings only trust you in person. Walk up to ${encounter.species.name} to meet it.`);
+      return;
+    }
+    openMeeting(creatureGame, spawn.id, encounter, () => clearSpawn(spawn, false, 'pet'));
   } else if (!companion(collection)) {
     toast('You need a companion to face Blotspawn.');
   } else {
-    openBattle(creatureGame, encounter, (won) => won && clearSpawn(spawn, true, 'monster', remote));
+    openBattle(creatureGame, encounter, (won) => {
+      if (!won) return;
+      clearSpawn(spawn, true, 'monster', remote);
+      // A Wildling that sees you drive off a Blotspawn trusts you all the faster.
+      if (collection.follower && !remote) settleFollower(followerTrust(collection, BLOT_TRUST_M));
+    });
   }
 }
 
@@ -464,6 +492,7 @@ function onFix(fix: Fix): void {
   showNotice(null);
   player.update(fix);
   companionMarker.update(fix.lng, fix.lat);
+  followerMarker.update(fix.lng, fix.lat);
 
   const metres = walk.add(fix);
   if (metres > 0) {
@@ -479,6 +508,7 @@ function onFix(fix: Fix): void {
       sound.play('coin');
       toast(`Found ${reward.seals > 1 ? `${reward.seals} binding seals` : 'a binding seal'} along the way.`);
     }
+    if (collection.follower) settleFollower(followerTrust(collection, metres));
     const readyToEvolve = walkInRealm(collection, metres, currentRealm);
     if (readyToEvolve) {
       sound.play('discover');
