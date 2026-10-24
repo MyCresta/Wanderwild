@@ -12,7 +12,7 @@ export const RANKS: Record<Rank, { name: string; hp: number; power: number; trai
   normal: { name: 'Blot', hp: 1, power: 1, traits: 0 },
   rare: { name: 'Rare', hp: 1.25, power: 1.05, traits: 1 },
   elite: { name: 'Elite', hp: 1.6, power: 1.1, traits: 2 },
-  boss: { name: 'Boss', hp: 2.6, power: 1.15, traits: 3 },
+  boss: { name: 'Boss', hp: 3.4, power: 1.3, traits: 3 },
 };
 
 /** Elites come in three tiers, each tougher, a little higher level, and worth more. */
@@ -22,15 +22,28 @@ export const ELITE_TIERS = [
   { hp: 1.4, power: 1.1, traits: 3, levels: 4 },
 ] as const;
 
-/** Bosses hold a lair for a week at a fixed level, so you can grow and prepare for them. */
+/**
+ * Bosses hold a lair for a week. Each tier has a lowest level, and a boss rises to meet a
+ * stronger party (tier I a level under your best pet, tier V three over), so outlevelling
+ * one is never enough: it takes pets strong against it, tonics and a full party.
+ */
 export const BOSS_LEVELS = [5, 10, 15, 20, 25] as const;
+/** Pets top out at level 30; a tier V boss still stands three above them. */
+const BOSS_MAX_LEVEL = 33;
+
+export function bossLevel(tier: number, strongestPet = 1): number {
+  const t = Math.min(BOSS_LEVELS.length, Math.max(1, tier));
+  return Math.min(BOSS_MAX_LEVEL, Math.max(BOSS_LEVELS[t - 1], strongestPet + t - 2));
+}
 export const BOSS_TITLES = ['the Swollen', 'the Ravenous', 'the Unwritten', 'the Ink-Tyrant', 'the Last Blot'] as const;
 
 export const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
 /** Health and power multipliers and quirk count for a foe of this rank and tier (1-based). */
-export function foeScale(rank: Rank, tier = 1): { hp: number; power: number; traits: number } {
+export function foeScale(rank: Rank, tier = 1, level = 1): { hp: number; power: number; traits: number } {
   const r = RANKS[rank];
+  // Bosses grow fiercer with level, keeping pace with evolved pets.
+  if (rank === 'boss') return { hp: r.hp + 0.04 * level, power: r.power + 0.008 * level, traits: r.traits };
   if (rank !== 'elite') return r;
   const t = ELITE_TIERS[Math.min(ELITE_TIERS.length, Math.max(1, tier)) - 1];
   return { hp: r.hp * t.hp, power: r.power * t.power, traits: t.traits };

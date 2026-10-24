@@ -31,7 +31,7 @@ export function makeFighter(
   const rank = foe.rank ?? 'normal';
   const tier = foe.tier ?? 1;
   const traits = foe.traits ?? [];
-  const r = foeScale(rank, tier);
+  const r = foeScale(rank, tier, level);
   const maxHp = Math.round(stats.hp * r.hp * (traits.includes('thick') ? 1.35 : 1));
   const atk = Math.round(stats.atk * r.power * (traits.includes('savage') ? 1.2 : 1));
   return { species, level, maxHp, hp: maxHp, atk, def: Math.round(stats.def * r.power), uid, rank, tier, traits };

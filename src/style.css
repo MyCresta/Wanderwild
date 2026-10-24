@@ -3306,21 +3306,75 @@ body:has(> .catch-scene) .parchment-overlay {
   margin: 4px 0;
 }
 
-.gate-party {
+/* Party health with a tonic button per hurt pet: after a fight and before a boss. */
+.heal-list ul {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin: 8px 0;
+  margin: 8px 0 4px;
   padding: 0;
   list-style: none;
 }
 
-.gate-party li {
+.heal-list li {
   display: grid;
-  grid-template-columns: 40px 1fr 80px;
+  grid-template-columns: 40px 1fr auto;
   align-items: center;
   gap: 8px;
   font-size: 14px;
+}
+
+.heal-list .creature {
+  width: 40px;
+  height: 40px;
+}
+
+.heal-name {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.heal-list .hint {
+  margin: 0 0 6px;
+  font-size: 13px;
+  text-align: center;
+}
+
+/* A small tonic button under or beside a hurt pet; a 44 px tall tap target. */
+.tonic-btn {
+  min-height: 44px;
+  min-width: 64px;
+  padding: 4px 10px;
+  border: 2px solid #4b6a3c;
+  border-radius: 10px;
+  background: rgba(75, 106, 60, 0.12);
+  color: #2f4a24;
+  font: inherit;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.tonic-btn:active {
+  background: rgba(75, 106, 60, 0.28);
+}
+
+.party-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.party-list .tonic-btn {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  padding: 4px;
+  border: 2px solid #4b6a3c;
+  background: rgba(75, 106, 60, 0.12);
+  color: #2f4a24;
 }
 
 .gate-verdict {
@@ -3354,6 +3408,3 @@ body:has(> .catch-scene) .parchment-overlay {
   opacity: 0.7;
 }
 
-.party-tonic {
-  margin-top: 8px;
-}
