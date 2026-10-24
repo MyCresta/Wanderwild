@@ -12,7 +12,7 @@ import { watchLocation } from './geo/location';
 import { setupInstallButton } from './install';
 import { loadSave } from './game/save';
 import { GameState } from './game/state';
-import { SHRINE_REACH_M, type Shrine } from './game/shrines';
+import type { Shrine } from './game/shrines';
 import { isNight, RARITIES } from './game/gear';
 import { MATERIALS, type MaterialId, type RealmId } from './game/realms';
 import { installProbeLayers, realmAt, shrinesNear } from './map/realmProbe';
@@ -41,7 +41,7 @@ import { realmShares, samplePoints, waymarkSpawn } from './game/demesne';
 import { DemesneLayer } from './map/demesneLayer';
 import { DemesnePanel } from './hud/demesnePanel';
 import { ringInRealm, walkInRealm } from './creatures/evolution';
-import { creatureReach } from './geo/reach';
+import { playerReach } from './geo/reach';
 import { setupRailMenu, watchLayout } from './ui/layout';
 import { installOrbitCamera } from './map/orbitCamera';
 import { FightBoard, type FoeNear } from './ui/fightBoard';
@@ -127,8 +127,7 @@ recenterEl.addEventListener('click', () => setFollowing(true));
 function useShrine(shrine: Shrine): void {
   if (!lastFix) return hud.toast('Find your location first to reach a shrine.');
   const away = haversine(lastFix, shrine);
-  const reach = SHRINE_REACH_M + game.bonuses().reachM;
-  if (away > reach) return hud.toast(`${shrine.name} is ${Math.round(away)} m away. Walk within ${Math.round(reach)} m to touch it.`);
+  if (!onFoot(shrine)) return hud.toast(`${shrine.name} is ${Math.round(away)} m away. Walk until it is inside your ring to touch it.`);
   const wait = game.shrineReadyAt(shrine) - Date.now();
   if (wait > 0) return hud.toast(`${shrine.name} is gathering its power. Ready in ${formatWait(wait)}.`);
   if (game.useShrine(shrine, realmAt(map, shrine.lng, shrine.lat) ?? currentRealm ?? 'hearthfields')) sound.play('shrine');
@@ -136,6 +135,7 @@ function useShrine(shrine: Shrine): void {
 }
 
 const shrines = new ShrineLayer(map, useShrine);
+const curioLayer = new CurioLayer(map, (curio) => takeCurio(curio));
 
 // Creatures: the collection, wild spawns around the player, and the companion at their side.
 const collection = loadCollection();
@@ -234,7 +234,7 @@ function clearSpawn(spawn: Spawn, won: boolean, kind: 'pet' | 'monster', remote 
 }
 
 /** Within the purple ring of where the Wayfarer actually stands. */
-const onFoot = (p: { lat: number; lng: number }) => !!lastFix && haversine(lastFix, p) <= creatureReach(lastFix, game.bonuses().reachM);
+const onFoot = (p: { lat: number; lng: number }) => !!lastFix && haversine(lastFix, p) <= playerReach(lastFix, game.bonuses().reachM);
 
 function meet(spawn: Spawn, encounter: Encounter): void {
   // By Farsight anything on the map can be met, for a smaller reward; in person it pays in full.
@@ -242,7 +242,7 @@ function meet(spawn: Spawn, encounter: Encounter): void {
   if (remote && !farsight.active) {
     if (!lastFix) return;
     const metres = haversine(lastFix, spawn);
-    const reach = creatureReach(lastFix, game.bonuses().reachM);
+    const reach = playerReach(lastFix, game.bonuses().reachM);
     sound.play('error');
     toast(`That ${encounter.species.name} is ${Math.round(metres)} m away. Walk ${Math.ceil(metres - reach)} m closer, or reach it by Farsight 👁 for ${Math.round(FARSIGHT_SHARE * 100)}% rewards.`);
     return;
@@ -335,10 +335,13 @@ function refreshSpawns(force = false): void {
 function showReach(): void {
   const fix = focus();
   if (!fix) return;
-  const reach = lastFix ? creatureReach(lastFix, game.bonuses().reachM) : 0;
+  const reach = lastFix ? playerReach(lastFix, game.bonuses().reachM) : 0;
   if (lastFix) player.setReach(reach);
   // By Farsight everything shown is in reach, so nothing is dimmed.
   creatures.markReach((spawn) => farsight.active || onFoot(spawn));
+  // Shrines need the Wayfarer in person; curios can still be taken by Farsight for a share.
+  shrines.markReach(onFoot);
+  curioLayer.markReach((curio) => farsight.active || onFoot(curio));
   const foes: FoeNear[] = shown
     .filter(({ spawn, encounter }) => encounter.species.kind === 'monster' && !(spawn.id in collection.cleared))
     .map(({ spawn, encounter }) => {
@@ -357,7 +360,6 @@ setInterval(() => refreshSpawns(), SPAWN_REFRESH_MS);
 map.once('idle', () => refreshSpawns(true));
 
 // Curios: small daily finds. Walk past one to pick it up in full, or tap it by Farsight for a share.
-const curioLayer = new CurioLayer(map, (curio) => takeCurio(curio));
 
 function takeCurio(curio: Curio): void {
   const here = onFoot(curio);

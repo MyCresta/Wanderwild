@@ -6,7 +6,6 @@ import { REALMS, type MaterialId, type RealmId } from './realms';
  * Touch one within reach for coin, XP, materials and a short blessing.
  */
 
-export const SHRINE_REACH_M = 40;
 export const SHRINE_COOLDOWN_MS = 5 * 60 * 1000;
 export const BLESSING_MS = 10 * 60 * 1000;
 /** Walking XP multiplier while a blessing lasts. */
