@@ -20,12 +20,12 @@ import {
 import type { Art, Drawer } from './types';
 
 const SHADOW = 'rgba(42, 26, 12, 0.28)';
-const INK = '#2a1d10';
+export const INK = '#2a1d10';
 
 const shadow = (rx: number) => el('ellipse', { cx: 100, cy: 172, rx, ry: rx * 0.16, fill: SHADOW });
 
 /** An eye that blinks by squashing vertically around its centre. */
-function eye(
+export function eye(
   x: number,
   y: number,
   r: number,

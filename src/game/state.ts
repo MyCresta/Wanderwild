@@ -356,7 +356,7 @@ export class GameState {
         s.waymarks.push({ id: `wm${now.toString(36)}`, lng, lat, setAt: now });
         if (s.waymarks.length > MAX_WAYMARKS) s.waymarks.splice(0, s.waymarks.length - MAX_WAYMARKS);
       }
-      text = 'Knot cast! A Waymark now holds this corner; a creature will always wait here.';
+      text = 'Knot cast! A Waymark now holds this corner; a Wildling or Blotspawn will always wait here.';
     }
     const extra = reward.wanderlight ? ` +${reward.xp} XP, +${reward.wanderlight} Wanderlight.` : ` +${reward.xp} XP.`;
     this.emit({ kind: 'glyph', glyph, text: text + extra, realm });

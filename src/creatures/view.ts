@@ -1,4 +1,7 @@
 import { EVOLVED_ART } from './art/evolved';
+import { EVOLVED2_ART } from './art/evolved2';
+import { taken } from './art/taken';
+import { WILDLING2_ART } from './art/wildlings2';
 import { MONSTER_ART } from './art/monsters';
 import { PET_ART } from './art/pets';
 import type { Art } from './art/types';
@@ -75,6 +78,8 @@ function loop(now: number): void {
   frame = live.size ? requestAnimationFrame(loop) : 0;
 }
 
+const drawerFor = (id: string) => PET_ART[id] ?? WILDLING2_ART[id] ?? EVOLVED_ART[id] ?? EVOLVED2_ART[id];
+
 /** Draws a creature as a self-animating SVG. It stops animating once removed from the page. */
 export function createCreatureSvg(options: CreatureOptions): SVGSVGElement {
   const { speciesId, seed, size = 160, facing = 1, silhouette = false, still = false } = options;
@@ -90,7 +95,7 @@ export function createCreatureSvg(options: CreatureOptions): SVGSVGElement {
   const defs = el('defs');
   svg.appendChild(defs);
 
-  const draw = species.kind === 'pet' ? (PET_ART[species.id] ?? EVOLVED_ART[species.id]) : MONSTER_ART[species.id];
+  const draw = species.kind === 'pet' ? drawerFor(species.id) : MONSTER_ART[species.id] ?? taken(drawerFor(species.id.replace(/^taken-/, '')));
   const shift = individual.hueShift;
   const art = draw({
     rng: mulberry32(seed),
