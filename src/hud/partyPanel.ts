@@ -27,7 +27,7 @@ export function renderParty(host: HTMLElement, ctx: GameContext): void {
       'beforeend',
       `<b>${species.name}</b><small>Lv ${pet.level}${pet.uid === lead.uid ? ' · leader' : ''}</small>` +
         `<span class="bench-hp" title="${Math.round(vigor * 100)}% health"><span style="width:${vigor * 100}%"></span></span>` +
-        (vigor < 1 ? `<small class="pet-resting">Rested in ${minutesToRested(pet)} min</small>` : ''),
+        `<small class="pet-resting">${vigor < 1 ? `Rested in ${minutesToRested(pet)} min` : ''}</small>`,
     );
     btn.addEventListener('click', () => {
       togglePartyMember(c, pet.uid);

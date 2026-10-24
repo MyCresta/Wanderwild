@@ -51,16 +51,11 @@ body {
     linear-gradient(90deg, transparent calc(50% - 2px), rgba(80, 52, 24, 0.14) 50%, rgba(255, 246, 222, 0.18) calc(50% + 1.5px), transparent calc(50% + 4px)),
     linear-gradient(180deg, transparent calc(33.3% - 2px), rgba(80, 52, 24, 0.12) 33.3%, rgba(255, 246, 222, 0.16) calc(33.3% + 1.5px), transparent calc(33.3% + 4px)),
     linear-gradient(180deg, transparent calc(66.6% - 2px), rgba(80, 52, 24, 0.12) 66.6%, rgba(255, 246, 222, 0.16) calc(66.6% + 1.5px), transparent calc(66.6% + 4px)),
-    /* A coffee-cup ring near the top right and a tea splash low on the left. */
-    radial-gradient(circle at 88% 30%, transparent 0 54px, rgba(122, 78, 32, 0.2) 57px, rgba(122, 78, 32, 0.07) 63px, transparent 72px),
-    radial-gradient(circle at 88% 30%, rgba(160, 112, 52, 0.08), transparent 60px),
-    radial-gradient(ellipse 90px 70px at 8% 72%, rgba(140, 96, 42, 0.16), rgba(140, 96, 42, 0.06) 70%, transparent 100%),
-    radial-gradient(ellipse 34px 26px at 18% 64%, rgba(140, 96, 42, 0.12), transparent 100%),
     /* Large, slow mottling of aged paper. */
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006' numOctaves='3' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.3 0 0 0 0 0.12 0 0 -1.1 0 0.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E"),
     /* Fine paper grain. */
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.25 0 0 0 0 0.12 0 0 0 0.26 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: auto, auto, auto, auto, auto, auto, auto, auto, 600px 600px, 240px 240px;
+  background-size: auto, auto, auto, auto, 600px 600px, 240px 240px;
   mix-blend-mode: multiply;
 }
 
@@ -340,32 +335,15 @@ body {
   height: calc(48px * var(--marker-scale, 1));
 }
 
-.bestiary-button {
+/* The hero's portrait sits bottom centre and opens the hero page (and the Bestiary). */
+.journal-open {
   position: fixed;
   left: 50%;
   bottom: calc(var(--safe-bottom) + 28px);
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   width: 60px;
   height: 60px;
-  padding: 7px 0 4px;
-  border: 2px solid var(--leather-dark);
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 35%, var(--leather), var(--leather-dark));
-  color: var(--gold);
-  font: inherit;
-  font-size: 9px;
-  font-weight: bold;
-  letter-spacing: 0.06em;
+  transform: translateX(-50%);
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4), inset 0 0 0 2px rgba(243, 210, 122, 0.3);
-  cursor: pointer;
-}
-
-.bestiary-button svg {
-  width: 30px;
-  height: 30px;
 }
 
 /* Short landscape screens: tuck everything closer to the edges to leave the map some room. */
@@ -386,7 +364,7 @@ body {
     gap: 8px;
   }
 
-  .bestiary-button {
+  .journal-open {
     bottom: calc(var(--safe-bottom) + 8px);
   }
 }
@@ -1052,9 +1030,9 @@ body:has(> .catch-scene) .parchment-overlay {
   flex-direction: row;
   align-items: center;
   gap: 12px;
-  width: auto;
-  min-width: 200px;
-  max-width: 300px;
+  /* One fixed width, so the bar does not grow and shift as the numbers do. */
+  width: 240px;
+  max-width: 100%;
   padding: 3px 12px 3px 6px;
   border-radius: 999px;
 }
@@ -1111,6 +1089,8 @@ body:has(> .catch-scene) .parchment-overlay {
   flex-direction: column;
   align-items: center;
   min-width: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .hud-purse {
@@ -1508,6 +1488,14 @@ body:has(> .catch-scene) .parchment-overlay {
   flex: 2;
 }
 
+/* Long labels (an upgrade's cost) trim instead of wrapping onto a second line. */
+.building-actions button {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .building button:disabled {
   opacity: 0.45;
   cursor: default;
@@ -1749,6 +1737,10 @@ body:has(> .catch-scene) .parchment-overlay {
 
 .party-list small {
   opacity: 0.75;
+}
+
+.party-list + .satchel-hint {
+  margin-top: 8px;
 }
 
 /* ---------- Evolution ---------- */
@@ -2040,126 +2032,11 @@ body:has(> .catch-scene) .parchment-overlay {
   font: inherit;
 }
 
-/* ---- Glyphwalking and the Inked Demesne ---- */
+/* ---- Glyphwalking ---- */
 .toast-glyph {
   float: left;
   margin: -2px 10px -2px 0;
   color: var(--gold);
-}
-
-.glyph-cards {
-  display: grid;
-  gap: 8px;
-  margin: 8px 0 4px;
-  padding: 0;
-  list-style: none;
-}
-
-.glyph-card {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 8px 10px;
-  border: 1px solid var(--parchment-dark);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.35);
-}
-
-.glyph-card p {
-  margin: 2px 0 0;
-  font-size: 13px;
-}
-
-.glyph-card small {
-  opacity: 0.7;
-}
-
-.glyph-pic {
-  flex: none;
-  color: var(--leather);
-}
-
-.glyph-effect {
-  font-style: italic;
-  opacity: 0.85;
-}
-
-.parcel.faded {
-  opacity: 0.7;
-}
-
-.ink-bar span {
-  background: linear-gradient(90deg, #7a4b12, #d9a441);
-}
-
-.realm-chips,
-.residents {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-  margin: 4px 0;
-}
-
-.realm-chip {
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid var(--realm);
-  background: color-mix(in srgb, var(--realm) 20%, transparent);
-  font-size: 12px;
-}
-
-.resident-chip {
-  padding: 2px 8px;
-  border: 1px solid var(--leather);
-  border-radius: 999px;
-  background: var(--parchment);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.residents select {
-  max-width: 100%;
-  font: inherit;
-  font-size: 13px;
-}
-
-.residents small {
-  opacity: 0.7;
-}
-
-.ley-badge {
-  color: #1f6f8b;
-  font-weight: 600;
-}
-
-.ley-list,
-.waymark-list {
-  margin: 4px 0;
-  padding-left: 18px;
-  font-size: 14px;
-}
-
-.waymark-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin: 4px 0;
-}
-
-.waymark-row small {
-  flex: 1;
-  opacity: 0.7;
-}
-
-.waymark-row button {
-  padding: 3px 10px;
-  border: 1px solid var(--leather-dark);
-  border-radius: 6px;
-  background: var(--parchment);
-  font: inherit;
-  cursor: pointer;
 }
 
 /* ---------- Combat rework: attacks, intents, ranks, the Elemental Wheel ---------- */
@@ -2409,34 +2286,6 @@ body:has(> .catch-scene) .parchment-overlay {
   .fighter-pet .creature {
     width: 112px;
     height: 112px;
-  }
-}
-
-/* ---------- Marginalia: Wildlings living in the Demesne ---------- */
-
-.map-resident {
-  pointer-events: none;
-  transition: opacity 0.6s;
-}
-
-.map-resident .creature {
-  display: block;
-  width: calc(40px * var(--marker-scale, 1));
-  height: calc(40px * var(--marker-scale, 1));
-  animation: resident-bob 3.2s ease-in-out infinite;
-  animation-delay: calc(var(--bob, 0s) * -3);
-  filter: sepia(0.35) drop-shadow(0 2px 2px rgba(42, 29, 58, 0.35));
-}
-
-@keyframes resident-bob {
-  50% {
-    transform: translateY(-3px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .map-resident .creature {
-    animation: none;
   }
 }
 
@@ -2734,7 +2583,7 @@ body:has(> .catch-scene) .parchment-overlay {
   }
 }
 
-/* Farsight: the 👁 rail button, the pill that says it is on, and the lantern-eye in the middle of the map. */
+/* Farsight: the 👁 rail button and the lantern-eye in the middle of the map. */
 
 .farsight-button {
   border: 2px solid var(--leather-dark);
@@ -2753,37 +2602,6 @@ body:has(> .catch-scene) .parchment-overlay {
 .farsight-button[aria-pressed='true'] {
   background: #4b3b6e;
   color: var(--gold);
-}
-
-.hud > .farsight-pill {
-  pointer-events: auto;
-}
-
-.farsight-pill {
-  max-width: 360px;
-  padding: 4px 10px;
-  border: 1px solid #4b3b6e;
-  border-radius: 999px;
-  background: rgba(75, 59, 110, 0.92);
-  color: #f3e9cf;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.farsight-pill strong {
-  color: var(--gold);
-}
-
-.farsight-pill-x {
-  margin-left: 6px;
-  font-size: 15px;
-  line-height: 1;
-}
-
-.farsight-pill[hidden] {
-  display: none;
 }
 
 .farsight-lens {
@@ -2869,7 +2687,6 @@ body:has(> .catch-scene) .parchment-overlay {
   border-radius: 50%;
   background: linear-gradient(var(--leather), var(--leather-dark));
   color: var(--gold);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
   cursor: pointer;
 }
 
@@ -2878,7 +2695,7 @@ body:has(> .catch-scene) .parchment-overlay {
   height: 100%;
 }
 
-/* Something waits inside: a ready building, a full parcel. */
+/* Something waits inside: a ready building, an evolution. */
 .journal-open:not([data-badge=''])[data-badge]::after {
   content: '';
   position: absolute;
@@ -2903,10 +2720,17 @@ body:has(> .catch-scene) .parchment-overlay {
   height: 30px;
 }
 
+/* Keep "Lukewarm" and friends inside the button instead of spilling past its edge. */
+.rail > .hunt-button .hunt-button-label {
+  max-width: 40px;
+}
+
 .journal[open] {
   display: flex;
   flex-direction: column;
-  max-height: min(680px, calc(100dvh - var(--safe-top) - var(--safe-bottom) - 48px));
+  /* One fixed height for every tab, so switching tabs never resizes or moves the sheet. */
+  height: min(680px, calc(100dvh - var(--safe-top) - var(--safe-bottom) - 48px));
+  max-height: none;
   overflow: hidden;
 }
 
@@ -3490,7 +3314,19 @@ body:has(> .catch-scene) .parchment-overlay {
   margin-top: 2px;
 }
 
+.party-list b,
+.party-list small,
+.pet-card-name,
+.pet-card-level {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Always holds a line, empty when rested, so a hurt pet's card is no taller than the rest. */
 .pet-resting {
+  min-height: 1.3em;
   opacity: 0.7;
 }
 

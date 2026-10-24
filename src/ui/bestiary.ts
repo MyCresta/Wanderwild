@@ -11,6 +11,9 @@ import { REALMS } from '../game/realms';
 import { openEvolution } from './evolution';
 import { h, openSheet, type Sheet } from './dom';
 
+/** Where the bestiary draws: a journal pane, with a title and a way to step aside for a scene. */
+export type Page = Pick<Sheet, 'body' | 'setTitle' | 'close'>;
+
 function petCard(pet: OwnedPet, isCompanion: boolean, onClick: () => void) {
   const species = getSpecies(pet.speciesId);
   const { gilded } = individualFromSeed(pet.seed, species.kind);
@@ -24,7 +27,7 @@ function petCard(pet: OwnedPet, isCompanion: boolean, onClick: () => void) {
   );
 }
 
-function petDetail(ctx: GameContext, sheet: Sheet, pet: OwnedPet, back: () => void) {
+function petDetail(ctx: GameContext, sheet: Page, pet: OwnedPet, back: () => void) {
   const species = getSpecies(pet.speciesId);
   const individual = individualFromSeed(pet.seed, species.kind);
   const stats = statsAt(species.base, pet.level, individual.trait);
@@ -113,7 +116,7 @@ function petDetail(ctx: GameContext, sheet: Sheet, pet: OwnedPet, back: () => vo
   );
 }
 
-function evolutionPanel(ctx: GameContext, sheet: Sheet, pet: OwnedPet) {
+function evolutionPanel(ctx: GameContext, sheet: Page, pet: OwnedPet) {
   const status = evolutionStatus(pet);
   if (!status) {
     const species = getSpecies(pet.speciesId);
@@ -151,9 +154,8 @@ function evolutionPanel(ctx: GameContext, sheet: Sheet, pet: OwnedPet) {
   );
 }
 
-/** Companions you have bound, and the bestiary of every species. */
-export function openBestiary(ctx: GameContext): void {
-  const sheet = openSheet('Bestiary', { className: 'sheet-bestiary' });
+/** Companions you have bound, and the bestiary of every species, drawn into `sheet`. */
+export function renderBestiary(ctx: GameContext, sheet: Page): void {
   let tab: 'pets' | 'dex' = ctx.collection.pets.length ? 'pets' : 'dex';
 
   const render = () => {
