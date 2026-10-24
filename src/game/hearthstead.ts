@@ -58,10 +58,10 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   kennel: {
     id: 'kennel',
     name: 'Kennel',
-    blurb: 'Trains pets while you are away.',
+    blurb: 'Trains Wildlings while you are away.',
     unlockLevel: 6,
     product: { kind: 'supply', id: 'petXp' },
-    productName: 'Pet XP',
+    productName: 'Wildling XP',
     baseRate: 25,
     upgradeMaterial: 'hearthgrain',
   },
@@ -127,7 +127,8 @@ export function tick(h: HearthsteadState, now: number): void {
   if (elapsed > 0) bank(h, elapsed);
 }
 
-const dayKey = (now: number) => {
+/** The local calendar day, for things that reset each morning. */
+export const dayKey = (now: number) => {
   const d = new Date(now);
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 };

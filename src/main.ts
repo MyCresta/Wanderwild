@@ -50,7 +50,7 @@ import { watchLayout } from './ui/layout';
 import { installOrbitCamera } from './map/orbitCamera';
 import { Farsight } from './ui/farsight';
 import { CurioLayer } from './map/curioLayer';
-import { CURIO_KINDS, curiosNear, FARSIGHT_SHARE, type Curio } from './game/farsight';
+import { CURIO_KINDS, curiosNear, FARSIGHT_RANGE_M, FARSIGHT_SHARE, type Curio } from './game/farsight';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -230,17 +230,19 @@ function settleFollower(outcome: FollowOutcome): void {
 }
 
 /** Within the purple ring of where the Wayfarer actually stands. */
-const onFoot = (p: { lat: number; lng: number }) => !!lastFix && haversine(lastFix, p) <= playerReach(lastFix, game.bonuses().reachM);
+const onFoot = (p: { lat: number; lng: number }) => !!lastFix && haversine(lastFix, p) <= playerReach(game.bonuses().reachM);
+/** In Farsight, and inside the dashed ring the eye may roam. */
+const byFarsight = (p: { lat: number; lng: number }) => farsight.active && !!lastFix && haversine(lastFix, p) <= FARSIGHT_RANGE_M;
 
 function meet(spawn: Spawn, encounter: Encounter): void {
   // By Farsight anything on the map can be met, for a smaller reward; in person it pays in full.
   const remote = !onFoot(spawn);
-  if (remote && !farsight.active) {
+  if (remote && !byFarsight(spawn)) {
     if (!lastFix) return;
     const metres = haversine(lastFix, spawn);
-    const reach = playerReach(lastFix, game.bonuses().reachM);
     sound.play('error');
-    toast(`${encounter.species.name} is ${Math.ceil(metres - reach)} m out of reach. Walk closer, or use Farsight 👁.`);
+    if (farsight.active) toast(`${encounter.species.name} is beyond Farsight's reach. Walk closer to see that far.`);
+    else toast(`${encounter.species.name} is ${Math.ceil(metres - playerReach(game.bonuses().reachM))} m out of reach. Walk closer, or use Farsight 👁.`);
     return;
   }
   if (encounter.species.kind === 'pet') {
@@ -284,16 +286,30 @@ const farsight = new Farsight({
     recenterEl.setAttribute('aria-pressed', 'false');
     recenterEl.hidden = true;
     orbit.setFree(true);
+    player.setFarsight(FARSIGHT_RANGE_M);
     if (!seenFarsightHint()) {
-      hud.toast(`Farsight: drag to explore and play from here for ${Math.round(FARSIGHT_SHARE * 100)}% rewards. Walking pays full.`, 5000);
+      hud.toast(`Farsight: explore inside the dashed ring for ${Math.round(FARSIGHT_SHARE * 100)}% rewards. Walking pays full.`, 5000);
     }
     refreshAround(true);
   },
   exit() {
     orbit.setFree(false);
+    player.setFarsight(0);
     setFollowing(true);
     refreshAround(true);
   },
+});
+// The eye stays on a leash: dragging past the dashed ring holds the lens on its edge.
+let leashing = false;
+map.on('move', () => {
+  if (!farsight.active || !lastFix || leashing) return;
+  const c = map.getCenter();
+  const d = haversine(lastFix, c);
+  if (d <= FARSIGHT_RANGE_M) return;
+  const k = FARSIGHT_RANGE_M / d;
+  leashing = true;
+  map.setCenter([lastFix.lng + (c.lng - lastFix.lng) * k, lastFix.lat + (c.lat - lastFix.lat) * k]);
+  leashing = false;
 });
 /** Where play is happening: the lens while in Farsight, otherwise the Wayfarer. */
 function focus(): { lat: number; lng: number } | null {
@@ -341,15 +357,14 @@ function refreshSpawns(force = false): void {
 function showReach(): void {
   const fix = focus();
   if (!fix) return;
-  const reach = lastFix ? playerReach(lastFix, game.bonuses().reachM) : 0;
-  if (lastFix) player.setReach(reach);
-  // By Farsight everything shown is in reach, so nothing is dimmed.
-  creatures.markReach((spawn) => farsight.active || onFoot(spawn));
+  if (lastFix) player.setReach(playerReach(game.bonuses().reachM));
+  // By Farsight everything inside the dashed ring is in reach.
+  creatures.markReach((spawn) => onFoot(spawn) || byFarsight(spawn));
   // Shrines need the Wayfarer in person; curios can still be taken by Farsight for a share.
   shrines.markReach(onFoot);
-  curioLayer.markReach((curio) => farsight.active || onFoot(curio));
+  curioLayer.markReach((curio) => onFoot(curio) || byFarsight(curio));
   const foeInReach = shown.some(
-    ({ spawn, encounter }) => encounter.species.kind === 'monster' && !(spawn.id in collection.cleared) && (farsight.active || onFoot(spawn)),
+    ({ spawn, encounter }) => encounter.species.kind === 'monster' && !(spawn.id in collection.cleared) && (onFoot(spawn) || byFarsight(spawn)),
   );
   if (!foeHinted && companion(collection) && foeInReach) {
     foeHinted = true;
@@ -365,8 +380,9 @@ map.once('idle', () => refreshSpawns(true));
 
 function takeCurio(curio: Curio): void {
   const here = onFoot(curio);
-  if (!here && !farsight.active) {
+  if (!here && !byFarsight(curio)) {
     sound.play('error');
+    if (farsight.active) return toast(`${CURIO_KINDS[curio.kind].name} is beyond Farsight's reach.`);
     const away = lastFix ? `${Math.round(haversine(lastFix, curio))} m away. ` : '';
     toast(`${CURIO_KINDS[curio.kind].name}, ${away}Walk to it, or pick it up by Farsight 👁 for ${Math.round(FARSIGHT_SHARE * 100)}%.`);
     return;
@@ -418,6 +434,7 @@ const hunts = new HuntController({
   map,
   game,
   position: () => lastFix,
+  reach: () => playerReach(game.bonuses().reachM),
   realmAt: (lat, lng) => realmAt(map, lng, lat),
   stopFollowing: () => setFollowing(false),
   onChange: () => refreshWorld(),

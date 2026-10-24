@@ -1,3 +1,4 @@
+import { REACH_M } from '../geo/reach';
 import { haversine } from '../geo/distance';
 import { hashString, seededRandom } from '../game/rng';
 
@@ -141,8 +142,9 @@ const RIDDLES: Record<LandmarkCategory, string[]> = {
 export const HUNT_MIN_M = 200;
 export const HUNT_MAX_M = 800;
 /** Never chosen closer than this, even when nothing better is near. */
-export const HUNT_FLOOR_M = 80;
-export const ARRIVE_M = 45;
+export const HUNT_FLOOR_M = 160;
+/** A landmark is found once it is inside the player's reach ring. */
+export const ARRIVE_M = REACH_M;
 /** Every this many metres walked during a hunt uncovers the next hint. */
 export const HINT_WALK_M = 200;
 /** Wanderlight to uncover a hint straight away. */
@@ -322,13 +324,13 @@ export const WARMTH_TEXT: Record<Warmth, string> = {
 };
 
 /** How close the player is, and whether they moved closer since the last check. */
-export function warmth(hunt: ActiveHunt, at: { lat: number; lng: number }): { warmth: Warmth; distanceM: number } {
+export function warmth(hunt: ActiveHunt, at: { lat: number; lng: number }, arriveM = ARRIVE_M): { warmth: Warmth; distanceM: number } {
   const d = haversine(at, hunt.landmark);
   const last = hunt.lastDistanceM ?? d;
   let w: Warmth;
-  if (d <= ARRIVE_M) w = 'found';
-  else if (d <= 80) w = 'burning';
-  else if (d <= 150) w = 'hot';
+  if (d <= arriveM) w = 'found';
+  else if (d <= arriveM + 40) w = 'burning';
+  else if (d <= arriveM + 110) w = 'hot';
   else if (d < last - 10) w = 'warmer';
   else if (d > last + 10) w = 'colder';
   else w = 'same';

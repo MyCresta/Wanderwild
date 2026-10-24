@@ -166,7 +166,7 @@ function openBossGate(ctx: GameContext, encounter: Encounter, onFight: () => voi
       : !counter && weak
         ? `A hard fight. None of your party is ${ELEMENTS[weak].name}, which it fears. Bring one, and tonics.`
         : pets.length < 3
-          ? 'A hard fight. Bring a full party of three, and tonics.'
+          ? 'A hard fight. Bring a full party of three Wildlings, and tonics.'
           : 'A hard fight, but you are ready. Lead with your strongest against it and keep tonics close.';
   sheet.body.append(
     h('div', { class: 'boss-gate' }, createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 120, facing: -1 })),
@@ -331,7 +331,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     panel.classList.toggle('cmd-waiting', side !== 'pet');
     turnBanner.hidden = !side;
     turnBanner.className = `turn-banner${side === 'foe' ? ' turn-banner-foe' : ''}`;
-    turnBanner.textContent = side === 'foe' ? `${foe.species.name}'s turn` : battle.mustSwap ? 'Send in a pet' : 'Your turn';
+    turnBanner.textContent = side === 'foe' ? `${foe.species.name}'s turn` : battle.mustSwap ? 'Send in a Wildling' : 'Your turn';
   };
 
   const refreshStatus = () => {
@@ -580,7 +580,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
         log.replaceChildren(
           `${foeName(encounter)} dissolves into a puddle of harmless ink. `,
           h('strong', {}, `+${reward.xp} XP`),
-          owned.length > 1 ? ' to each pet that fought (half to the rest)' : '',
+          owned.length > 1 ? ' to each Wildling that fought (half to the rest)' : '',
           '.',
           ...grew.map((g) => h('strong', { class: 'level-up' }, ` ${g}`)),
         );
@@ -590,8 +590,8 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       finish(false);
       sheet.setTitle('Driven back');
       log.textContent = practice
-        ? 'Worn out, but it was only practice. Try leading with a pet that is strong against it.'
-        : 'Your party is worn out and retreats. Their wounds stay until they rest (about an hour to full) or drink a tonic. Bring pets strong against it and try again.';
+        ? 'Worn out, but it was only practice. Try leading with a Wildling that is strong against it.'
+        : 'Your party is worn out and retreats. Their wounds stay until they rest (about an hour to full) or drink a tonic. Bring Wildlings strong against it and try again.';
     }
     // Wounds stay, so this is the moment to patch the party up, picking who gets a tonic.
     const hurt = !practice && owned.some((p) => vigorNow(p) < 1);

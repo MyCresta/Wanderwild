@@ -6,6 +6,7 @@
  */
 
 import type { RealmId } from '../game/realms';
+import { beatenBy } from './elements';
 
 export type Element = 'grove' | 'tide' | 'ember' | 'stone' | 'gale' | 'lumen';
 export type Rarity = 'common' | 'uncommon' | 'rare';
@@ -144,6 +145,85 @@ export const PETS: readonly PetSpecies[] = [
     base: { hp: 40, atk: 16, def: 10 },
     move: 'Gloam Flare',
   },
+
+  {
+    kind: 'pet',
+    stage: 1,
+    evolution: { into: 'mirecap', level: EVOLVE_LEVEL, realm: 'wildwood', metres: EVOLVE_METRES },
+    id: 'capling',
+    name: 'Capling',
+    epithet: 'the Toadstool Toad',
+    lore: 'Sits so still under its cap that foragers try to pick it. It does not mind; it simply hops away and grows a new spot.',
+    element: 'grove',
+    rarity: 'uncommon',
+    base: { hp: 50, atk: 10, def: 14 },
+    move: 'Spore Puff',
+  },
+  {
+    kind: 'pet',
+    stage: 1,
+    evolution: { into: 'conchwarden', level: EVOLVE_LEVEL, realm: 'tidemere', metres: EVOLVE_METRES },
+    id: 'shellop',
+    name: 'Shellop',
+    epithet: 'the Spiral-Shell',
+    lore: 'Its shell turns once for every year it has wandered the tideline. Hold it to your ear and you hear the harbour of the day it was born.',
+    element: 'tide',
+    rarity: 'uncommon',
+    base: { hp: 52, atk: 9, def: 17 },
+    move: 'Tidal Coil',
+  },
+  {
+    kind: 'pet',
+    stage: 1,
+    evolution: { into: 'forgewyrm', level: EVOLVE_LEVEL, realm: 'hearthfields', metres: EVOLVE_METRES },
+    id: 'sparkwick',
+    name: 'Sparkwick',
+    epithet: 'the Candle-Newt',
+    lore: 'Lives in forges and bread ovens and eats only the sparks that fly loose. A smith with a Sparkwick never loses a nail to the dark.',
+    element: 'ember',
+    rarity: 'rare',
+    base: { hp: 36, atk: 17, def: 9 },
+    move: 'Spark Lash',
+  },
+  {
+    kind: 'pet',
+    stage: 1,
+    evolution: { into: 'cairnlord', level: EVOLVE_LEVEL, realm: 'stoneward', metres: EVOLVE_METRES },
+    id: 'pebblit',
+    name: 'Pebblit',
+    epithet: 'the Little Cairn',
+    lore: 'Every walker who added a stone to a waymark cairn gave a Pebblit a little more of itself. It marks the way for those who come after.',
+    element: 'stone',
+    rarity: 'common',
+    base: { hp: 54, atk: 11, def: 15 },
+    move: 'Cairn Toss',
+  },
+  {
+    kind: 'pet',
+    stage: 1,
+    evolution: { into: 'tempestkite', level: EVOLVE_LEVEL, realm: 'hearthfields', metres: EVOLVE_METRES },
+    id: 'kitewisp',
+    name: 'Kitewisp',
+    epithet: 'the String-Lost Kite',
+    lore: 'Once a child\'s kite, it slipped its string on a gusty fair day and never came down. It still loves a running child more than anything.',
+    element: 'gale',
+    rarity: 'common',
+    base: { hp: 38, atk: 13, def: 10 },
+    move: 'Updraft',
+  },
+  {
+    kind: 'pet',
+    stage: 1,
+    evolution: { into: 'moonhare', level: EVOLVE_LEVEL, realm: 'barrows', metres: EVOLVE_METRES },
+    id: 'glimhare',
+    name: 'Glimhare',
+    epithet: 'the Lamp-Eared Hare',
+    lore: 'Its ears glow brightest on the darkest paths. Lost travellers who follow a Glimhare always reach a gate by morning.',
+    element: 'lumen',
+    rarity: 'uncommon',
+    base: { hp: 42, atk: 14, def: 12 },
+    move: 'Lampflash',
+  },
 ];
 
 /** What a Wildling becomes after walking long enough in its home realm. */
@@ -220,6 +300,79 @@ export const EVOLVED: readonly PetSpecies[] = [
     base: { hp: 54, atk: 22, def: 14 },
     move: 'Gloaming Lantern',
   },
+
+  {
+    kind: 'pet',
+    stage: 2,
+    id: 'mirecap',
+    name: 'Mirecap',
+    epithet: 'Lord of the Fairy Ring',
+    lore: 'Where a Mirecap rests, a ring of glowing toadstools comes up by morning. Step inside it and the wood goes very quiet.',
+    element: 'grove',
+    rarity: 'uncommon',
+    base: { hp: 68, atk: 14, def: 19 },
+    move: 'Fairy Ring',
+  },
+  {
+    kind: 'pet',
+    stage: 2,
+    id: 'conchwarden',
+    name: 'Conchwarden',
+    epithet: 'the Pearl-Keeper',
+    lore: 'Its shell has grown a crown of spines and, at its heart, a pearl that holds a whole calm sea.',
+    element: 'tide',
+    rarity: 'uncommon',
+    base: { hp: 70, atk: 13, def: 23 },
+    move: 'Pearl Tide',
+  },
+  {
+    kind: 'pet',
+    stage: 2,
+    id: 'forgewyrm',
+    name: 'Forgewyrm',
+    epithet: 'the Anvil-Backed',
+    lore: 'Smiths say the best blades are quenched in the steam off a Forgewyrm\'s back. It asks only for the first spark of every fire.',
+    element: 'ember',
+    rarity: 'rare',
+    base: { hp: 50, atk: 23, def: 13 },
+    move: 'Forgefire',
+  },
+  {
+    kind: 'pet',
+    stage: 2,
+    id: 'cairnlord',
+    name: 'Cairnlord',
+    epithet: 'the Waymark King',
+    lore: 'Runestones circle it like moons. Any path a Cairnlord has walked can never quite be lost again.',
+    element: 'stone',
+    rarity: 'common',
+    base: { hp: 74, atk: 15, def: 21 },
+    move: 'Standing Stones',
+  },
+  {
+    kind: 'pet',
+    stage: 2,
+    id: 'tempestkite',
+    name: 'Tempestkite',
+    epithet: 'Rider of the Squall',
+    lore: 'It flies the front edge of every storm, ribbons cracking with lightning. It still swoops low for a running child.',
+    element: 'gale',
+    rarity: 'common',
+    base: { hp: 54, atk: 18, def: 14 },
+    move: 'Squall Line',
+  },
+  {
+    kind: 'pet',
+    stage: 2,
+    id: 'moonhare',
+    name: 'Moonhare',
+    epithet: 'the Night-Walker',
+    lore: 'It carries the moon on its back on nights the sky forgets to. Barrow-wights bow as it passes.',
+    element: 'lumen',
+    rarity: 'uncommon',
+    base: { hp: 58, atk: 19, def: 16 },
+    move: 'Moonbeam',
+  },
 ];
 
 export const MONSTERS: readonly MonsterSpecies[] = [
@@ -273,7 +426,27 @@ export const MONSTERS: readonly MonsterSpecies[] = [
   },
 ];
 
-export const ALL_SPECIES: readonly Species[] = [...PETS, ...EVOLVED, ...MONSTERS];
+/**
+ * The Taken: Wildlings the Blot has soaked through. They fight like Blotspawn, keep their
+ * own element, and are overpowered by whatever overpowers that element on the Wheel.
+ */
+export const TAKEN: readonly MonsterSpecies[] = PETS.map((pet) => ({
+  kind: 'monster' as const,
+  id: `taken-${pet.id}`,
+  name: `Taken ${pet.name}`,
+  epithet: `${pet.name} lost to the Blot`,
+  lore: `A ${pet.name} that wandered too far into spilled ink. The Blot looks out through its eyes now. Drive the ink out and somewhere a ${pet.name} wakes up very confused.`,
+  element: pet.element,
+  rarity: pet.rarity,
+  weakTo: beatenBy(pet.element),
+  base: { hp: Math.round(pet.base.hp * 1.1), atk: Math.round(pet.base.atk * 1.1), def: pet.base.def },
+  move: `Blotted ${pet.move}`,
+}));
+
+/** Every foe, the old Blotspawn and the Taken. */
+export const FOES: readonly MonsterSpecies[] = [...MONSTERS, ...TAKEN];
+
+export const ALL_SPECIES: readonly Species[] = [...PETS, ...EVOLVED, ...FOES];
 
 const byId = new Map(ALL_SPECIES.map((s) => [s.id, s]));
 export function getSpecies(id: string): Species {

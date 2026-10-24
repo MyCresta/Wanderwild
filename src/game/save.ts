@@ -55,6 +55,8 @@ export interface SaveData {
   glyphsCast: Record<GlyphKind, number>;
   /** Curio id → when it expires, for curios already picked up today. */
   curiosFound: Record<string, number>;
+  /** Steps counted on `day` (a local date), for the daily step counter. */
+  steps: { day: string; count: number };
 }
 
 export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
@@ -86,6 +88,7 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     waymarks: [],
     glyphsCast: { ring: 0, stroke: 0, knot: 0 },
     curiosFound: {},
+    steps: { day: '', count: 0 },
   };
 }
 
@@ -179,6 +182,10 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
       return { ring: num(g.ring), stroke: num(g.stroke), knot: num(g.knot) };
     })(),
     curiosFound: numbers(raw.curiosFound) as Record<string, number>,
+    steps: (() => {
+      const st = isObject(raw.steps) ? raw.steps : {};
+      return { day: typeof st.day === 'string' ? st.day : '', count: Math.max(0, num(st.count)) };
+    })(),
   };
 }
 

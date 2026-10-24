@@ -21,6 +21,7 @@ import {
   BUILDINGS,
   collect,
   MAX_BUILDING_LEVEL,
+  dayKey,
   strideBoost,
   tick,
   upgradeCost,
@@ -56,7 +57,10 @@ import { MAX_WAYMARKS } from './waymarks';
 
 /** Walking pays out per full 100 m: Wanderlight is only ever earned this way. */
 export const WALK_REWARD_STEP_M = 100;
-export const WALK_REWARD = { wanderlight: 1, xp: 30, coin: 2 };
+export const WALK_REWARD = { wanderlight: 1, coin: 2 };
+/** A walking step, in metres: every one counted gives STEP_XP. */
+export const STRIDE_M = 0.75;
+export const STEP_XP = 1;
 export const VISITED_CELL_M = 50;
 export const EGG_UNLOCK_LEVEL = 8;
 /** Chance a shrine gives a rune once runes are unlocked. */
@@ -121,16 +125,27 @@ export class GameState {
       this.save.materials[id] = (this.save.materials[id] ?? 0) + n;
   }
 
-  /** Records metres walked and pays out every full 100 m. Returns the number of steps paid. */
+  /** Steps walked today, counted from distance. */
+  stepsToday(now = Date.now()): number {
+    return this.save.steps.day === dayKey(now) ? this.save.steps.count : 0;
+  }
+
+  /** Records metres walked: STEP_XP per step, and the rest every full 100 m. Returns the number of 100 m paid. */
   recordWalk(metres: number, now = Date.now()): number {
     const s = this.save;
+    const footfalls = Math.floor((s.distanceMetres + metres) / STRIDE_M) - Math.floor(s.distanceMetres / STRIDE_M);
     s.distanceMetres += metres;
+    if (footfalls > 0) {
+      const today = dayKey(now);
+      if (s.steps.day !== today) s.steps = { day: today, count: 0 };
+      s.steps.count += footfalls;
+      this.grantXp(footfalls * STEP_XP * (this.isBlessed(now) ? BLESSING_XP_BONUS : 1));
+    }
     const steps = Math.floor((s.distanceMetres - s.rewardedMetres) / WALK_REWARD_STEP_M);
     if (steps > 0) {
       s.rewardedMetres += steps * WALK_REWARD_STEP_M;
       s.currencies.wanderlight += steps * WALK_REWARD.wanderlight;
       s.currencies.coin += steps * WALK_REWARD.coin;
-      this.grantXp(steps * WALK_REWARD.xp * (this.isBlessed(now) ? BLESSING_XP_BONUS : 1));
       tick(s.hearthstead, now);
       const bonus = this.bonuses();
       const skippedMs = strideBoost(s.hearthstead, steps, now, bonus.stride);
@@ -356,7 +371,7 @@ export class GameState {
         s.waymarks.push({ id: `wm${now.toString(36)}`, lng, lat, setAt: now });
         if (s.waymarks.length > MAX_WAYMARKS) s.waymarks.splice(0, s.waymarks.length - MAX_WAYMARKS);
       }
-      text = 'Knot cast! A Waymark now holds this corner; a creature will always wait here.';
+      text = 'Knot cast! A Waymark now holds this corner; a Wildling or Blotspawn will always wait here.';
     }
     const extra = reward.wanderlight ? ` +${reward.xp} XP, +${reward.wanderlight} Wanderlight.` : ` +${reward.xp} XP.`;
     this.emit({ kind: 'glyph', glyph, text: text + extra, realm });

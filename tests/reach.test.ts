@@ -6,10 +6,10 @@ import { spawnsNear } from '../src/game/spawns';
 const fix = (accuracy: number) => ({ lat: 55.9533, lng: -3.1883, accuracy, time: 0 });
 
 describe('creature reach', () => {
-  it('adds gear bonuses and forgives part of the GPS error', () => {
-    expect(playerReach(fix(0))).toBe(REACH_M);
-    expect(playerReach(fix(15), 10)).toBe(REACH_M + 25);
-    expect(playerReach(fix(500))).toBe(REACH_M + 40);
+  it('is one fixed ring of about 100 m, widened only by gear', () => {
+    expect(REACH_M).toBe(100);
+    expect(playerReach()).toBe(REACH_M);
+    expect(playerReach(10)).toBe(REACH_M + 10);
   });
 
   it('usually leaves some of the shown creatures within reach', () => {
@@ -20,7 +20,7 @@ describe('creature reach', () => {
       const here = { ...fix(10), lat: 55.95 + i * 0.0013, lng: -3.19 + i * 0.0007 };
       const spawns = spawnsNear(here.lat, here.lng, i * 15 * 60 * 1000, 1);
       shown += spawns.length;
-      inReach += spawns.filter((s) => haversine(here, s) <= playerReach(here)).length;
+      inReach += spawns.filter((s) => haversine(here, s) <= playerReach()).length;
     }
     expect(shown / 200).toBeGreaterThan(9);
     expect(inReach / 200).toBeGreaterThan(1.5);

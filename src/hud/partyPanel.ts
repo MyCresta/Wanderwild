@@ -42,6 +42,6 @@ export function renderParty(host: HTMLElement, ctx: GameContext): void {
   host.replaceChildren(list);
   host.insertAdjacentHTML(
     'beforeend',
-    `<p class="satchel-hint">Tap up to two more to fight beside your companion. Wounds last between fights: pets rest back to full in about an hour, or tap ⚗ under a hurt pet to give it a tonic${ctx.wayfarer ? ` (×${ctx.wayfarer.tonics()})` : ''}.</p>`,
+    `<p class="satchel-hint">Tap up to two more to fight beside your companion. Wounds last between fights: Wildlings rest back to full in about an hour, or tap ⚗ under a hurt one to give it a tonic${ctx.wayfarer ? ` (×${ctx.wayfarer.tonics()})` : ''}.</p>`,
   );
 }

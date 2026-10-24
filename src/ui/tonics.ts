@@ -65,7 +65,7 @@ export function healList(ctx: GameContext, pets: OwnedPet[]): HTMLElement {
           );
         }),
       ),
-      hurt ? h('p', { class: 'hint' }, tonics ? `⚗ ×${tonics} tonics. Tap one to heal that pet.` : 'No tonics left. Pets rest back to full in about an hour.') : '',
+      hurt ? h('p', { class: 'hint' }, tonics ? `⚗ ×${tonics} tonics. Tap one to heal that Wildling.` : 'No tonics left. Wildlings rest back to full in about an hour.') : '',
     );
   };
   render();

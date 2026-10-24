@@ -1,20 +1,43 @@
-import type { Feature, Polygon } from 'geojson';
+import type { Feature, FeatureCollection, LineString, Point, Polygon } from 'geojson';
 import { Marker, type GeoJSONSource, type Map } from 'maplibre-gl';
 import type { Fix } from '../geo/distance';
+import { FONT_REGULAR } from './fantasyStyle';
 
-const ACCURACY_SOURCE = 'player-accuracy';
 const REACH_SOURCE = 'player-reach';
+const COMPASS_SOURCE = 'player-compass';
+const FARSIGHT_SOURCE = 'player-farsight';
+const RING = '#6b3fa0';
+const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
-/** Polygon approximating a circle of `radiusM` metres around a point. */
-function circle(lng: number, lat: number, radiusM: number, steps = 48): Feature<Polygon> {
-  const coords: [number, number][] = [];
+/** The point `radiusM` metres from a centre, `deg` degrees clockwise from north. */
+function offset(lng: number, lat: number, radiusM: number, deg: number): [number, number] {
   const dLat = radiusM / 111_320;
   const dLng = dLat / Math.cos((lat * Math.PI) / 180);
-  for (let i = 0; i <= steps; i++) {
-    const t = (i / steps) * 2 * Math.PI;
-    coords.push([lng + dLng * Math.cos(t), lat + dLat * Math.sin(t)]);
-  }
+  const t = (deg * Math.PI) / 180;
+  return [lng + dLng * Math.sin(t), lat + dLat * Math.cos(t)];
+}
+
+/** Polygon approximating a circle of `radiusM` metres around a point. */
+function circle(lng: number, lat: number, radiusM: number, steps = 72): Feature<Polygon> {
+  const coords: [number, number][] = [];
+  for (let i = 0; i <= steps; i++) coords.push(offset(lng, lat, radiusM, (i / steps) * 360));
   return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [coords] } };
+}
+
+/** Small ticks across the ring at north, east, south and west, with a letter just outside each. */
+function compass(lng: number, lat: number, radiusM: number): FeatureCollection<LineString | Point> {
+  const tick = radiusM * 0.08;
+  const features: Feature<LineString | Point>[] = [];
+  ['N', 'E', 'S', 'W'].forEach((letter, i) => {
+    const deg = i * 90;
+    features.push({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates: [offset(lng, lat, radiusM - tick, deg), offset(lng, lat, radiusM + tick, deg)] },
+    });
+    features.push({ type: 'Feature', properties: { letter }, geometry: { type: 'Point', coordinates: offset(lng, lat, radiusM + tick * 2.6, deg) } });
+  });
+  return { type: 'FeatureCollection', features };
 }
 
 function createTokenElement(): HTMLElement {
@@ -25,43 +48,63 @@ function createTokenElement(): HTMLElement {
   return el;
 }
 
-/** The player's token on the map plus a soft circle showing GPS accuracy. */
+/**
+ * The player's token on the map, the one purple reach ring (with N, E, S and W marked on it,
+ * so they turn with the camera) and, in Farsight, the dashed edge of how far the eye can roam.
+ */
 export class PlayerMarker {
   private readonly marker: Marker;
   private placed = false;
   private last: Fix | null = null;
   private reachM = 0;
+  private farsightM = 0;
 
   constructor(private readonly map: Map) {
     this.marker = new Marker({ element: createTokenElement(), anchor: 'bottom' });
     const addLayers = () => {
-      if (map.getSource(ACCURACY_SOURCE)) return;
-      map.addSource(ACCURACY_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      if (map.getSource(REACH_SOURCE)) return;
+      map.addSource(FARSIGHT_SOURCE, { type: 'geojson', data: EMPTY });
       map.addLayer({
-        id: 'player-accuracy-fill',
-        type: 'fill',
-        source: ACCURACY_SOURCE,
-        paint: { 'fill-color': '#f3d27a', 'fill-opacity': 0.18 },
-      });
-      map.addLayer({
-        id: 'player-accuracy-edge',
+        id: 'player-farsight-edge',
         type: 'line',
-        source: ACCURACY_SOURCE,
-        paint: { 'line-color': '#a8772e', 'line-width': 1, 'line-dasharray': [2, 2], 'line-opacity': 0.6 },
+        source: FARSIGHT_SOURCE,
+        paint: { 'line-color': RING, 'line-width': 2, 'line-dasharray': [3, 3], 'line-opacity': 0.7 },
       });
-      // How far the player can reach creatures, shrines and curios, so "near" on screen matches the game.
-      map.addSource(REACH_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      // How far the player can reach creatures, shrines, curios and hunts, so "near" on screen matches the game.
+      map.addSource(REACH_SOURCE, { type: 'geojson', data: EMPTY });
       map.addLayer({
         id: 'player-reach-fill',
         type: 'fill',
         source: REACH_SOURCE,
-        paint: { 'fill-color': '#6b3fa0', 'fill-opacity': 0.08 },
+        paint: { 'fill-color': RING, 'fill-opacity': 0.08 },
       });
       map.addLayer({
         id: 'player-reach-edge',
         type: 'line',
         source: REACH_SOURCE,
-        paint: { 'line-color': '#6b3fa0', 'line-width': 3, 'line-opacity': 0.85 },
+        paint: { 'line-color': RING, 'line-width': 3, 'line-opacity': 0.85 },
+      });
+      map.addSource(COMPASS_SOURCE, { type: 'geojson', data: EMPTY });
+      map.addLayer({
+        id: 'player-compass-ticks',
+        type: 'line',
+        source: COMPASS_SOURCE,
+        filter: ['==', ['geometry-type'], 'LineString'],
+        paint: { 'line-color': RING, 'line-width': 3, 'line-opacity': 0.85 },
+      });
+      map.addLayer({
+        id: 'player-compass-letters',
+        type: 'symbol',
+        source: COMPASS_SOURCE,
+        filter: ['==', ['geometry-type'], 'Point'],
+        layout: {
+          'text-field': ['get', 'letter'],
+          'text-font': FONT_REGULAR,
+          'text-size': 13,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        paint: { 'text-color': RING, 'text-halo-color': '#f4e8c8', 'text-halo-width': 1.6 },
       });
       if (this.last) this.update(this.last);
     };
@@ -82,6 +125,13 @@ export class PlayerMarker {
     if (this.last) this.update(this.last);
   }
 
+  /** Radius Farsight may roam from the Wayfarer; 0 hides its edge. */
+  setFarsight(metres: number): void {
+    if (metres === this.farsightM) return;
+    this.farsightM = metres;
+    if (this.last) this.update(this.last);
+  }
+
   update(fix: Fix): void {
     this.last = fix;
     this.marker.setLngLat([fix.lng, fix.lat]);
@@ -89,10 +139,9 @@ export class PlayerMarker {
       this.marker.addTo(this.map);
       this.placed = true;
     }
-    const source = this.map.getSource<GeoJSONSource>(ACCURACY_SOURCE);
-    source?.setData(circle(fix.lng, fix.lat, fix.accuracy));
-    this.map
-      .getSource<GeoJSONSource>(REACH_SOURCE)
-      ?.setData(this.reachM > 0 ? circle(fix.lng, fix.lat, this.reachM, 72) : { type: 'FeatureCollection', features: [] });
+    const set = (id: string, data: Feature | FeatureCollection) => this.map.getSource<GeoJSONSource>(id)?.setData(data);
+    set(REACH_SOURCE, this.reachM > 0 ? circle(fix.lng, fix.lat, this.reachM) : EMPTY);
+    set(COMPASS_SOURCE, this.reachM > 0 ? compass(fix.lng, fix.lat, this.reachM) : EMPTY);
+    set(FARSIGHT_SOURCE, this.farsightM > 0 ? circle(fix.lng, fix.lat, this.farsightM, 120) : EMPTY);
   }
 }

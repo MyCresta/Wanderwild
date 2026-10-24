@@ -34,6 +34,8 @@ export interface HuntDeps {
   game: GameState;
   /** The latest GPS fix, if any. */
   position(): Fix | null;
+  /** The player's reach ring in metres; the landmark is found inside it. */
+  reach(): number;
   realmAt(lat: number, lng: number): RealmId | undefined;
   /** Stops the map following the player, as a hand pan does. */
   stopFollowing(): void;
@@ -116,7 +118,7 @@ export class HuntController {
       if (fresh > 0) sound.play('coin');
       if (fresh > 0) toast(fresh > 1 ? 'Your walking uncovered new clues on the treasure map!' : 'Your walking uncovered a new clue on the treasure map!');
     }
-    const w = warmth(hunt, fix).warmth;
+    const w = warmth(hunt, fix, this.deps.reach()).warmth;
     if (w === 'found') return this.arrive();
     if (w !== this.last && (w === 'burning' || w === 'hot')) toast(`${WARMTH_TEXT[w]} The treasure is close.`);
     this.last = w;
@@ -214,7 +216,7 @@ export class HuntController {
     const sheet = openSheet('Treasure map', { className: 'hunt-sheet' });
     const clues = huntClues(hunt);
     const fix = this.deps.position();
-    const w = fix ? warmth(hunt, fix).warmth : undefined;
+    const w = fix ? warmth(hunt, fix, this.deps.reach()).warmth : undefined;
     const next = metresToNextHint(hunt);
     const light = this.deps.game.save.currencies.wanderlight;
     const buy = h(

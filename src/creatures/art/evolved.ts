@@ -30,7 +30,7 @@ interface Grown {
   tickBase(t: number): void;
 }
 
-function grow(base: Drawer, ctx: ArtContext, tone: { dh?: number; ks?: number; kl?: number }, scale: number): Grown {
+export function grow(base: Drawer, ctx: ArtContext, tone: { dh?: number; ks?: number; kl?: number }, scale: number): Grown {
   const { dh = 0, ks = 1, kl = 1 } = tone;
   const art = base({ ...ctx, c: (h, s, l) => ctx.c(h + dh, s * ks, l * kl) });
   const root = el('g');

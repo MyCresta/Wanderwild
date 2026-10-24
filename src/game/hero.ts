@@ -36,7 +36,7 @@ export const CLASSES: Record<HeroClass, ClassDef> = {
     name: 'Warden',
     glyph: '⛨',
     color: '#3f6f9a',
-    blurb: 'Shields and heals your creatures.',
+    blurb: 'Shields and heals your Wildlings.',
     growth: { might: 0.4, ward: 1.4, lore: 0.8 },
     spells: ['mending', 'aegis', 'secondWind'],
   },
@@ -52,7 +52,7 @@ export const CLASSES: Record<HeroClass, ClassDef> = {
     name: 'Beastcaller',
     glyph: '❦',
     color: '#4b7a3c',
-    blurb: 'Makes your creatures hit harder.',
+    blurb: 'Makes your Wildlings hit harder.',
     growth: { might: 1.4, ward: 0.6, lore: 0.6 },
     spells: ['frenzy', 'wildcall', 'packHowl'],
   },
@@ -76,13 +76,13 @@ export interface SpellDef {
 
 export const HERO_SPELLS: Record<HeroSpellId, SpellDef> = {
   mending: { name: 'Mending', glyph: '✚', cost: 8, kind: 'heal', blurb: 'Heals the whole party a little.' },
-  aegis: { name: 'Aegis', glyph: '⛨', cost: 6, kind: 'buff', blurb: 'The pet in front takes half damage for 2 turns.' },
-  secondWind: { name: 'Second Wind', glyph: '❤', cost: 16, kind: 'heal', blurb: 'Fully heals the pet in front.' },
+  aegis: { name: 'Aegis', glyph: '⛨', cost: 6, kind: 'buff', blurb: 'The Wildling in front takes half damage for 2 turns.' },
+  secondWind: { name: 'Second Wind', glyph: '❤', cost: 16, kind: 'heal', blurb: 'Fully heals the Wildling in front.' },
   wheelbolt: { name: 'Wheelbolt', glyph: '✶', cost: 6, kind: 'damage', blurb: 'Strikes with the element the foe is weak to.' },
   hex: { name: 'Hex', glyph: '☾', cost: 8, kind: 'curse', blurb: 'The foe hits 30% softer for 3 turns.' },
   starfall: { name: 'Starfall', glyph: '☄', cost: 14, kind: 'damage', blurb: 'A heavy blow that ignores wards.' },
   frenzy: { name: 'Frenzy', glyph: '✦', cost: 5, kind: 'buff', blurb: 'The next attack is critical.' },
-  wildcall: { name: 'Wild Call', glyph: '❦', cost: 8, kind: 'buff', blurb: 'The pet in front can use its move and art again.' },
+  wildcall: { name: 'Wild Call', glyph: '❦', cost: 8, kind: 'buff', blurb: 'The Wildling in front can use its move and art again.' },
   packHowl: { name: 'Pack Howl', glyph: '☽', cost: 10, kind: 'buff', blurb: 'The party hits 30% harder for 3 turns.' },
 };
 
