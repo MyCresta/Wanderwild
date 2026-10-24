@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Battle, makeFighter, TONIC_HEAL, victoryRewards } from '../src/creatures/battle';
 import { addPet, emptyCollection, fitToFight, healPet, petMaxHp, REST_FULL_MS, setVigor, vigorNow } from '../src/creatures/collection';
-import { BOSS_LEVELS, foeScale, rankLabel, rollFoe } from '../src/creatures/foes';
+import { BOSS_LEVELS, bossLevel, foeScale, rankLabel, rollFoe } from '../src/creatures/foes';
 import { mulberry32 } from '../src/creatures/rng';
 import { getSpecies, MONSTERS } from '../src/creatures/species';
 import { creatureForSpawn } from '../src/creatures/stats';
@@ -76,7 +76,18 @@ describe('elite tiers and bosses', () => {
     }
   });
 
-  it('places the same boss lairs for everyone all week, at fixed levels', () => {
+  it('raises bosses to meet a stronger party, never below their tier', () => {
+    expect(bossLevel(1, 1)).toBe(5);
+    expect(bossLevel(1, 15)).toBe(14);
+    expect(bossLevel(5, 15)).toBe(25);
+    expect(bossLevel(5, 30)).toBe(33);
+    const t = 3 * LAIR_WEEK_MS + 1000;
+    for (const { encounter } of lairsNear(52.37, 4.89, t, 15)) expect(encounter.level).toBeGreaterThanOrEqual(14);
+    // A boss of the same level grows sturdier as levels climb.
+    expect(foeScale('boss', 1, 20).hp).toBeGreaterThan(foeScale('boss', 1, 5).hp);
+  });
+
+  it('places the same boss lairs for everyone all week, at their tier level', () => {
     const t = 3 * LAIR_WEEK_MS + 1000;
     const a = lairsNear(52.37, 4.89, t);
     expect(lairsNear(52.37, 4.89, t + 86_400_000)).toEqual(a);

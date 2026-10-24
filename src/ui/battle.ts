@@ -30,6 +30,7 @@ import { createCreatureSvg } from '../creatures/view';
 import type { GameContext } from './context';
 import { h, openSheet, toast, wait } from './dom';
 import { elementTag, wheelHelp } from './wheel';
+import { healList } from './tonics';
 import { sound } from '../audio/sound';
 import { HERO_SPELLS, type HeroSpellId } from '../game/hero';
 
@@ -158,7 +159,15 @@ function openBossGate(ctx: GameContext, encounter: Encounter, onFight: () => voi
   const gap = encounter.level - level;
   const sheet = openSheet(foeName(encounter), { className: 'sheet-boss' });
   const weak = encounter.species.kind === 'monster' ? encounter.species.weakTo : null;
-  const verdict = gap <= -2 ? 'Your party should handle it.' : gap <= 1 ? 'A hard fight. Bring pets strong against it, and tonics.' : `Too strong for now: it is level ${encounter.level}, your party about ${level}.`;
+  const counter = weak && pets.some((p) => getSpecies(p.speciesId).element === weak);
+  const verdict =
+    gap > 2
+      ? `Too strong for now: it is level ${encounter.level}, your party about ${level}.`
+      : !counter && weak
+        ? `A hard fight. None of your party is ${ELEMENTS[weak].name}, which it fears. Bring one, and tonics.`
+        : pets.length < 3
+          ? 'A hard fight. Bring a full party of three, and tonics.'
+          : 'A hard fight, but you are ready. Lead with your strongest against it and keep tonics close.';
   sheet.body.append(
     h('div', { class: 'boss-gate' }, createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 120, facing: -1 })),
     h(
@@ -171,20 +180,7 @@ function openBossGate(ctx: GameContext, encounter: Encounter, onFight: () => voi
       weak ? elementTag(weak) : '',
     ),
     h('p', { class: 'hint' }, (encounter.traits ?? []).map((t) => `${FOE_TRAITS[t].glyph} ${FOE_TRAITS[t].name}: ${FOE_TRAITS[t].blurb}`).join(' '), ' Below half health it grows enraged.'),
-    h(
-      'ul',
-      { class: 'gate-party' },
-      ...pets.map((p) => {
-        const v = vigorNow(p);
-        return h(
-          'li',
-          {},
-          createCreatureSvg({ speciesId: p.speciesId, seed: p.seed, size: 40, still: true }),
-          h('span', {}, `${getSpecies(p.speciesId).name} · Lv ${p.level}`),
-          h('span', { class: 'bench-hp' }, h('span', { style: { width: `${v * 100}%` } })),
-        );
-      }),
-    ),
+    healList(ctx, pets),
     h('p', { class: `gate-verdict${gap > 1 ? ' gate-risky' : ''}` }, verdict),
     h(
       'div',
@@ -201,7 +197,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   if (!owned.length) return;
   if (!owned.some((p) => fitToFight(p))) {
     const soonest = Math.ceil(Math.min(...owned.map((p) => (FIT_TO_FIGHT - vigorNow(p)) * REST_FULL_MS)) / 60_000);
-    toast(`Your party is worn out. Let them rest${soonest > 0 ? ` about ${soonest} min` : ''}, or give a tonic from the satchel.`);
+    toast(`Your party is worn out. Let them rest${soonest > 0 ? ` about ${soonest} min` : ''}, or give them a tonic on the Hero page.`);
     return;
   }
   if (encounter.rank === 'boss' && !opts.gateSeen) {
@@ -597,7 +593,12 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
         ? 'Worn out, but it was only practice. Try leading with a pet that is strong against it.'
         : 'Your party is worn out and retreats. Their wounds stay until they rest (about an hour to full) or drink a tonic. Bring pets strong against it and try again.';
     }
-    panel.replaceChildren(h('button', { class: 'btn btn-primary btn-continue', type: 'button', onclick: () => sheet.close() }, 'Continue'));
+    // Wounds stay, so this is the moment to patch the party up, picking who gets a tonic.
+    const hurt = !practice && owned.some((p) => vigorNow(p) < 1);
+    panel.replaceChildren(
+      hurt ? healList(ctx, owned) : '',
+      h('button', { class: 'btn btn-primary btn-continue', type: 'button', onclick: () => sheet.close() }, 'Continue'),
+    );
     panel.classList.remove('cmd-waiting');
     fleeBtn.hidden = true;
   };

@@ -324,8 +324,9 @@ function refreshSpawns(force = false): void {
     }
     spawn.realm = spawnRealms.get(spawn.id);
   }
-  // Boss lairs hold the same spot all week, at their own level.
-  const lairs = lairsNear(fix.lat, fix.lng, now).filter(({ spawn }) => !(spawn.id in collection.cleared));
+  // Boss lairs hold the same spot all week and rise to meet your strongest pet.
+  const strongest = Math.max(1, ...collection.pets.map((p) => p.level));
+  const lairs = lairsNear(fix.lat, fix.lng, now, strongest).filter(({ spawn }) => !(spawn.id in collection.cleared));
   shown = [
     ...live
       .map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) }))

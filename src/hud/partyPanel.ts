@@ -1,8 +1,8 @@
-import { TONIC_HEAL } from '../creatures/battle';
-import { companion, healPet, minutesToRested, partyPets, togglePartyMember, vigorNow, type OwnedPet } from '../creatures/collection';
+import { companion, minutesToRested, partyPets, togglePartyMember, vigorNow } from '../creatures/collection';
 import { getSpecies } from '../creatures/species';
 import { createCreatureSvg } from '../creatures/view';
 import type { GameContext } from '../ui/context';
+import { tonicButton } from '../ui/tonics';
 
 /** The party picker in the satchel: the companion always leads, tap others to bring two along. */
 export function renderParty(host: HTMLElement, ctx: GameContext): void {
@@ -35,30 +35,13 @@ export function renderParty(host: HTMLElement, ctx: GameContext): void {
       renderParty(host, ctx);
     });
     li.append(btn);
+    const tonic = tonicButton(ctx, pet, () => renderParty(host, ctx));
+    if (tonic) li.append(tonic);
     list.append(li);
   }
   host.replaceChildren(list);
   host.insertAdjacentHTML(
     'beforeend',
-    '<p class="satchel-hint">Tap up to two more to fight beside your companion. Wounds last between fights: pets rest back to full in about an hour.</p>',
+    `<p class="satchel-hint">Tap up to two more to fight beside your companion. Wounds last between fights: pets rest back to full in about an hour, or tap ⚗ under a hurt pet to give it a tonic${ctx.wayfarer ? ` (×${ctx.wayfarer.tonics()})` : ''}.</p>`,
   );
-  // One tonic button for the most hurt party member, shown only when it can help.
-  const way = ctx.wayfarer;
-  const hurt = partyPets(c)
-    .filter((p) => vigorNow(p) < 1)
-    .sort((a, b) => vigorNow(a) - vigorNow(b))[0] as OwnedPet | undefined;
-  if (way && hurt && way.tonics() > 0) {
-    const heal = Math.round(TONIC_HEAL * (way.tonicPower?.() ?? 1));
-    const tonic = document.createElement('button');
-    tonic.type = 'button';
-    tonic.className = 'btn btn-small party-tonic';
-    tonic.textContent = `⚗ Tonic for ${getSpecies(hurt.speciesId).name} (+${heal}) · ×${way.tonics()}`;
-    tonic.addEventListener('click', () => {
-      if (!way.useTonic()) return;
-      healPet(hurt, heal);
-      ctx.changed();
-      renderParty(host, ctx);
-    });
-    host.append(tonic);
-  }
 }

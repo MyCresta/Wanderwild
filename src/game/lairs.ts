@@ -1,14 +1,14 @@
 import { cellsAround } from './cells';
 import { hashString, seededRandom, weightedPick } from './rng';
 import type { Spawn } from './spawns';
-import { BOSS_LEVELS, pickTraits } from '../creatures/foes';
+import { bossLevel, pickTraits } from '../creatures/foes';
 import { MONSTERS } from '../creatures/species';
 import type { Encounter } from '../creatures/stats';
 
 /**
- * Boss lairs: a big Blotspawn settles in about one in two ~1.2 km squares for a week, at a
- * fixed level. It does not scale with you, so a high-tier lair is something to grow into
- * and prepare for: level the party, bring pets strong against it, stock tonics.
+ * Boss lairs: a big Blotspawn settles in about one in two ~1.2 km squares for a week. Its
+ * tier sets a lowest level and it rises to meet a stronger party, so every lair is
+ * something to prepare for: bring pets strong against it, a full party and tonics.
  */
 
 export const LAIR_CELL_M = 1200;
@@ -23,8 +23,8 @@ export interface Lair {
 
 export const lairWeek = (time: number) => Math.floor(time / LAIR_WEEK_MS);
 
-/** The lairs in the squares around a point this week. Everyone nearby finds the same ones. */
-export function lairsNear(lat: number, lng: number, time: number, radiusCells = 1): Lair[] {
+/** The lairs in the squares around a point this week, risen to the level of the player's strongest pet. */
+export function lairsNear(lat: number, lng: number, time: number, strongestPet = 1, radiusCells = 1): Lair[] {
   const week = lairWeek(time);
   const lairs: Lair[] = [];
   for (const cell of cellsAround(lat, lng, LAIR_CELL_M, radiusCells)) {
@@ -41,7 +41,7 @@ export function lairsNear(lat: number, lng: number, time: number, radiusCells = 
       rarity: 'legendary',
       expiresAt: (week + 1) * LAIR_WEEK_MS,
     };
-    const encounter: Encounter = { species, level: BOSS_LEVELS[tier - 1], seed, rank: 'boss', tier, traits: pickTraits(rand, 3) };
+    const encounter: Encounter = { species, level: bossLevel(tier, strongestPet), seed, rank: 'boss', tier, traits: pickTraits(rand, 3) };
     lairs.push({ spawn, encounter });
   }
   return lairs;
