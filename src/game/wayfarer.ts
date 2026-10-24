@@ -40,7 +40,7 @@ export const UNLOCKS: Unlock[] = [
   { level: 8, what: 'Pet expeditions and wild eggs' },
   { level: 10, what: 'Wardens and realm claiming' },
   { level: 15, what: 'Runes and gear upgrades to +10' },
-  { level: 20, what: 'Rifts' },
+  { level: 20, what: 'A second hero class, and Rifts' },
   { level: 30, what: 'Mythic gear and the final story chapter' },
 ];
 

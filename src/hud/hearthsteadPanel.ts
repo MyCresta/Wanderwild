@@ -4,12 +4,10 @@ import type { GameState } from '../game/state';
 import { EGG_UNLOCK_LEVEL } from '../game/state';
 import { formatCount, formatDistance, formatDuration } from './format';
 import { EXPEDITION_LENGTHS, EXPEDITION_LEVEL, EXPEDITION_SLOTS, expeditionProgress, msLeft } from '../game/expeditions';
-import { FORGE_LEVEL } from '../game/gear';
 import { REALMS } from '../game/realms';
 import { grantPetXp, partyPets } from '../creatures/collection';
 import { getSpecies } from '../creatures/species';
 import type { GameContext } from '../ui/context';
-import type { ForgePanel } from './forgePanel';
 import { journal } from '../ui/journal';
 
 const HEARTHSTEAD_LEVEL = Math.min(...BUILDING_IDS.map((id) => BUILDINGS[id].unlockLevel));
@@ -22,7 +20,6 @@ export class HearthsteadPanel {
     private readonly game: GameState,
     private readonly toast: (text: string) => void,
     private readonly creatures: GameContext,
-    private readonly forge: ForgePanel,
   ) {
     journal.onShow('hearth', () => {
       game.tickHearthstead();
@@ -31,7 +28,6 @@ export class HearthsteadPanel {
     this.body.addEventListener('click', (e) => {
       const button = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-act]');
       if (!button) return;
-      if (button.dataset.act === 'forge') return this.forge.open();
       if (button.dataset.act?.startsWith('exp-')) return this.expeditionAction(button);
       const id = button.dataset.id as keyof typeof BUILDINGS;
       const def = BUILDINGS[id];
@@ -169,13 +165,9 @@ export class HearthsteadPanel {
               )
               .join('')}</ul>`
           : '<p class="satchel-hint">No eggs yet. Touch shrines to find one.</p>';
-    const forge =
-      level >= FORGE_LEVEL
-        ? `<li class="building forge-card"><div class="building-head"><b>The Forge</b><small>Gear for you and your pets</small></div><button type="button" data-act="forge">Enter</button></li>`
-        : '';
     this.body.innerHTML = `
       <p class="stride-note" title="Every 100 m you walk moves all timers forward 10 minutes">Walking skips time: <b>${formatDuration(STRIDE_DAILY_CAP_MS - left)}</b> of ${formatDuration(STRIDE_DAILY_CAP_MS)} today</p>
-      <ul class="buildings">${forge}${cards}</ul>
+      <ul class="buildings">${cards}</ul>
       <p class="satchel-hint">${formatCount(s.supplies.tonic)} Tonic · ${formatCount(s.supplies.petXp)} Pet XP</p>
       <h3>Expeditions</h3>
       ${this.expeditionsHtml()}

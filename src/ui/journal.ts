@@ -4,14 +4,14 @@ export type JournalTab = 'wayfarer' | 'hearth' | 'demesne' | 'settings';
 
 const TABS: JournalTab[] = ['wayfarer', 'hearth', 'demesne', 'settings'];
 const TITLES: Record<JournalTab, string> = {
-  wayfarer: 'Wayfarer',
+  wayfarer: 'Hero',
   hearth: 'The Hearthstead',
   demesne: 'The Inked Demesne',
   settings: 'Settings',
 };
 
 /**
- * The one sheet behind the satchel button: the Wayfarer, the Hearthstead, the Demesne
+ * The one sheet behind the hero's portrait button: the hero, the Hearthstead, the Demesne
  * and settings as tabs, so the map keeps only a handful of buttons. Each panel
  * renders into its pane when its tab is shown, and can light a dot on its tab and on
  * the map button when something waits there.

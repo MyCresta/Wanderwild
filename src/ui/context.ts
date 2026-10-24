@@ -1,3 +1,4 @@
+import type { HeroPower, HeroSpellId } from '../game/hero';
 import type { Collection } from '../creatures/collection';
 
 /** What battles can draw on from the Wayfarer's side of the game. */
@@ -6,9 +7,14 @@ export interface WayfarerHooks {
   tonics(): number;
   /** Spends a Herb Garden tonic. Returns false when there are none. */
   useTonic(): boolean;
-  /** Metres walked toward spells since the last cast. */
-  spellMetres(): number;
-  spendSpell(metres: number): boolean;
+  /** The hero beside the party: stat boosts, talents and known spells. */
+  hero(): HeroPower;
+  heroName?(): string;
+  /** Mana ready to spend; it fills by walking. */
+  mana(): number;
+  spellCost(spell: HeroSpellId): number;
+  /** Pays for a spell. Returns false when there is not enough mana. */
+  spendMana(spell: HeroSpellId): boolean;
   /** Gear bonuses: multipliers on pet damage and health, and extra catch chance (0.06 = +6 points). */
   gear(): { petDamage: number; petHealth: number; catchBonus: number };
 }

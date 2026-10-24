@@ -21,17 +21,7 @@ function createTokenElement(): HTMLElement {
   const el = document.createElement('div');
   el.className = 'player-token';
   el.setAttribute('aria-label', 'You are here');
-  el.innerHTML = `
-    <span class="player-rune"></span>
-    <svg class="player-figure" viewBox="0 0 40 48" aria-hidden="true">
-      <path d="M20 3c-7 0-11 6-11 12 0 4 1 6 2 8l-5 20c4 2 9 3 14 3s10-1 14-3l-5-20c1-2 2-4 2-8 0-6-4-12-11-12z"
-            fill="var(--cloak, #4b6a3c)" stroke="#2a1d10" stroke-width="2" stroke-linejoin="round"/>
-      <path d="M13 16c2-5 12-5 14 0-1 5-3 8-7 8s-6-3-7-8z" fill="#2a1d10"/>
-      <circle cx="17" cy="17" r="1.3" fill="#f3d27a"/><circle cx="23" cy="17" r="1.3" fill="#f3d27a"/>
-      <path d="M31 10l3 34" stroke="#6b4a2a" stroke-width="2.5" stroke-linecap="round"/>
-      <circle cx="31" cy="9" r="2.6" fill="var(--staff, #f3d27a)" stroke="#2a1d10" stroke-width="1"/>
-      <g class="player-lantern"><path d="M8 26v4" stroke="#2a1d10" stroke-width="1.4"/><rect x="5" y="30" width="6" height="8" rx="1.5" fill="#f3d27a" stroke="#2a1d10" stroke-width="1.2"/></g>
-    </svg>`;
+  el.innerHTML = '<span class="player-rune"></span><span class="player-figure"></span>';
   return el;
 }
 
@@ -79,12 +69,10 @@ export class PlayerMarker {
     else map.once('load', addLayers);
   }
 
-  /** Shows equipped gear on the token: cloak and staff colours, and a lantern when carried. */
-  setLook(look: { cloak?: string; staff?: string; lantern?: boolean }): void {
-    const el = this.marker.getElement();
-    el.style.setProperty('--cloak', look.cloak ?? '#4b6a3c');
-    el.style.setProperty('--staff', look.staff ?? '#f3d27a');
-    el.classList.toggle('has-lantern', !!look.lantern);
+  /** Draws the hero on the token; `svg` is trusted markup. */
+  setFigure(svg: string): void {
+    const figure = this.marker.getElement().querySelector('.player-figure')!;
+    if (figure.innerHTML !== svg) figure.innerHTML = svg;
   }
 
   /** Radius of the reach ring in metres; 0 hides it. */

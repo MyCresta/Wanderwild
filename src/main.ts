@@ -13,7 +13,7 @@ import { setupInstallButton } from './install';
 import { loadSave } from './game/save';
 import { GameState } from './game/state';
 import type { Shrine } from './game/shrines';
-import { isNight, RARITIES } from './game/gear';
+import { isNight } from './game/gear';
 import { MATERIALS, type MaterialId, type RealmId } from './game/realms';
 import { installProbeLayers, realmAt, shrinesNear } from './map/realmProbe';
 import { ShrineLayer } from './map/shrineLayer';
@@ -22,6 +22,8 @@ import { HearthsteadPanel } from './hud/hearthsteadPanel';
 import { renderParty } from './hud/partyPanel';
 import { journal } from './ui/journal';
 import { ForgePanel } from './hud/forgePanel';
+import { HeroPanel, openHeroChoice } from './hud/heroPanel';
+import { heroSvg } from './hud/heroArt';
 import { formatWait } from './hud/format';
 import { CompanionMarker, CreatureMarkers, FollowerMarker, ResidentMarkers } from './map/creatures';
 import { addPet, companion, loadCollection, saveCollection, walkRewards } from './creatures/collection';
@@ -99,10 +101,7 @@ const forge = new ForgePanel(game, (text) => hud.toast(text));
 // Bank the time the app was closed, so offline production shows straight away.
 game.tickHearthstead();
 const player = new PlayerMarker(map);
-const dressPlayer = () => {
-  const worn = Object.fromEntries(game.equippedItems().map((g) => [g.slot, RARITIES[g.rarity].color]));
-  player.setLook({ cloak: worn.cloak, staff: worn.staff, lantern: !!worn.lantern });
-};
+const dressPlayer = () => player.setFigure(heroSvg(game.save.hero.cls, game.save.hero.look, 40));
 dressPlayer();
 game.on((e) => e.kind === 'change' && dressPlayer());
 const walk = new WalkTracker();
@@ -157,8 +156,11 @@ creatureGame.wayfarer = {
   level: () => game.level.level,
   tonics: () => game.save.supplies.tonic,
   useTonic: () => game.useTonic(),
-  spellMetres: () => game.save.spellChargeM,
-  spendSpell: (m) => game.spendSpell(m),
+  hero: () => game.heroPower(),
+  heroName: () => game.save.hero.name,
+  mana: () => game.mana,
+  spellCost: (spell) => game.spellCost(spell),
+  spendMana: (spell) => game.spendMana(spell),
   gear: () => {
     const b = game.bonuses();
     return { petDamage: b.petDamage + (isNight() ? b.nightDamage : 0), petHealth: b.petHealth, catchBonus: b.catchBonus };
@@ -166,7 +168,8 @@ creatureGame.wayfarer = {
 };
 creatureGame.changed();
 journal.onShow('wayfarer', () => renderParty($('satchel-party'), creatureGame));
-new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame, forge);
+new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame);
+new HeroPanel(game, forge, (text) => hud.toast(text));
 
 // Glyphwalking: the shape of the walk, kept in memory only, and the Demesne it claims.
 const trace = new Trace();
@@ -414,7 +417,12 @@ function refreshAround(force = false): void {
 map.on('moveend', () => farsight.active && refreshAround());
 
 $('bestiary').addEventListener('click', () => openBestiary(creatureGame));
-if (!collection.pets.length) openStarterChoice(creatureGame);
+// First play: who the hero is, then the first companion.
+const meetCompanion = () => {
+  if (!collection.pets.length) openStarterChoice(creatureGame);
+};
+if (!game.save.hero.cls) openHeroChoice(game, meetCompanion);
+else meetCompanion();
 
 // Treasure hunts: riddles that lead to real landmarks.
 const hunts = new HuntController({

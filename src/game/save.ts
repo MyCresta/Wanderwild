@@ -5,6 +5,7 @@ import { RUNE_IDS, SLOTS, type GearItem, type GearRarity, type RuneId, type Slot
 import { REALMS, type MaterialId, type RealmId } from './realms';
 import type { LeyLine, Parcel, Waymark } from './demesne';
 import type { GlyphKind, LngLat } from './glyphs';
+import { isHeroClass, LOOKS, METRES_PER_MANA, newHero, TALENTS, talentKey, type HeroState } from './hero';
 
 /**
  * One versioned save holding all progress. It lives in IndexedDB (localStorage as a
@@ -23,6 +24,8 @@ export interface SaveData {
   /** Metres already turned into walking rewards; the rest is carried to the next 100 m. */
   rewardedMetres: number;
   wayfarer: { xp: number };
+  /** The Wayfarer as a hero: class, looks, talents and mana. */
+  hero: HeroState;
   currencies: { coin: number; wanderlight: number };
   materials: Partial<Record<MaterialId, number>>;
   /** Shrine id → time (ms) it can be used again. */
@@ -34,8 +37,6 @@ export interface SaveData {
   /** Coarse ~50 m cells walked through, never a raw GPS trail. */
   visitedCells: string[];
   supplies: Record<SupplyId, number>;
-  /** Metres walked since the last spell, capped at SPELL_CHARGE_MAX_M. */
-  spellChargeM: number;
   hearthstead: HearthsteadState;
   eggs: Egg[];
   /** Hatched creatures waiting for the creatures code to add them to the roster. */
@@ -67,6 +68,7 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     // Distance from before the save system existed is not paid out again.
     rewardedMetres: distanceMetres,
     wayfarer: { xp: 0 },
+    hero: newHero(),
     currencies: { coin: 0, wanderlight: 0 },
     materials: {},
     shrineCooldowns: {},
@@ -74,7 +76,6 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     blessingUntil: 0,
     visitedCells: [],
     supplies: { tonic: 0, petXp: 0 },
-    spellChargeM: 0,
     hearthstead: newHearthstead(now),
     eggs: [],
     hatchlings: [],
@@ -137,7 +138,7 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
     blessingUntil: num(raw.blessingUntil),
     visitedCells: strings(raw.visitedCells),
     supplies: { tonic: num(supplies.tonic), petXp: num(supplies.petXp) },
-    spellChargeM: num(raw.spellChargeM),
+    hero: parseHero(raw.hero, num(raw.spellChargeM)),
     hearthstead: {
       buildings: Object.fromEntries(
         BUILDING_IDS.filter((id) => isObject(buildings[id])).map((id) => {
@@ -205,6 +206,31 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
       return { ring: num(g.ring), stroke: num(g.stroke), knot: num(g.knot) };
     })(),
     curiosFound: numbers(raw.curiosFound) as Record<string, number>,
+  };
+}
+
+/** Reads the hero back, or makes a new one; spell charge from before heroes becomes mana. */
+function parseHero(raw: unknown, oldChargeM: number): HeroState {
+  const hero = newHero();
+  if (!isObject(raw)) return { ...hero, mana: Math.floor(oldChargeM / METRES_PER_MANA) };
+  const cls = isHeroClass(raw.cls) ? raw.cls : null;
+  const second = cls && isHeroClass(raw.second) && raw.second !== cls ? raw.second : null;
+  const talents: HeroState['talents'] = {};
+  const picks = isObject(raw.talents) ? raw.talents : {};
+  for (const c of [cls, second]) {
+    if (!c) continue;
+    TALENTS[c].forEach((_, row) => {
+      const pick = picks[talentKey(c, row)];
+      if (pick === 0 || pick === 1) talents[talentKey(c, row)] = pick;
+    });
+  }
+  return {
+    name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 24) : hero.name,
+    cls,
+    second,
+    look: Math.max(0, Math.min(LOOKS.warden.length - 1, Math.floor(num(raw.look)))),
+    talents,
+    mana: Math.max(0, num(raw.mana)),
   };
 }
 

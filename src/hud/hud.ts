@@ -1,7 +1,7 @@
 import { exportSave, importSave } from '../game/save';
 import { MATERIALS, REALMS, type MaterialId, type RealmId } from '../game/realms';
 import type { GameState } from '../game/state';
-import { nextUnlock, UNLOCKS } from '../game/wayfarer';
+import { UNLOCKS } from '../game/wayfarer';
 import { sound } from '../audio/sound';
 import { glyphSvg } from '../game/glyphs';
 import { journal } from '../ui/journal';
@@ -109,12 +109,6 @@ export class Hud {
   private renderSatchel(): void {
     const s = this.game.save;
     const lvl = this.game.level;
-    const next = nextUnlock(lvl.level);
-    journal.setTitle(`Wayfarer level ${lvl.level}`);
-    $('satchel-xp').textContent = lvl.needed
-      ? `${formatCount(lvl.into)} / ${formatCount(lvl.needed)} XP to level ${lvl.level + 1}`
-      : 'Highest level reached';
-    $('satchel-next').textContent = next ? `Next at level ${next.level}: ${next.what}` : 'Everything unlocked';
     $('satchel-unlocks').innerHTML = UNLOCKS.map(
       (u) =>
         `<li class="${u.level <= lvl.level ? 'open' : ''}"><span>${u.level}</span>${u.what}</li>`,
