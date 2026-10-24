@@ -1,4 +1,5 @@
 import { cellAt } from './cells';
+import { curioReward, type Curio, type CurioReward } from './farsight';
 import { pruneSave, storeSave, type SaveData } from './save';
 import { MATERIALS, type MaterialId, type RealmId } from './realms';
 import { BLESSING_MS, BLESSING_XP_BONUS, rollShrineReward, SHRINE_COOLDOWN_MS, type Shrine } from './shrines';
@@ -481,6 +482,19 @@ export class GameState {
     this.emit({ kind: 'reward', text: `+${reward.coin} coin, ${mats}, +${reward.xp} XP. Blessed for 10 minutes.${egg}` });
     this.changed();
     return true;
+  }
+
+  /** Picks up a curio once and pays it out; returns what it held. */
+  findCurio(curio: Curio, realm: RealmId, onFoot: boolean): CurioReward | null {
+    if (curio.id in this.save.curiosFound) return null;
+    const reward = curioReward(curio, realm, onFoot);
+    this.save.curiosFound[curio.id] = curio.expiresAt;
+    this.save.currencies.coin += reward.coin;
+    this.save.currencies.wanderlight += reward.wanderlight;
+    this.addMaterials(reward.materials);
+    this.grantXp(reward.xp);
+    this.changed();
+    return reward;
   }
 
   changed(): void {

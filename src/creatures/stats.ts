@@ -89,17 +89,6 @@ export function damage(atk: number, def: number, power: number, eff: number, rol
   return Math.max(1, Math.round(power * atk * (20 / (20 + def)) * 1.1 * eff * variance * (crit ? 1.5 : 1)));
 }
 
-const CATCH_BASE: Record<Rarity, number> = { common: 0.55, uncommon: 0.4, rare: 0.28 };
-const FLEE_CHANCE: Record<Rarity, number> = { common: 0.12, uncommon: 0.18, rare: 0.25 };
-
-/** Chance that a binding seal holds. `quality` is 0..1, from how well the seal was timed. */
-export function catchChance(rarity: Rarity, level: number, quality: number): number {
-  const chance = (CATCH_BASE[rarity] - 0.01 * (level - 1)) * (0.7 + 0.8 * quality);
-  return Math.min(0.95, Math.max(0.05, chance));
-}
-
-export const fleeChance = (rarity: Rarity) => FLEE_CHANCE[rarity];
-
 /** Spawn rarity tiers coming from the map, which may be finer than species rarity. */
 export type SpawnRarity = Rarity | 'epic' | 'legendary';
 export type RealmId = 'wildwood' | 'tidemere' | 'stoneward' | 'barrows' | 'hearthfields';

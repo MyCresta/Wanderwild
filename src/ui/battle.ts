@@ -10,11 +10,12 @@ import {
   type Attack,
   type BattleEvent,
   type Fighter,
+  type HpSnap,
   type SpellId,
 } from '../creatures/battle';
 import { STRONG } from '../creatures/elements';
 import { FOE_TRAITS, RANKS } from '../creatures/foes';
-import { grantPetXp, markSeen, MAX_SEALS, partyPets } from '../creatures/collection';
+import { grantPetXp, markSeen, partyPets } from '../creatures/collection';
 import { ELEMENTS, getSpecies } from '../creatures/species';
 import type { Encounter } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
@@ -23,24 +24,29 @@ import { h, openSheet, wait } from './dom';
 import { elementTag, wheelHelp } from './wheel';
 import { sound } from '../audio/sound';
 
-const RING_MS = 900;
-const RING_FROM = 2.4;
-const RING_TO = 0.55;
+/** How long the timing needle takes to sweep across an attack button. */
+const SWEEP_MS = 850;
+/** Where the sweet spot sits on the sweep, 0..1, and how far from it still counts for something. */
+const SWEET = 0.8;
+const SWEET_SPREAD = 0.3;
+/** Lunge timings: the blow lands at the far end of the lunge. */
+const LUNGE_MS = 420;
+const IMPACT_MS = 190;
+/** Pause between your move and the foe's, so turns read as turns. */
+const TURN_PAUSE_MS = 450;
 
-function hpBar(f: () => Fighter) {
+function hpBar() {
   const name = h('span', { class: 'hp-name' });
   const fill = h('span', { class: 'hp-fill' });
   const text = h('span', { class: 'hp-text' });
   const bar = h('div', { class: 'hp' }, name, h('span', { class: 'hp-track' }, fill), text);
-  const update = () => {
-    const fighter = f();
-    const pct = (fighter.hp / fighter.maxHp) * 100;
+  const update = (fighter: Fighter, hp: number) => {
+    const pct = (hp / fighter.maxHp) * 100;
     name.textContent = `${fighter.species.name} · Lv ${fighter.level}`;
     fill.style.width = `${pct}%`;
     fill.classList.toggle('hp-low', pct < 30);
-    text.textContent = `${fighter.hp} / ${fighter.maxHp}`;
+    text.textContent = `${hp} / ${fighter.maxHp}`;
   };
-  update();
   return { bar, update };
 }
 
@@ -58,44 +64,63 @@ function edgeTag(edge: number): HTMLElement | null {
 }
 
 /**
- * The timing ring: a rune circle closes in on the foe and a tap as it meets the
- * inner ring lands a critical hit. Resolves with a quality from 0 to 1.
+ * The timing tap: a needle sweeps along a wide bar just above the attacks, where the thumb
+ * on the button cannot hide it, and a second tap on that same button (or on the bar) as the
+ * needle crosses the gold mark lands a critical hit. Resolves with 0..1.
  */
-function timingRing(host: HTMLElement, over: HTMLElement): Promise<number> {
-  const outer = h('span', { class: 'rune-ring' });
-  const target = h('span', { class: 'rune-target' });
-  const layer = h('div', { class: 'rune-layer', role: 'button', 'aria-label': 'Tap when the rings meet' }, target, outer);
-  // The layer covers the whole arena so a tap anywhere counts; the rings sit on the foe.
-  const a = host.getBoundingClientRect();
-  const b = over.getBoundingClientRect();
-  layer.style.setProperty('--cx', `${b.left - a.left + b.width / 2}px`);
-  layer.style.setProperty('--cy', `${b.top - a.top + b.height / 2}px`);
-  host.appendChild(layer);
+function timingSweep(btn: HTMLButtonElement, bar: HTMLElement): Promise<number> {
+  const needle = h('span', { class: 'sweep-needle' });
+  const runner = h('span', { class: 'sweep-runner' }, needle);
+  const track = h('span', { class: 'sweep-track', style: `--sweet: ${SWEET * 100}%` }, h('span', { class: 'sweep-zone' }), runner);
+  const hint = h('span', { class: 'sweep-hint' }, 'Tap again on the gold!');
+  bar.replaceChildren(hint, track);
+  bar.classList.add('sweeping');
+  btn.classList.add('sweeping');
+  btn.disabled = false;
+  // A transform animation runs on the compositor, so the needle glides even when the page is busy,
+  // and the tap is scored from its own timestamp against the animation's clock: what you see is what counts.
+  const sweep = runner.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(100%)' }], {
+    duration: SWEEP_MS,
+    easing: 'linear',
+    fill: 'forwards',
+  });
   return new Promise((resolve) => {
-    const start = performance.now();
     let done = false;
-    const scaleAt = (t: number) => RING_FROM + (RING_TO - RING_FROM) * Math.min(1, (t - start) / RING_MS);
+    const at = (t: number) => {
+      const start = sweep.startTime;
+      return typeof start === 'number' ? Math.min(1, Math.max(0, (t - start) / SWEEP_MS)) : 0;
+    };
     const finish = (quality: number) => {
       if (done) return;
       done = true;
-      layer.classList.add(quality >= CRIT_QUALITY ? 'rune-perfect' : quality > 0.4 ? 'rune-good' : 'rune-miss');
-      setTimeout(() => layer.remove(), 380);
+      sweep.pause();
+      btn.removeEventListener('pointerdown', onTap);
+      bar.removeEventListener('pointerdown', onTap);
+      bar.classList.add(quality >= CRIT_QUALITY ? 'sweep-perfect' : quality > 0.4 ? 'sweep-good' : 'sweep-miss');
+      hint.textContent = quality >= CRIT_QUALITY ? 'Perfect!' : quality > 0.4 ? 'Good' : 'Missed the mark';
+      setTimeout(() => {
+        btn.classList.remove('sweeping');
+        bar.classList.remove('sweeping', 'sweep-perfect', 'sweep-good', 'sweep-miss');
+        bar.replaceChildren();
+      }, 420);
       resolve(quality);
     };
     const onTap = (e: Event) => {
       e.preventDefault();
-      // Distance from the inner ring, as a share of how far the outer ring travels.
-      finish(Math.max(0, 1 - Math.abs(scaleAt(performance.now()) - 1) / 0.6));
+      finish(Math.max(0, 1 - Math.abs(at(e.timeStamp) - SWEET) / SWEET_SPREAD));
     };
-    layer.addEventListener('pointerdown', onTap);
-    const frame = (t: number) => {
-      if (done) return;
-      outer.style.transform = `scale(${scaleAt(t)})`;
-      if (t - start >= RING_MS) finish(0.2);
-      else requestAnimationFrame(frame);
-    };
-    requestAnimationFrame(frame);
+    btn.addEventListener('pointerdown', onTap);
+    bar.addEventListener('pointerdown', onTap);
+    sweep.finished.then(
+      () => finish(0.2),
+      () => finish(0.2),
+    );
   });
+}
+
+/** One command card: icon and name, a line under it, and an optional tag. All buttons in the battle share it. */
+function card(btn: HTMLButtonElement, name: string, sub: string, tag?: HTMLElement | null): void {
+  btn.replaceChildren(h('span', { class: 'cmd-name' }, name), h('span', { class: 'cmd-sub' }, sub), tag ?? '');
 }
 
 export interface BattleOpts {
@@ -136,19 +161,35 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     finish(false);
   });
 
+  // What the screen shows, which trails the battle's own state until each blow is played out.
+  const shown: HpSnap & { active: number } = { foe: foe.hp, party: battle.party.map((f) => f.hp), active: 0 };
+
   const foeSvg = createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 150, facing: -1 });
   const intent = h('div', { class: 'intent', 'aria-live': 'polite' });
   const foeSpot = h('div', { class: `fighter fighter-foe fighter-${foe.rank}` }, foeSvg, intent);
   const petSpot = h('div', { class: 'fighter fighter-pet' });
   const petStatus = h('div', { class: 'status-row' });
   const showPet = () => {
-    const p = owned[battle.active];
+    const p = owned[shown.active];
     petSpot.classList.remove('faint');
     petSpot.replaceChildren(createCreatureSvg({ speciesId: p.speciesId, seed: p.seed, size: 150 }));
   };
   showPet();
-  const foeHp = hpBar(() => battle.foe);
-  const petHp = hpBar(() => battle.pet);
+  const foeHp = hpBar();
+  const petHp = hpBar();
+  const showHp = () => {
+    foeHp.update(foe, shown.foe);
+    petHp.update(battle.party[shown.active], shown.party[shown.active]);
+    bench.querySelectorAll<HTMLElement>('.bench-hp > span').forEach((bar, i) => {
+      bar.style.width = `${(100 * shown.party[i]) / battle.party[i].maxHp}%`;
+    });
+  };
+  const applySnap = (e: BattleEvent) => {
+    if (!e.hp) return;
+    shown.foe = e.hp.foe;
+    shown.party = [...e.hp.party];
+    showHp();
+  };
   const foeTags = h(
     'div',
     { class: 'status-row' },
@@ -157,10 +198,12 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     ...foe.traits.map((t) => h('span', { class: 'trait-chip', title: FOE_TRAITS[t].blurb }, `${FOE_TRAITS[t].glyph} ${FOE_TRAITS[t].name}`)),
   );
   const wardChip = foe.traits.includes('warded') ? foeTags.querySelectorAll('.trait-chip')[foe.traits.indexOf('warded')] : null;
+  const turnBanner = h('div', { class: 'turn-banner', 'aria-live': 'polite' });
   const arena = h(
     'div',
     { class: 'arena' },
-    h('div', { class: 'arena-row' }, h('div', { class: 'arena-info' }, foeHp.bar, foeTags), foeSpot),
+    turnBanner,
+    h('div', { class: 'arena-row arena-row-foe' }, h('div', { class: 'arena-info' }, foeHp.bar, foeTags), foeSpot),
     h('div', { class: 'arena-row arena-row-pet' }, petSpot, h('div', { class: 'arena-info' }, petHp.bar, petStatus)),
   );
   const weakness = foe.species.kind === 'monster' ? foe.species.weakTo : null;
@@ -171,24 +214,51 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   ].join('');
   const log = h('p', { class: 'battle-log' }, opening);
 
-  const attackBtn = (attack: Attack) => {
-    const btn = h('button', { class: `btn attack attack-${attack}`, type: 'button' });
-    btn.addEventListener('click', () => act({ kind: attack }));
-    return btn;
-  };
-  const attacks: Record<Attack, HTMLButtonElement> = { strike: attackBtn('strike'), move: attackBtn('move'), art: attackBtn('art') };
-  const attackRow = h('div', { class: 'attacks' }, attacks.strike, attacks.move, attacks.art);
-
+  const cmd = (extra = '') => h('button', { class: `cmd ${extra}`, type: 'button' });
+  const attacks: Record<Attack, HTMLButtonElement> = { strike: cmd('cmd-strike'), move: cmd('cmd-move'), art: cmd('cmd-art') };
+  for (const attack of Object.keys(attacks) as Attack[]) attacks[attack].addEventListener('click', () => act({ kind: attack }));
+  const tonicBtn = cmd('cmd-way');
+  const spellBtns = (Object.keys(SPELLS) as SpellId[]).map((id) => ({ id, el: cmd('cmd-way') }));
+  const fleeBtn = h('button', { class: 'btn btn-small btn-flee', type: 'button', onclick: () => sheet.close() }, practice ? 'Stop' : 'Flee');
   const bench = h('div', { class: 'party-bench', role: 'group', 'aria-label': 'Party' });
-  const tonicBtn = h('button', { class: 'btn btn-small', type: 'button' });
-  const spellBtns = (Object.keys(SPELLS) as SpellId[]).map((id) => ({ id, el: h('button', { class: 'btn btn-small btn-spell', type: 'button' }) }));
-  const fleeBtn = h('button', { class: 'btn btn-small', type: 'button', onclick: () => sheet.close() }, practice ? 'Stop' : 'Flee');
-  const extras = h('div', { class: 'battle-extras' }, tonicBtn, ...spellBtns.map((s) => s.el), fleeBtn);
-  const help = wheelHelp(foe.species.element);
-  sheet.body.append(arena, log, attackRow, bench, extras, help);
+
+  const section = (title: string, ...children: HTMLElement[]) =>
+    h('section', { class: 'cmd-section' }, h('h3', { class: 'cmd-title' }, title), ...children);
+  const attackSection = section('Attacks', h('div', { class: 'cmd-grid' }, attacks.strike, attacks.move, attacks.art));
+  const waySection = section('Wayfarer', h('div', { class: 'cmd-grid' }, tonicBtn, ...spellBtns.map((s) => s.el)));
+  const partySection = section('Party · tap to swap', bench);
+  waySection.hidden = !way;
+  partySection.hidden = battle.party.length < 2;
+  const panel = h('div', { class: 'cmd-panel' }, attackSection, waySection, partySection);
+  const footer = h('div', { class: 'battle-footer' }, wheelHelp(foe.species.element), fleeBtn);
+  // The crit bar lies over the log, so it shows above the attacks without shifting the buttons.
+  const sweepBar = h('div', { class: 'sweep-bar', 'aria-live': 'polite' });
+  sheet.body.append(arena, h('div', { class: 'log-wrap' }, log, sweepBar), panel, footer);
 
   let busy = false;
-  const all = () => [...Object.values(attacks), fleeBtn, tonicBtn, ...spellBtns.map((s) => s.el), ...bench.querySelectorAll('button')];
+  const all = () => [...Object.values(attacks), tonicBtn, ...spellBtns.map((s) => s.el), ...bench.querySelectorAll('button')];
+
+  const setTurn = (side: 'pet' | 'foe' | null) => {
+    arena.classList.toggle('turn-pet', side === 'pet');
+    arena.classList.toggle('turn-foe', side === 'foe');
+    panel.classList.toggle('cmd-waiting', side !== 'pet');
+    turnBanner.hidden = !side;
+    turnBanner.className = `turn-banner${side === 'foe' ? ' turn-banner-foe' : ''}`;
+    turnBanner.textContent = side === 'foe' ? `${foe.species.name}'s turn` : battle.mustSwap ? 'Send in a pet' : 'Your turn';
+  };
+
+  const refreshStatus = () => {
+    petStatus.replaceChildren(
+      ...[
+        elementTag(battle.party[shown.active].species.element),
+        battle.guard && h('span', { class: 'trait-chip chip-good' }, `⛨ Guard ${battle.guard.turns}`),
+        battle.dodge && h('span', { class: 'trait-chip chip-good' }, '❂ Dodge'),
+        battle.focus && h('span', { class: 'trait-chip chip-good' }, '✦ Weak spot marked'),
+      ].filter((n): n is HTMLSpanElement => !!n),
+    );
+    if (wardChip) wardChip.classList.toggle('chip-broken', !battle.wardUp);
+    foeSpot.classList.toggle('burning', battle.burn > 0);
+  };
 
   const refresh = () => {
     const pet = battle.pet;
@@ -197,38 +267,25 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     const forced = battle.mustSwap;
     const label = (attack: Attack, name: string, blurb: string, wait: number) => {
       const btn = attacks[attack];
-      btn.replaceChildren(
-        h('span', { class: 'attack-name' }, name),
-        h('span', { class: 'attack-blurb' }, wait > 0 ? `Ready in ${wait}` : blurb),
-        (attack !== 'strike' && wait === 0 && edgeTag(battle.edge(attack))) || '',
-      );
+      const edge = battle.edge(attack);
+      card(btn, name, wait > 0 ? `Ready in ${wait}` : blurb, attack !== 'strike' && wait === 0 ? edgeTag(edge) : null);
       btn.disabled = busy || forced || wait > 0;
-      btn.classList.toggle('attack-strong', wait === 0 && battle.edge(attack) > 1);
+      btn.classList.toggle('cmd-strong', wait === 0 && edge > 1);
       btn.style.setProperty('--el', attack === 'strike' ? 'var(--leather)' : ELEMENTS[element].color);
     };
-    label('strike', '⚔ Strike', 'Always ready', 0);
-    label('move', `${ELEMENTS[element].glyph} ${pet.species.move}`, 'Big hit · time the rune', cd.move);
+    label('strike', '⚔ Strike', 'Tap twice: time it for a crit', 0);
+    label('move', `${ELEMENTS[element].glyph} ${pet.species.move}`, 'Big hit · tap twice to time it', cd.move);
     label('art', `${ELEMENTS[element].glyph} ${ARTS[element].name}`, ARTS[element].blurb, cd.art);
 
     const next = battle.intent;
     const threat = next.big ? battle.threat(battle.active) : 1;
     intent.className = `intent${next.big ? ' intent-big' : ''}`;
     intent.replaceChildren(
-      next.big ? `⚠ ${next.element ? ELEMENTS[next.element].glyph : ''} ${next.name}` : 'Next: Strike',
+      next.big ? `⚠ Next: ${next.element ? ELEMENTS[next.element].glyph : ''} ${next.name}` : 'Next: Strike',
       threat > 1 ? h('small', {}, ' strong vs you!') : '',
     );
     intent.hidden = !!battle.winner;
-
-    petStatus.replaceChildren(
-      ...[
-        elementTag(element),
-        battle.guard && h('span', { class: 'trait-chip chip-good' }, `⛨ Guard ${battle.guard.turns}`),
-        battle.dodge && h('span', { class: 'trait-chip chip-good' }, '❂ Dodge'),
-        battle.focus && h('span', { class: 'trait-chip chip-good' }, '✦ Weak spot marked'),
-      ].filter((n): n is HTMLSpanElement => !!n),
-    );
-    if (wardChip) wardChip.classList.toggle('chip-broken', !battle.wardUp);
-    foeSpot.classList.toggle('burning', battle.burn > 0);
+    refreshStatus();
 
     bench.replaceChildren(
       ...battle.party.map((f, i) => {
@@ -251,33 +308,31 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
         return btn;
       }),
     );
-    bench.hidden = battle.party.length < 2;
 
     const tonics = way?.tonics() ?? 0;
-    tonicBtn.replaceChildren(`Tonic ×${tonics}`);
+    card(tonicBtn, '⚗ Tonic', tonics ? `Heals half · ×${tonics}` : 'None · brew at Hearthstead');
     tonicBtn.disabled = busy || forced || !tonics || pet.hp >= pet.maxHp;
-    tonicBtn.hidden = !way;
     const metres = way?.spellMetres() ?? 0;
     for (const { id, el } of spellBtns) {
       const spell = SPELLS[id];
       const ready = metres >= spell.metres;
-      el.replaceChildren(
+      card(
+        el,
         id === 'fireball' ? `🔥 ${spell.name}` : `✚ ${spell.name}`,
-        h('small', {}, ready ? (id === 'fireball' ? ` ${battle.fireball}` : ' ready') : ` ${Math.round(metres)}/${spell.metres} m`),
+        ready ? (id === 'fireball' ? `${battle.fireball} damage · ready` : 'Heals party · ready') : `Walk ${Math.max(0, Math.round(spell.metres - metres))} m more`,
       );
       el.title = `${spell.blurb} Charged by walking ${spell.metres} m.`;
       el.disabled = busy || forced || !ready;
-      el.hidden = !way;
     }
     fleeBtn.disabled = busy;
-    foeHp.update();
-    petHp.update();
+    showHp();
+    setTurn(battle.winner ? null : 'pet');
   };
 
   const describe = (e: BattleEvent): string => {
     switch (e.kind) {
       case 'hit': {
-        const who = e.attacker === 'pet' ? battle.pet.species.name : battle.foe.species.name;
+        const who = e.attacker === 'pet' ? battle.party[shown.active].species.name : foe.species.name;
         let text = `${who} used ${e.name}`;
         if (e.effectiveness > 1) text += '. Strong hit!';
         else if (e.effectiveness < 1) text += '. Weak hit.';
@@ -288,34 +343,34 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
         return text;
       }
       case 'miss':
-        return `${battle.foe.species.name}'s ${e.name} whiffs past!`;
+        return `${foe.species.name}'s ${e.name} whiffs past!`;
       case 'status':
         switch (e.status) {
           case 'guard':
-            return `${battle.pet.species.name} raises ${e.name}.`;
+            return `${battle.party[shown.active].species.name} raises ${e.name}.`;
           case 'dodge':
-            return `${battle.pet.species.name} rides an ${e.name}, ready to dodge.`;
+            return `${battle.party[shown.active].species.name} rides an ${e.name}, ready to dodge.`;
           case 'focus':
             return `${e.name}! The weak spot glows. Next attack is critical.`;
           case 'burn':
-            return `${battle.foe.species.name} catches fire!`;
+            return `${foe.species.name} catches fire!`;
           case 'ward-break':
             return 'The ward shatters!';
         }
         return '';
       case 'burn':
-        return `${battle.foe.species.name} burns for ${e.damage}.`;
+        return `${foe.species.name} burns for ${e.damage}.`;
       case 'reflect':
         return `Thorns throw ${e.damage} back!`;
       case 'leech':
-        return `${battle.foe.species.name} drinks ${e.amount} health back.`;
+        return `${foe.species.name} drinks ${e.amount} health back.`;
       case 'swap':
         return `${battle.party[e.to].species.name}, you're up!`;
       case 'heal':
         return e.source === 'tonic'
           ? `A tonic restores ${e.amount} health.`
           : e.source === 'art'
-            ? `${battle.pet.species.name} draws on a Wellspring (+${e.amount}).`
+            ? `${battle.party[shown.active].species.name} draws on a Wellspring (+${e.amount}).`
             : `Mending light washes over the party (+${e.amount}).`;
       case 'fireball':
         return `You hurl a Fireball for ${e.damage}!`;
@@ -324,81 +379,90 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     }
   };
 
+  /** Events that belong to the foe's half of the turn. */
+  const foeSide = (e: BattleEvent) => (e.kind === 'hit' && e.attacker === 'foe') || e.kind === 'miss' || e.kind === 'burn';
+
   const play = async (e: BattleEvent) => {
     log.textContent = describe(e);
     if (e.kind === 'hit') {
-      const attacker = e.attacker === 'pet' ? petSpot : foeSpot;
-      const target = e.attacker === 'pet' ? foeSpot : petSpot;
+      const fromPet = e.attacker === 'pet';
+      const attacker = fromPet ? petSpot : foeSpot;
+      const target = fromPet ? foeSpot : petSpot;
       const elemental = e.action !== 'strike';
       attacker.classList.add(elemental ? 'cast' : 'lunge');
       sound.play(elemental ? 'spell' : 'strike');
-      await wait(200);
+      // The blow lands as the lunge reaches its target: that is when health drops.
+      await wait(IMPACT_MS);
       target.classList.add('hit');
       sound.play(e.crit ? 'crit' : e.effectiveness > 1 ? 'weakHit' : 'hit');
       floatText(target, `-${e.damage}`, e.effectiveness > 1 || e.crit ? 'big' : e.effectiveness < 1 ? 'small' : 'dmg');
-      if (e.effectiveness > 1) floatText(target, 'Strong!', 'word');
-      refresh();
-      await wait(340);
+      if (e.crit) floatText(target, 'Critical!', 'word');
+      else if (e.effectiveness > 1) floatText(target, 'Strong!', 'word');
+      applySnap(e);
+      await wait(LUNGE_MS - IMPACT_MS);
       attacker.classList.remove('lunge', 'cast');
-      target.classList.remove('hit');
       await wait(120);
+      target.classList.remove('hit');
     } else if (e.kind === 'miss') {
       foeSpot.classList.add('lunge');
+      await wait(IMPACT_MS);
       petSpot.classList.add('dodging');
       sound.play('strike');
       floatText(petSpot, 'Miss', 'word');
-      await wait(420);
+      await wait(LUNGE_MS - IMPACT_MS);
       foeSpot.classList.remove('lunge');
       petSpot.classList.remove('dodging');
     } else if (e.kind === 'status') {
       const spot = e.target === 'pet' ? petSpot : foeSpot;
       spot.classList.add(e.target === 'pet' ? 'healed' : 'hit');
       sound.play(e.status === 'ward-break' ? 'crit' : 'spell');
-      refresh();
+      refreshStatus();
       await wait(420);
       spot.classList.remove('healed', 'hit');
     } else if (e.kind === 'burn' || e.kind === 'reflect') {
       foeSpot.classList.add('hit', 'burn');
       sound.play('hit');
       floatText(foeSpot, `-${e.damage}`, 'dmg');
-      refresh();
+      applySnap(e);
       await wait(420);
       foeSpot.classList.remove('hit', 'burn');
     } else if (e.kind === 'leech') {
       floatText(foeSpot, `+${e.amount}`, 'heal');
-      refresh();
+      applySnap(e);
       await wait(360);
     } else if (e.kind === 'fireball') {
       foeSpot.classList.add('hit', 'burn');
       sound.play('crit');
       floatText(foeSpot, `-${e.damage}`, 'big');
-      refresh();
+      applySnap(e);
       await wait(550);
       foeSpot.classList.remove('hit', 'burn');
     } else if (e.kind === 'heal') {
       petSpot.classList.add('healed');
       sound.play('reward');
       floatText(petSpot, `+${e.amount}`, 'heal');
-      refresh();
+      applySnap(e);
       await wait(480);
       petSpot.classList.remove('healed');
     } else if (e.kind === 'swap') {
       petSpot.classList.add('swap-out');
       sound.play('tap');
       await wait(200);
+      shown.active = e.to;
       showPet();
+      showHp();
+      refreshStatus();
       petSpot.classList.remove('swap-out');
-      refresh();
       await wait(240);
     } else if (e.kind === 'faint') {
       petSpot.classList.add('faint');
-      refresh();
       await wait(450);
     }
   };
 
   const end = () => {
     intent.hidden = true;
+    setTurn(null);
     if (battle.winner === 'pet') {
       foeSpot.classList.add('dissolve');
       sound.play('victory');
@@ -413,13 +477,12 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
         owned.forEach((p, i) => {
           if (grantPetXp(p, shares[i]) > 0) grew.push(`${getSpecies(p.speciesId).name} grew to level ${p.level}!`);
         });
-        ctx.collection.seals = Math.min(MAX_SEALS, ctx.collection.seals + reward.seals);
         ctx.changed();
         log.replaceChildren(
           `${encounter.species.name} dissolves into a puddle of harmless ink. `,
           h('strong', {}, `+${reward.xp} XP`),
           owned.length > 1 ? ' to each pet that fought (half to the rest)' : '',
-          `, +${reward.seals} seal${reward.seals > 1 ? 's' : ''}.`,
+          '.',
           ...grew.map((g) => h('strong', { class: 'level-up' }, ` ${g}`)),
         );
       }
@@ -431,9 +494,9 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
         ? 'Worn out, but it was only practice. Try leading with a pet that is strong against it.'
         : 'Your party is worn out and retreats to rest. Bring a pet strong against it, brew tonics and charge spells by walking, then try again.';
     }
-    bench.hidden = true;
-    extras.hidden = true;
-    attackRow.replaceChildren(h('button', { class: 'btn btn-primary', type: 'button', onclick: () => sheet.close() }, 'Continue'));
+    panel.replaceChildren(h('button', { class: 'btn btn-primary btn-continue', type: 'button', onclick: () => sheet.close() }, 'Continue'));
+    panel.classList.remove('cmd-waiting');
+    fleeBtn.hidden = true;
   };
 
   const act = async (action: Action) => {
@@ -442,8 +505,20 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     if (action.kind === 'spell' && !way?.spendSpell(SPELLS[action.spell].metres)) return;
     busy = true;
     all().forEach((b) => ((b as HTMLButtonElement).disabled = true));
-    if (action.kind === 'move' && battle.ready('move')) action = { ...action, quality: await timingRing(arena, foeSpot) };
-    for (const e of battle.turn(action)) await play(e);
+    fleeBtn.disabled = true;
+    if ((action.kind === 'strike' || action.kind === 'move') && battle.ready(action.kind)) {
+      action = { ...action, quality: await timingSweep(attacks[action.kind], sweepBar) };
+    }
+    panel.classList.add('cmd-waiting');
+    let foeTurn = false;
+    for (const e of battle.turn(action)) {
+      if (!foeTurn && foeSide(e)) {
+        foeTurn = true;
+        setTurn('foe');
+        await wait(TURN_PAUSE_MS);
+      }
+      await play(e);
+    }
     busy = false;
     if (battle.winner) end();
     else refresh();

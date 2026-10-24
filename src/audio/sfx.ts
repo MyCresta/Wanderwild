@@ -104,7 +104,7 @@ const RECIPES: Record<SfxName, Recipe> = {
       osc(ctx, 'sawtooth', midiToHz(m), filter(ctx, 'lowpass', 900, 1, env), t + i * 0.25, t + i * 0.25 + 1.4);
     }
   },
-  // The binding seal flying through the air.
+  // A quick whoosh.
   throw(ctx, out, t) {
     whoosh(ctx, out, t, 0.45, 400, 2500, 0.12);
     const env = envelope(ctx, out, t, 0.04, 0.05, 0.4);

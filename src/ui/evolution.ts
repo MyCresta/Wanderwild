@@ -47,7 +47,7 @@ export function openEvolution(ctx: GameContext, pet: OwnedPet, onDone?: () => vo
   const oldForm = h('div', { class: 'evo-form evo-old' }, oldSvg);
   const newForm = h('div', { class: 'evo-form evo-new' }, newSvg);
   const stage = h('div', { class: 'evo-stage' }, rays(), oldForm, newForm);
-  const caption = h('p', { class: 'evo-caption' }, `What? ${from.name} is evolving!`);
+  const caption = h('p', { class: 'evo-caption' }, `The ink around ${from.name} begins to stir…`);
   const flash = h('div', { class: 'evo-flash' });
   const scene = h('div', { class: 'catch-scene evo-scene', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${from.name} is evolving` }, backdrop.svg, stage, caption, flash);
   document.body.appendChild(scene);

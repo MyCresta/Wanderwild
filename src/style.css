@@ -91,7 +91,7 @@ body {
 /*
  * Screen layout. Round map buttons live in two rails that stack upward from the
  * bottom corners and wrap into a second column when the screen is short, and
- * every passing banner (notices, toasts, deeds) stacks in one column under the
+ * every passing banner (notices, toasts) stacks in one column under the
  * top bar. New buttons go in a rail and new banners in #banners, never at a
  * fixed spot of their own, so nothing lands on top of anything else.
  * --rail-top and --hud-bottom are kept up to date by src/ui/layout.ts.
@@ -130,62 +130,6 @@ body {
   width: 44px;
   height: 44px;
   padding: 6px;
-}
-
-.rail > .hunt-button,
-.rail > .install {
-  height: 52px;
-  padding: 3px 0 2px;
-  border-radius: 22px;
-  font-size: 8.5px;
-}
-
-.rail > .hunt-button svg,
-.rail > .install svg {
-  width: 30px;
-  height: 30px;
-}
-
-/* Less-used buttons fold away behind the "more" button until it is opened. */
-.rail > .rail-extra {
-  display: none;
-}
-
-.rail.open > .rail-extra:not([hidden]) {
-  display: block;
-  animation: fade-in 0.15s ease-out;
-}
-
-.rail-more {
-  border: 2px solid var(--leather-dark);
-  border-radius: 50%;
-  background: linear-gradient(var(--leather), var(--leather-dark));
-  color: var(--gold);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-
-.rail-more svg {
-  width: 100%;
-  height: 100%;
-  transition: transform 0.2s;
-}
-
-.rail.open > .rail-more svg {
-  transform: rotate(90deg);
-}
-
-/* A deed waiting to be seen shows on the closed menu too. */
-.rail:not(.open):has(.deeds-button:not([data-unseen=''])[data-unseen]) > .rail-more::after {
-  content: '';
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--parchment);
-  border-radius: 50%;
-  background: #8e2b22;
 }
 
 .banners {
@@ -280,33 +224,16 @@ body {
   height: 100%;
 }
 
-/* Sound: all → effects only → muted. Sits above the follow button. */
-.sound-toggle {
-  width: 44px;
-  height: 44px;
-  padding: 7px;
-  border: 2px solid var(--leather-dark);
-  border-radius: 50%;
-  background: var(--leather);
-  color: var(--gold);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-
-.sound-toggle[data-mode='off'] {
-  color: var(--parchment-dark);
-  opacity: 0.8;
-}
-
-.sound-toggle svg {
-  width: 100%;
-  height: 100%;
-}
-
 /* Player token: a hooded wanderer standing on a glowing rune ring. */
+/* MapLibre places every marker with a transform from the map's top-left corner. Any
+   `position` from a marker's own class would put it back in the page flow, so each
+   one landed beside the one before it instead of on its spot. */
+#map .maplibregl-marker {
+  position: absolute;
+}
+
 /* Map icons size by --marker-scale (src/map/markerScale.ts): smaller zoomed out, tap targets stay 44 px. */
 .player-token {
-  position: relative;
   width: calc(40px * var(--marker-scale, 1));
   height: calc(48px * var(--marker-scale, 1));
   pointer-events: none;
@@ -349,35 +276,6 @@ body {
   font-family: system-ui, sans-serif;
 }
 
-.install {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 56px;
-  height: 64px;
-  padding: 6px 0 4px;
-  border: 2px solid var(--leather-dark);
-  border-radius: 28px;
-  background: linear-gradient(var(--leather), var(--leather-dark));
-  color: var(--gold);
-  font: inherit;
-  font-size: 9.5px;
-  font-weight: bold;
-  letter-spacing: 0.03em;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-
-.install[hidden] {
-  display: none;
-}
-
-.install svg {
-  width: 36px;
-  height: 36px;
-  flex: none;
-}
-
 /* ---------- Creatures ---------- */
 
 .creature {
@@ -394,7 +292,6 @@ body {
 }
 
 .map-creature {
-  position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -416,7 +313,9 @@ body {
   filter: drop-shadow(0 0 5px rgba(60, 20, 90, 0.7));
 }
 
-.map-creature.out-of-reach {
+.map-creature.out-of-reach,
+.shrine-marker.out-of-reach,
+.curio-marker.out-of-reach {
   opacity: 0.55;
   filter: grayscale(0.6) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.25));
 }
@@ -473,10 +372,6 @@ body {
   .hud {
     top: calc(var(--safe-top) + 6px);
     gap: 4px;
-  }
-
-  .title-ribbon {
-    margin-top: -4px;
   }
 
   /* Clear two columns of rail buttons on each side. */
@@ -1033,6 +928,27 @@ body {
   text-align: center;
 }
 
+/*
+ * While a sheet or scene is up, the map underneath stays still: its looping marker animations
+ * pause, and under a full-screen scene the map and its parchment wash are not drawn at all,
+ * so every frame goes to what you are looking at.
+ */
+body:has(> .sheet-backdrop, > .catch-scene) #map *,
+body:has(> .sheet-backdrop, > .catch-scene) .hud *,
+body:has(> .sheet-backdrop, > .catch-scene) .rail * {
+  animation-play-state: paused !important;
+}
+
+body:has(> .catch-scene) #map,
+body:has(> .catch-scene) .parchment-overlay {
+  visibility: hidden;
+}
+
+/* Lunges and shakes move the fighter on its own layer instead of repainting the arena. */
+.fighter {
+  will-change: transform;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sheet,
   .sheet-backdrop,
@@ -1085,398 +1001,6 @@ body {
   background: radial-gradient(ellipse at center, transparent 60%, rgba(74, 46, 20, 0.35) 100%);
 }
 
-.catch-field {
-  position: absolute;
-  inset: 0;
-}
-
-.catch-top {
-  position: absolute;
-  z-index: 2;
-  top: calc(var(--safe-top) + 10px);
-  left: 10px;
-  right: 10px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px 8px 14px;
-  border: 2px solid var(--leather-dark);
-  border-radius: 12px;
-  background: linear-gradient(var(--leather), var(--leather-dark));
-  color: var(--parchment);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-}
-
-.catch-title {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  font-size: 13px;
-}
-
-.catch-title strong {
-  color: var(--gold);
-  font-size: 19px;
-}
-
-.catch-seals {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--gold);
-  font-size: 18px;
-  font-weight: bold;
-  font-variant-numeric: tabular-nums;
-}
-
-.catch-seals svg {
-  width: 26px;
-  height: 26px;
-}
-
-.catch-run {
-  min-height: 40px;
-  padding: 6px 12px;
-  border: 1px solid rgba(243, 210, 122, 0.5);
-  border-radius: 8px;
-  background: none;
-  color: var(--parchment);
-  font: inherit;
-  cursor: pointer;
-}
-
-.catch-creature {
-  position: absolute;
-  left: 0;
-  top: 0;
-  will-change: transform;
-}
-
-.catch-platform {
-  position: absolute;
-  left: 8%;
-  right: 8%;
-  bottom: 2%;
-  height: 16%;
-  border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(255, 248, 225, 0.75), rgba(255, 248, 225, 0) 70%);
-}
-
-.catch-creature-inner {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  transition: transform 0.45s ease-in, opacity 0.45s ease-in, filter 0.45s;
-}
-
-.catch-creature-inner .creature {
-  width: 100%;
-  height: 100%;
-}
-
-.catch-sucked {
-  transform: scale(0.04) rotate(200deg);
-  opacity: 0;
-  filter: brightness(3) sepia(1);
-}
-
-.catch-flee {
-  transform: translateY(-60px) scale(0.5);
-  opacity: 0;
-  filter: blur(6px) brightness(0.2);
-  transition-duration: 1s;
-}
-
-.catch-seal {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 64px;
-  height: 64px;
-  pointer-events: none;
-  will-change: transform;
-  filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.4));
-}
-
-.catch-seal[hidden] {
-  display: none;
-}
-
-.catch-seal svg {
-  width: 100%;
-  height: 100%;
-}
-
-.catch-seal-fall svg {
-  animation: seal-fall 0.5s ease-in forwards;
-}
-
-@keyframes seal-fall {
-  to {
-    transform: translateY(60px) rotate(120deg);
-    opacity: 0;
-  }
-}
-
-.catch-seal-burst svg {
-  animation: seal-burst 0.45s ease-out forwards;
-}
-
-@keyframes seal-burst {
-  40% {
-    transform: scale(1.4);
-  }
-  to {
-    transform: scale(0.2);
-    opacity: 0;
-  }
-}
-
-.catch-seal-glow svg {
-  filter: drop-shadow(0 0 14px #f3d27a) drop-shadow(0 0 4px #fff);
-  animation: seal-pop 0.6s ease-out;
-}
-
-@keyframes seal-pop {
-  50% {
-    transform: scale(1.5);
-  }
-}
-
-.catch-fx {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.catch-popup {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  color: #fff8e6;
-  font-size: 26px;
-  font-weight: bold;
-  font-variant: small-caps;
-  white-space: nowrap;
-  text-shadow: 0 2px 0 var(--leather-dark), 0 0 8px rgba(0, 0, 0, 0.6);
-  animation: popup 1.2s ease-out forwards;
-}
-
-.catch-popup-grade {
-  color: #f3d27a;
-  font-size: 32px;
-}
-
-.catch-popup-miss {
-  color: #f0c8bf;
-  font-size: 22px;
-}
-
-@keyframes popup {
-  0% {
-    transform: translate(-50%, -30%) scale(0.6);
-    opacity: 0;
-  }
-  15% {
-    transform: translate(-50%, -50%) scale(1.15);
-    opacity: 1;
-  }
-  70% {
-    opacity: 1;
-  }
-  to {
-    transform: translate(-50%, -110%) scale(1);
-    opacity: 0;
-  }
-}
-
-.catch-particle {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  margin: -4px 0 0 -4px;
-  border-radius: 50%;
-  animation: particle 0.9s ease-out forwards;
-}
-
-.catch-particle-star {
-  width: auto;
-  height: auto;
-  margin: -10px 0 0 -6px;
-  font-size: 18px;
-  text-shadow: 0 0 6px currentColor;
-}
-
-@keyframes particle {
-  to {
-    transform: translate(var(--dx), var(--dy)) scale(0.3);
-    opacity: 0;
-  }
-}
-
-.catch-bottom {
-  position: absolute;
-  z-index: 2;
-  left: 16px;
-  right: 16px;
-  bottom: calc(var(--safe-bottom) + 14px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  pointer-events: none;
-}
-
-.catch-bottom > * {
-  pointer-events: auto;
-}
-
-.catch-hint {
-  max-width: 360px;
-  margin: 0;
-  padding: 6px 12px;
-  border-radius: 8px;
-  background: rgba(232, 217, 181, 0.88);
-  text-align: center;
-  font-size: 14px;
-}
-
-.catch-hint:empty {
-  display: none;
-}
-
-.catch-throw {
-  min-width: 160px;
-}
-
-/* Banners from elsewhere in the game drop below the scene's title card instead of covering it. */
-body:has(.catch-scene) .banners {
-  top: calc(var(--safe-top) + 112px);
-}
-
-/* Sketching: trace the creature's outline before it loses patience. */
-.sketch-layer {
-  position: absolute;
-  overflow: visible;
-  pointer-events: none;
-  touch-action: none;
-}
-
-.sketch-active {
-  pointer-events: auto;
-  cursor: crosshair;
-}
-
-.sketch-guide {
-  fill: none;
-  stroke: rgba(255, 248, 225, 0.95);
-  stroke-width: 2;
-  stroke-dasharray: 3 5;
-  filter: drop-shadow(0 0 1.5px rgba(42, 29, 58, 0.9));
-  opacity: 0;
-  transition: opacity 0.9s;
-}
-
-.sketch-guide-show {
-  opacity: 1;
-  animation: sketch-guide-in 1.2s ease-out;
-}
-
-.sketch-guide-faded {
-  opacity: 0.22;
-}
-
-@keyframes sketch-guide-in {
-  from {
-    stroke-dashoffset: 400;
-    opacity: 0;
-  }
-}
-
-.sketch-marks line {
-  stroke: transparent;
-  stroke-width: 5;
-  stroke-linecap: round;
-  transition: stroke 0.2s;
-}
-
-.sketch-marks line.sketch-inked {
-  stroke: rgba(243, 210, 122, 0.85);
-}
-
-.sketch-ink path {
-  fill: none;
-  stroke: #2a1d3a;
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0.85;
-}
-
-.sketch-done .sketch-ink path {
-  stroke: #f3d27a;
-  filter: drop-shadow(0 0 3px rgba(243, 210, 122, 0.9));
-  transition: stroke 0.3s;
-}
-
-.sketch-smudge {
-  animation: sketch-smudge 0.7s ease-in forwards;
-}
-
-@keyframes sketch-smudge {
-  to {
-    opacity: 0;
-    filter: blur(6px);
-  }
-}
-
-.catch-posed .creature {
-  filter: saturate(0.85) brightness(1.05);
-}
-
-.sketch-patience {
-  width: min(320px, 100%);
-  height: 8px;
-  border-radius: 4px;
-  background: rgba(42, 29, 58, 0.35);
-  overflow: hidden;
-}
-
-.sketch-patience[hidden],
-.sketch-odds[hidden] {
-  display: none;
-}
-
-.sketch-patience-fill {
-  display: block;
-  height: 100%;
-  background: #f3d27a;
-  transform-origin: left;
-}
-
-.sketch-patience-low .sketch-patience-fill {
-  background: #c0533a;
-}
-
-.sketch-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  pointer-events: none;
-}
-
-.sketch-odds {
-  flex: none;
-  padding: 4px 10px;
-  border-radius: 12px;
-  background: rgba(42, 29, 58, 0.6);
-  color: #fff8e1;
-  font-size: 13px;
-  font-weight: bold;
-  white-space: nowrap;
-}
-
 .catch-result {
   position: absolute;
   z-index: 3;
@@ -1516,17 +1040,8 @@ body:has(.catch-scene) .banners {
   font-size: 14px;
 }
 
-.catch-rewards {
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-  color: #4b6a3c;
-  font-weight: bold;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .catch-scene,
-  .sketch-guide-show {
+  .catch-scene {
     animation: none;
   }
 }
@@ -1536,9 +1051,15 @@ body:has(.catch-scene) .banners {
   flex-direction: row;
   align-items: center;
   gap: 12px;
-  width: 100%;
-  max-width: 380px;
-  padding: 4px 10px;
+  width: auto;
+  min-width: 200px;
+  max-width: 300px;
+  padding: 3px 12px 3px 6px;
+  border-radius: 999px;
+}
+
+.hud-bar .hud-value {
+  font-size: 15px;
 }
 
 .hud-level {
@@ -1554,9 +1075,12 @@ body:has(.catch-scene) .banners {
   place-items: center;
   width: 26px;
   height: 26px;
-  border: 2px solid var(--gold);
+  border: 3px solid transparent;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #6b4a2a, var(--leather-dark));
+  /* The rim fills with gold as XP builds toward the next level. */
+  background:
+    radial-gradient(circle at 35% 30%, #6b4a2a, var(--leather-dark)) padding-box,
+    conic-gradient(var(--gold) var(--xp, 0%), rgba(0, 0, 0, 0.5) 0) border-box;
   color: var(--gold);
   font-weight: bold;
   font-size: 13px;
@@ -1564,7 +1088,7 @@ body:has(.catch-scene) .banners {
 }
 
 .hud-xp {
-  display: block;
+  display: none;
   width: 36px;
   height: 4px;
   border-radius: 3px;
@@ -1590,9 +1114,9 @@ body:has(.catch-scene) .banners {
 
 .hud-purse {
   display: flex;
-  flex-direction: column;
-  gap: 0;
-  min-width: 56px;
+  flex-direction: row;
+  gap: 10px;
+  min-width: 0;
   font-variant-numeric: tabular-nums;
   font-weight: bold;
   font-size: 12px;
@@ -1601,7 +1125,9 @@ body:has(.catch-scene) .banners {
 .hud-purse > span {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  color: var(--gold);
+  font-size: 14px;
 }
 
 .hud-purse i {
@@ -1614,11 +1140,6 @@ body:has(.catch-scene) .banners {
 .hud-coin i {
   background: radial-gradient(circle at 35% 30%, #fff1b8, #c99a3a 60%, #8a6420);
   border: 1px solid #5a3e12;
-}
-
-.hud-light i {
-  background: radial-gradient(circle, #ffffff, #9fe3d0 45%, rgba(111, 195, 160, 0));
-  box-shadow: 0 0 6px #9fe3d0;
 }
 
 .blessed .hud-level-num {
@@ -1661,7 +1182,14 @@ body:has(.catch-scene) .banners {
 }
 
 .realm-banner.arrive {
-  animation: banner-unfurl 0.7s ease-out;
+  animation: banner-unfurl 0.7s ease-out, banner-fade 0.6s ease-in 3.9s forwards;
+}
+
+@keyframes banner-fade {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 @keyframes banner-unfurl {
@@ -1723,23 +1251,6 @@ body:has(.catch-scene) .banners {
 }
 
 /* ---- Satchel ---- */
-.satchel-open {
-  width: 56px;
-  height: 56px;
-  padding: 9px;
-  border: 2px solid var(--leather-dark);
-  border-radius: 50%;
-  background: linear-gradient(var(--leather), var(--leather-dark));
-  color: var(--gold);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-
-.satchel-open svg {
-  width: 100%;
-  height: 100%;
-}
-
 .satchel {
   width: min(440px, calc(100vw - 32px));
   max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 48px);
@@ -1874,39 +1385,7 @@ body:has(.catch-scene) .banners {
   cursor: pointer;
 }
 
-.hud-seals i {
-  border-radius: 2px;
-  transform: rotate(45deg) scale(0.85);
-  background: radial-gradient(circle, #f3d27a 30%, #8a2f2f 32%);
-  border: 1px solid #2a1d10;
-}
-
 /* ---- Hearthstead ---- */
-.hearthstead-open {
-  width: 56px;
-  height: 56px;
-  padding: 9px;
-  border: 2px solid var(--leather-dark);
-  border-radius: 50%;
-  background: linear-gradient(var(--leather), var(--leather-dark));
-  color: var(--gold);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-
-.hearthstead-open[hidden] {
-  display: none;
-}
-
-.hearthstead-open svg {
-  width: 100%;
-  height: 100%;
-}
-
-.hearthstead-open.ready {
-  box-shadow: 0 0 0 3px var(--gold), 0 0 14px var(--gold);
-}
-
 .hud-distance {
   position: relative;
 }
@@ -2571,296 +2050,7 @@ body:has(.catch-scene) .banners {
   font: inherit;
 }
 
-/* ---------- Deeds and titles ---------- */
-
-.deeds-button {
-  width: 56px;
-  height: 56px;
-  padding: 8px;
-  border: 2px solid var(--leather-dark);
-  border-radius: 50%;
-  background: linear-gradient(var(--leather), var(--leather-dark));
-  color: var(--gold);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-
-.deeds-button svg {
-  width: 100%;
-  height: 100%;
-}
-
-.deeds-button:not([data-unseen=''])[data-unseen]::after {
-  content: attr(data-unseen);
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border: 2px solid var(--parchment);
-  border-radius: 999px;
-  background: #8e2b22;
-  color: #fdf6e3;
-  font-size: 10px;
-  font-weight: bold;
-  line-height: 14px;
-  text-align: center;
-}
-
-.title-ribbon {
-  margin-top: -6px;
-  padding: 1px 12px 2px;
-  border: 1px solid var(--leather-dark);
-  border-top: 0;
-  border-radius: 0 0 10px 10px;
-  background: linear-gradient(#8e2b22, #6a1d16);
-  color: var(--gold);
-  font-size: 11px;
-  font-style: italic;
-  letter-spacing: 0.05em;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.title-ribbon[hidden] {
-  display: none;
-}
-
-.deed-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 360px;
-  padding: 6px 12px;
-  border: 2px solid var(--gold);
-  border-radius: 12px;
-  background: linear-gradient(var(--leather), var(--leather-dark));
-  color: var(--gold);
-  font: inherit;
-  text-align: left;
-  box-shadow: 0 0 0 3px rgba(243, 210, 122, 0.25), 0 6px 18px rgba(0, 0, 0, 0.5);
-  animation: deed-unroll 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
-  transition: opacity 0.4s, transform 0.4s;
-  cursor: pointer;
-}
-
-.deed-banner .deed-medal {
-  width: 38px;
-  height: 38px;
-  animation: deed-spin 0.9s ease-out;
-}
-
-.deed-banner-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.deed-banner-text small {
-  font-size: 11px;
-  font-variant: small-caps;
-  letter-spacing: 0.12em;
-  opacity: 0.85;
-}
-
-.deed-banner-text b {
-  font-size: 16px;
-}
-
-.deed-banner-text span {
-  color: #f0e4c4;
-  font-size: 13px;
-}
-
-.deed-banner-out {
-  opacity: 0;
-  transform: translateY(-12px);
-}
-
-@keyframes deed-unroll {
-  from {
-    transform: scaleY(0.2) translateY(-20px);
-    opacity: 0;
-  }
-}
-
-@keyframes deed-spin {
-  from {
-    transform: rotateY(540deg) scale(0.4);
-  }
-}
-
-.deed-medal {
-  flex: none;
-  width: 40px;
-  height: 40px;
-}
-
-.deed-medal svg {
-  width: 100%;
-  height: 100%;
-}
-
-.deeds-summary {
-  margin: 0 0 8px;
-  font-style: italic;
-}
-
-.deeds-hint {
-  margin: 0 0 8px;
-  font-size: 14px;
-}
-
-.title-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.title-chip {
-  min-height: 36px;
-  padding: 4px 12px;
-  border: 1px solid var(--leather);
-  border-radius: 999px;
-  background: rgba(255, 250, 235, 0.6);
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-  font-style: italic;
-  cursor: pointer;
-}
-
-.title-chip[aria-checked='true'] {
-  border-color: var(--leather-dark);
-  background: linear-gradient(#8e2b22, #6a1d16);
-  color: var(--gold);
-}
-
-.deed-group h3 {
-  margin: 14px 0 6px;
-  font-variant: small-caps;
-  letter-spacing: 0.04em;
-}
-
-.deed-group h3 small {
-  font-weight: normal;
-  opacity: 0.7;
-}
-
-.deed-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.deed {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px dashed rgba(74, 51, 32, 0.3);
-}
-
-.deed:not(.deed-earned) .deed-text b {
-  opacity: 0.75;
-}
-
-.deed-text {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  font-size: 14px;
-}
-
-.deed-text small {
-  opacity: 0.75;
-}
-
-.deed-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 3px;
-}
-
-.deed-track {
-  flex: 1;
-  height: 6px;
-  overflow: hidden;
-  border-radius: 3px;
-  background: rgba(74, 51, 32, 0.2);
-}
-
-.deed-fill {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, #9a7212, var(--gold));
-}
-
-.deed-reward {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  max-width: 34%;
-  text-align: right;
-}
-
-.deed-reward small {
-  font-size: 11px;
-  opacity: 0.7;
-}
-
-.deed-title-tag {
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: #8e2b22;
-  color: #fdf6e3;
-  font-size: 11px;
-  font-style: italic;
-}
-
-.deed-secret .deed-text {
-  font-style: italic;
-  opacity: 0.7;
-}
-
 /* ---- Glyphwalking and the Inked Demesne ---- */
-.demesne-open {
-  width: 56px;
-  height: 56px;
-  padding: 8px;
-  border: 2px solid var(--leather-dark);
-  border-radius: 50%;
-  background: linear-gradient(var(--leather), var(--leather-dark));
-  color: var(--gold);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-
-.demesne-open svg {
-  width: 100%;
-  height: 100%;
-}
-
-.demesne-open.ready {
-  box-shadow: 0 0 0 3px var(--gold), 0 0 14px var(--gold);
-}
-
-.demesne-open.fading::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--leather-dark);
-  border-radius: 50%;
-  background: #b4442f;
-}
-
 .toast-glyph {
   float: left;
   margin: -2px 10px -2px 0;
@@ -3101,64 +2291,6 @@ body:has(.catch-scene) .banners {
   }
 }
 
-.attacks {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.attacks > .btn-primary {
-  grid-column: 1 / -1;
-}
-
-.attack {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  min-height: 72px;
-  padding: 6px;
-  border-left: 6px solid var(--el, var(--leather));
-  text-align: left;
-}
-
-.attack-name {
-  font-size: 14px;
-  line-height: 1.15;
-}
-
-.attack-blurb {
-  font-size: 11px;
-  font-weight: normal;
-  line-height: 1.2;
-  opacity: 0.8;
-}
-
-.attack:disabled {
-  opacity: 0.55;
-}
-
-.attack-strong:not(:disabled) {
-  box-shadow: 0 2px 0 var(--leather-dark), 0 0 0 2px #4b6a3c;
-}
-
-.edge {
-  align-self: flex-start;
-  padding: 0 5px;
-  border-radius: 6px;
-  font-size: 11px;
-}
-
-.edge-strong {
-  background: #4b6a3c;
-  color: #fff8e6;
-}
-
-.edge-weak {
-  background: #8e2b22;
-  color: #fff8e6;
-}
-
 .bench-pet {
   position: relative;
 }
@@ -3238,105 +2370,11 @@ body:has(.catch-scene) .banners {
   line-height: 1.9;
 }
 
-/* The ⚔ map button and the Blotspawn board. */
-
-.fight-button {
-  border: 2px solid var(--leather-dark);
-  border-radius: 50%;
-  background: linear-gradient(var(--leather), var(--leather-dark));
-  color: var(--parchment);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-
-.fight-button svg {
-  width: 100%;
-  height: 100%;
-}
-
-.fight-button.fight-ready {
-  color: var(--gold);
-  animation: fight-glow 1.6s ease-in-out infinite;
-}
-
-@keyframes fight-glow {
+/* A glow that fades a ring in and out, cheaper than animating a box-shadow. */
+@keyframes ring-glow {
   50% {
-    box-shadow: 0 0 0 6px rgba(142, 43, 34, 0.35), 0 3px 10px rgba(0, 0, 0, 0.35);
+    opacity: 1;
   }
-}
-
-.fight-button:not([data-count=''])[data-count]::after {
-  content: attr(data-count);
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border-radius: 10px;
-  background: #8e2b22;
-  color: #fff8e6;
-  font-size: 12px;
-  font-weight: bold;
-  line-height: 20px;
-  text-align: center;
-}
-
-.foe-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0 0 10px;
-  padding: 0;
-  list-style: none;
-}
-
-.foe-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px;
-  border: 1px solid var(--leather);
-  border-radius: 12px;
-  background: rgba(255, 248, 230, 0.5);
-}
-
-.foe-row .creature {
-  flex: none;
-  width: 56px;
-  height: 56px;
-}
-
-.foe-rare {
-  border-color: #c99a3a;
-  box-shadow: inset 0 0 0 1px #f3d27a;
-}
-
-.foe-elite {
-  border: 2px solid #8e2b22;
-}
-
-.foe-far {
-  opacity: 0.75;
-}
-
-.foe-info {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  font-size: 14px;
-}
-
-.foe-meta,
-.foe-traits,
-.foe-dist {
-  font-size: 12px;
-}
-
-.foe-dist {
-  opacity: 0.75;
 }
 
 /* Blotspawn on the map sit in a pool of spilled ink, so they read as foes at a glance. */
@@ -3373,7 +2411,7 @@ body:has(.catch-scene) .banners {
 }
 
 @media (max-width: 360px) {
-  .attack-blurb {
+  .cmd-sub {
     font-size: 10px;
   }
 
@@ -3410,4 +2448,635 @@ body:has(.catch-scene) .banners {
   .map-resident .creature {
     animation: none;
   }
+}
+
+/* ---------- Battle command panel, timing sweep and turns ---------- */
+
+.cmd-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  transition: opacity 0.2s;
+}
+
+.cmd-panel.cmd-waiting {
+  opacity: 0.6;
+}
+
+.cmd-section[hidden] {
+  display: none;
+}
+
+.cmd-title {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.cmd-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.cmd {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 2px;
+  min-height: 64px;
+  padding: 6px 6px 6px 9px;
+  overflow: hidden;
+  border: 2px solid var(--leather-dark);
+  border-left: 6px solid var(--el, var(--leather));
+  border-radius: 12px;
+  background: var(--parchment);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  box-shadow: 0 2px 0 var(--leather-dark);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.cmd:active:not(:disabled) {
+  translate: 0 2px;
+  box-shadow: none;
+}
+
+.cmd:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.cmd-way {
+  --el: #b8902a;
+  background: linear-gradient(#f6e7c4, #ead6a6);
+}
+
+.cmd-name {
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1.15;
+}
+
+.cmd-sub {
+  font-size: 11px;
+  line-height: 1.2;
+  opacity: 0.8;
+}
+
+.cmd-strong:not(:disabled) {
+  box-shadow: 0 2px 0 var(--leather-dark), 0 0 0 2px #4b6a3c;
+}
+
+/* The timing sweep runs on a bar over the log, right above the attacks and clear of the thumb. */
+.log-wrap {
+  position: relative;
+}
+
+.sweep-bar {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 4px 6px;
+  border-radius: 12px;
+  background: var(--parchment);
+  touch-action: manipulation;
+}
+
+.sweep-bar.sweeping {
+  display: flex;
+}
+
+.cmd.sweeping {
+  opacity: 1;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(243, 210, 122, 0.7);
+}
+
+.sweep-track {
+  position: relative;
+  display: block;
+  height: 18px;
+  border-radius: 9px;
+  background: rgba(59, 42, 26, 0.25);
+}
+
+.sweep-zone {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: calc(var(--sweet) - 9%);
+  width: 18%;
+  border-radius: 9px;
+  background: var(--gold);
+  box-shadow: 0 0 10px var(--gold);
+}
+
+/* Spans the track so translateX(100%) carries the needle to the far end. */
+.sweep-runner {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.sweep-needle {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  left: 0;
+  width: 5px;
+  margin-left: -2px;
+  border-radius: 3px;
+  background: #8e2b22;
+}
+
+.sweep-hint {
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.sweep-perfect .sweep-zone {
+  background: #fff4c2;
+  box-shadow: 0 0 16px #f3d27a;
+}
+
+.sweep-miss .sweep-zone {
+  opacity: 0.35;
+}
+
+.battle-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.battle-footer .wheel-help {
+  flex: 1;
+  margin-top: 8px;
+}
+
+.btn-flee[hidden] {
+  display: none;
+}
+
+.btn-continue {
+  width: 100%;
+}
+
+/* Whose turn it is: a banner over the arena and a glow under whoever acts. */
+.turn-banner {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  z-index: 1;
+  translate: -50% 0;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: #4b6a3c;
+  color: #fff8e6;
+  font-size: 13px;
+  font-weight: bold;
+  white-space: nowrap;
+  animation: turn-in 0.25s ease-out;
+}
+
+.turn-banner-foe {
+  background: #8e2b22;
+}
+
+.turn-banner[hidden] {
+  display: none;
+}
+
+@keyframes turn-in {
+  from {
+    opacity: 0;
+    scale: 0.8;
+  }
+}
+
+.arena-row-foe {
+  margin-top: 22px;
+}
+
+.fighter::after {
+  content: '';
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  bottom: 2px;
+  z-index: -1;
+  height: 18px;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.turn-pet .fighter-pet::after {
+  opacity: 1;
+  background: radial-gradient(ellipse, rgba(75, 106, 60, 0.6), transparent 70%);
+}
+
+.turn-foe .fighter-foe::after {
+  opacity: 1;
+  background: radial-gradient(ellipse, rgba(142, 43, 34, 0.6), transparent 70%);
+}
+
+/* Lunges peak at the moment of impact, when the target's health drops. */
+.fighter-pet.lunge,
+.fighter-foe.lunge,
+.fighter.cast {
+  transform: none;
+}
+
+.fighter-pet.lunge {
+  animation: lunge-pet 0.42s ease-in-out;
+}
+
+.fighter-foe.lunge {
+  animation: lunge-foe 0.42s ease-in-out;
+}
+
+.fighter.cast {
+  animation: cast 0.42s ease-in-out;
+}
+
+@keyframes lunge-pet {
+  45% {
+    transform: translate(56px, -34px);
+  }
+}
+
+@keyframes lunge-foe {
+  45% {
+    transform: translate(-56px, 34px);
+  }
+}
+
+@keyframes cast {
+  45% {
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 12px #f3d27a);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fighter-pet.lunge,
+  .fighter-foe.lunge,
+  .fighter.cast {
+    animation: none;
+  }
+}
+
+/* Farsight: the 👁 rail button, the pill that says it is on, and the lantern-eye in the middle of the map. */
+
+.farsight-button {
+  border: 2px solid var(--leather-dark);
+  border-radius: 50%;
+  background: var(--parchment);
+  color: var(--leather);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.farsight-button svg {
+  width: 100%;
+  height: 100%;
+}
+
+.farsight-button[aria-pressed='true'] {
+  background: #4b3b6e;
+  color: var(--gold);
+}
+
+.hud > .farsight-pill {
+  pointer-events: auto;
+}
+
+.farsight-pill {
+  max-width: 360px;
+  padding: 4px 10px;
+  border: 1px solid #4b3b6e;
+  border-radius: 999px;
+  background: rgba(75, 59, 110, 0.92);
+  color: #f3e9cf;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.farsight-pill strong {
+  color: var(--gold);
+}
+
+.farsight-pill-x {
+  margin-left: 6px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.farsight-pill[hidden] {
+  display: none;
+}
+
+.farsight-lens {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  border: 2px dashed rgba(75, 59, 110, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(243, 233, 207, 0.6), inset 0 0 18px rgba(75, 59, 110, 0.35);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.farsight-lens::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: #4b3b6e;
+}
+
+.farsight-on .farsight-lens {
+  opacity: 1;
+  animation: farsight-turn 18s linear infinite;
+}
+
+@keyframes farsight-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A faint violet wash says "this is a vision, not where you stand". */
+.farsight-on .parchment-overlay {
+  box-shadow: inset 0 0 120px rgba(75, 59, 110, 0.45);
+}
+
+.curio-marker {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: max(44px, calc(34px * var(--marker-scale, 1)));
+  height: max(44px, calc(34px * var(--marker-scale, 1)));
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+  animation: curio-bob 2.4s ease-in-out infinite;
+}
+
+.curio-marker svg {
+  width: calc(34px * var(--marker-scale, 1));
+  height: calc(34px * var(--marker-scale, 1));
+}
+
+@keyframes curio-bob {
+  50% {
+    translate: 0 -3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .curio-marker,
+  .farsight-on .farsight-lens {
+    animation: none;
+  }
+}
+
+/* ---------- Journal: one sheet with tabs behind the satchel button ---------- */
+
+.journal-open {
+  border: 2px solid var(--leather-dark);
+  border-radius: 50%;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.journal-open svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Something waits inside: a ready building, a full parcel. */
+.journal-open:not([data-badge=''])[data-badge]::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--parchment);
+  border-radius: 50%;
+  background: #8e2b22;
+}
+
+.rail > .hunt-button {
+  height: 52px;
+  padding: 3px 0 2px;
+  border-radius: 22px;
+  font-size: 8.5px;
+}
+
+.rail > .hunt-button svg {
+  width: 30px;
+  height: 30px;
+}
+
+.journal[open] {
+  display: flex;
+  flex-direction: column;
+  max-height: min(680px, calc(100dvh - var(--safe-top) - var(--safe-bottom) - 48px));
+  overflow: hidden;
+}
+
+.journal-head {
+  position: relative;
+  flex: none;
+  padding: 12px 14px 0;
+}
+
+.journal-head h2 {
+  margin: 0 36px 8px 2px;
+  font-size: 19px;
+}
+
+.journal-head .satchel-close {
+  top: 4px;
+  right: 6px;
+}
+
+.journal-tabs {
+  gap: 2px;
+  margin: 0;
+}
+
+.journal-tabs .tab {
+  position: relative;
+  min-height: 36px;
+  padding: 0 4px;
+  font-size: 12.5px;
+}
+
+.journal-tabs .tab[hidden] {
+  display: none;
+}
+
+.journal-tabs .tab:not([data-badge=''])[data-badge]::after {
+  content: attr(data-badge);
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #8e2b22;
+  color: #fdf6e3;
+  font-size: 9px;
+  line-height: 14px;
+}
+
+.journal-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px 16px 18px;
+}
+
+.journal-pane[hidden] {
+  display: none;
+}
+
+.journal-pane > h3:first-child {
+  margin-top: 4px;
+}
+
+.journal-title {
+  margin-bottom: 2px !important;
+  color: #8e2b22;
+  font-style: italic;
+}
+
+.journal-more {
+  margin-top: 14px;
+}
+
+.journal-more > summary {
+  padding: 6px 0;
+  color: var(--leather);
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.journal-more .satchel-unlocks {
+  margin-top: 10px;
+}
+
+.journal-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 6px 10px;
+  border: 1px solid var(--leather);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.25);
+  color: var(--ink);
+  font: inherit;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.journal-link-icon svg {
+  display: block;
+  width: 28px;
+  height: 28px;
+}
+
+.choice-row {
+  display: flex;
+  gap: 6px;
+}
+
+.choice-row button {
+  flex: 1;
+  padding: 8px 4px;
+  border: 1px solid var(--leather);
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.choice-row button[aria-checked='true'] {
+  background: var(--leather);
+  color: var(--gold);
+  font-weight: bold;
+}
+
+/* ---------- A Wildling walking along, deciding whether to stay ---------- */
+
+.map-follower {
+  position: relative;
+  pointer-events: none;
+}
+
+.map-follower[hidden] {
+  display: none;
+}
+
+.map-follower .creature {
+  display: block;
+  width: calc(42px * var(--marker-scale, 1));
+  height: calc(42px * var(--marker-scale, 1));
+  animation: resident-bob 0.9s ease-in-out infinite;
+}
+
+.map-follower-left {
+  position: absolute;
+  left: 50%;
+  bottom: -12px;
+  transform: translateX(-50%);
+  padding: 0 6px;
+  border-radius: 8px;
+  background: rgba(42, 29, 58, 0.75);
+  color: #fff8e1;
+  font-size: 11px;
+  white-space: nowrap;
 }

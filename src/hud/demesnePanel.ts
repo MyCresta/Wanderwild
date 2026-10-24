@@ -16,9 +16,8 @@ import { partyPets } from '../creatures/collection';
 import { getSpecies } from '../creatures/species';
 import { sound } from '../audio/sound';
 import type { GameContext } from '../ui/context';
+import { journal } from '../ui/journal';
 import { formatCount, formatDistance, formatDuration } from './format';
-
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const GLYPH_PICTURES: Record<GlyphKind, string> = {
   ring: glyphSvg({ kind: 'ring', path: Array.from({ length: 12 }, (_, i) => [Math.cos(i / 1.91) * 0.001, Math.sin(i / 1.91) * 0.0006] as [number, number]) }, 40),
@@ -32,11 +31,9 @@ export function formatArea(m2: number): string {
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-/** The Demesne dialog: how to walk glyphs, the parcels held, their residents and Waymarks. */
+/** The journal's Demesne tab: the parcels held, their residents, Waymarks, and how to walk glyphs. */
 export class DemesnePanel {
-  private readonly dialog = $<HTMLDialogElement>('demesne');
-  private readonly body = $('demesne-content');
-  private readonly button = $('demesne-open');
+  private readonly body = journal.pane('demesne');
 
   constructor(
     private readonly game: GameState,
@@ -45,14 +42,15 @@ export class DemesnePanel {
     private readonly trailMetres: () => number,
     private readonly showOnMap: (lng: number, lat: number) => void,
   ) {
-    this.button.addEventListener('click', () => this.open());
-    $('demesne-close').addEventListener('click', () => this.dialog.close());
-    this.dialog.addEventListener('click', (e) => {
-      if (e.target === this.dialog) return this.dialog.close();
+    journal.onShow('demesne', () => {
+      this.game.tickDemesne();
+      this.render();
+    });
+    this.body.addEventListener('click', (e) => {
       const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
       if (el && el.tagName !== 'SELECT') this.act(el);
     });
-    this.dialog.addEventListener('change', (e) => {
+    this.body.addEventListener('change', (e) => {
       const el = e.target as HTMLSelectElement;
       if (el.dataset.act === 'resident' && el.value) {
         this.game.toggleResident(el.dataset.id ?? '', el.value);
@@ -62,7 +60,7 @@ export class DemesnePanel {
     });
     game.on((event) => {
       if (event.kind !== 'change') return;
-      if (this.dialog.open) this.render();
+      if (journal.showing('demesne')) this.render();
       else this.markReady();
     });
     setInterval(() => this.markReady(), 20_000);
@@ -70,10 +68,7 @@ export class DemesnePanel {
   }
 
   open(focusId?: string): void {
-    this.game.tickDemesne();
-    this.render();
-    if (!this.dialog.open) this.dialog.showModal();
-    sound.play('open');
+    journal.open('demesne');
     if (focusId) this.body.querySelector(`[data-parcel="${focusId}"]`)?.scrollIntoView({ block: 'center' });
   }
 
@@ -104,7 +99,7 @@ export class DemesnePanel {
           const w = s.waymarks.find((x) => x.id === id);
           if (w) this.showOnMap(w.lng, w.lat);
         }
-        this.dialog.close();
+        journal.close();
         return;
       case 'release':
         if (parcel && confirm(`Release ${parcel.name}? Its residents come home and anything waiting there is lost.`)) {
@@ -122,8 +117,8 @@ export class DemesnePanel {
   private markReady(): void {
     const s = this.game.save;
     const now = Date.now();
-    this.button.classList.toggle('ready', s.parcels.some((p) => isFull(p, s.leyLines, now) && inkAt(p, now) > 0));
-    this.button.classList.toggle('fading', s.parcels.some((p) => inkAt(p, now) < 0.3));
+    const full = s.parcels.some((p) => isFull(p, s.leyLines, now) && inkAt(p, now) > 0);
+    journal.setBadge('demesne', full || s.parcels.some((p) => inkAt(p, now) < 0.3));
   }
 
   render(): void {
@@ -153,16 +148,17 @@ export class DemesnePanel {
       )
       .join('');
     this.body.innerHTML = `
-      <p class="satchel-hint">Your walks are ink. Walk these shapes and the realm answers. ${trail > 0 ? `Your current trail is ${formatDistance(trail)} long.` : ''}</p>
-      <ul class="glyph-cards">${glyphs}</ul>
+      ${trail > 0 ? `<p class="satchel-hint">Current trail: ${formatDistance(trail)}</p>` : ''}
       <h3>Parcels <small>${s.parcels.length} of ${cap}</small></h3>
-      ${parcels ? `<ul class="buildings">${parcels}</ul>` : '<p class="satchel-hint">Walk a Ring around a block, a park or a pond to claim your first parcel. Each one yields the materials of the realms inside it.</p>'}
+      ${parcels ? `<ul class="buildings">${parcels}</ul>` : '<p class="satchel-hint">Walk a Ring around a block or a park to claim one.</p>'}
       ${anyStored ? '<div class="satchel-actions"><button type="button" data-act="collect-all">Gather everything</button></div>' : ''}
-      <p class="satchel-hint">Ink fades over a week. Walk along a parcel's border to re-ink it; walking half of it fills it back up. A new Ring over a parcel redraws it.</p>
-      <h3>Ley lines <small>${ley.length}</small></h3>
-      ${ley.length ? `<ul class="ley-list">${ley.map((l) => `<li>Hums for ${formatDuration(l.until - now)} · ${s.parcels.filter((p) => leyNear(l, p.centroid)).length} parcels nearby</li>`).join('')}</ul>` : '<p class="satchel-hint">Walk a Stroke to lay one.</p>'}
-      <h3>Waymarks <small>${s.waymarks.length} of 5</small></h3>
-      ${waymarks ? `<ul class="waymark-list">${waymarks}</ul>` : '<p class="satchel-hint">Tie a Knot at a corner to set one. A creature always waits at each Waymark.</p>'}`;
+      ${ley.length ? `<h3>Ley lines <small>${ley.length}</small></h3><ul class="ley-list">${ley.map((l) => `<li>Hums for ${formatDuration(l.until - now)} · ${s.parcels.filter((p) => leyNear(l, p.centroid)).length} parcels nearby</li>`).join('')}</ul>` : ''}
+      ${waymarks ? `<h3>Waymarks <small>${s.waymarks.length} of 5</small></h3><ul class="waymark-list">${waymarks}</ul>` : ''}
+      <details class="journal-more">
+        <summary>How to walk glyphs</summary>
+        <ul class="glyph-cards">${glyphs}</ul>
+        <p class="satchel-hint">Ink fades over a week. Walk half a parcel's border to re-ink it.</p>
+      </details>`;
   }
 
   private parcelHtml(p: Parcel, now: number): string {

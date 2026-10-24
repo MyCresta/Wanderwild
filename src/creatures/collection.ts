@@ -13,8 +13,20 @@ export interface OwnedPet {
   realmWalkM?: number;
   /** Whether it has walked a Ring in its home realm as companion, the last step to evolving. */
   homeRing?: boolean;
-  /** How well it was sketched when it was bound. */
+  /** How well it was sketched when it was bound (from before Wildlings were befriended). */
   sketch?: string;
+}
+
+/** A wild Wildling walking along with the Wayfarer, deciding whether to stay. */
+export interface Follower {
+  spawnId: string;
+  speciesId: string;
+  seed: number;
+  level: number;
+  /** Metres to walk together before it joins. */
+  needM: number;
+  walkedM: number;
+  startedAt: number;
 }
 
 export interface Collection {
@@ -23,21 +35,17 @@ export interface Collection {
   companionUid: string | null;
   /** Up to two more pets that join the companion in battle, by uid. */
   party: string[];
-  /** Binding seals, spent to catch Wildlings and earned by walking and battles. */
-  seals: number;
   /** Species met at least once, for the bestiary. */
   seen: string[];
   /** Spawn ids already caught or beaten, with when each may be forgotten. */
   cleared: Record<string, number>;
-  /** Metres walked toward the next seal and the companion's next walking experience. */
-  sealProgressM: number;
+  /** Metres walked toward the companion's next walking experience. */
   xpProgressM: number;
+  /** The Wildling currently walking along to see if it likes you. */
+  follower?: Follower | null;
 }
 
 const KEY = 'wanderwild.bestiary';
-export const STARTING_SEALS = 10;
-export const MAX_SEALS = 60;
-export const METRES_PER_SEAL = 100;
 export const METRES_PER_WALK_XP = 25;
 
 export const STARTERS = ['bramblet', 'driftfin', 'emberkit'] as const;
@@ -48,10 +56,8 @@ export function emptyCollection(): Collection {
     pets: [],
     companionUid: null,
     party: [],
-    seals: STARTING_SEALS,
     seen: [],
     cleared: {},
-    sealProgressM: 0,
     xpProgressM: 0,
   };
 }
@@ -62,7 +68,9 @@ export function loadCollection(storage: Pick<Storage, 'getItem'> | undefined = g
     if (!raw) return emptyCollection();
     const parsed = JSON.parse(raw) as Partial<Collection>;
     if (parsed.version !== 1) return emptyCollection();
-    return { ...emptyCollection(), ...parsed };
+    // Binding seals were retired when Wildlings started joining by walking together.
+    const { seals: _seals, sealProgressM: _progress, ...rest } = parsed as Partial<Collection> & { seals?: number; sealProgressM?: number };
+    return { ...emptyCollection(), ...rest };
   } catch {
     return emptyCollection();
   }
@@ -135,21 +143,12 @@ export function grantPetXp(pet: OwnedPet, amount: number): number {
   return addXp(pet, amount * trait.xp);
 }
 
-/** Turns walked metres into seals and companion experience. */
-export function walkRewards(c: Collection, metres: number): { seals: number; levels: number } {
-  c.sealProgressM += metres;
+/** Turns walked metres into companion experience. */
+export function walkRewards(c: Collection, metres: number): { levels: number } {
   c.xpProgressM += metres;
-  let seals = 0;
-  while (c.sealProgressM >= METRES_PER_SEAL) {
-    c.sealProgressM -= METRES_PER_SEAL;
-    if (c.seals < MAX_SEALS) {
-      c.seals++;
-      seals++;
-    }
-  }
   const xp = Math.floor(c.xpProgressM / METRES_PER_WALK_XP);
   c.xpProgressM -= xp * METRES_PER_WALK_XP;
   const pet = companion(c);
   const levels = pet && xp > 0 ? grantPetXp(pet, xp) : 0;
-  return { seals, levels };
+  return { levels };
 }

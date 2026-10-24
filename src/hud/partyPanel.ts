@@ -8,7 +8,7 @@ export function renderParty(host: HTMLElement, ctx: GameContext): void {
   const c = ctx.collection;
   const lead = companion(c);
   if (!lead) {
-    host.innerHTML = '<p class="satchel-hint">Bind a Wildling to start your party.</p>';
+    host.innerHTML = '<p class="satchel-hint">Befriend a Wildling to start your party.</p>';
     return;
   }
   const inParty = new Set(partyPets(c).map((p) => p.uid));
@@ -34,5 +34,5 @@ export function renderParty(host: HTMLElement, ctx: GameContext): void {
     list.append(li);
   }
   host.replaceChildren(list);
-  host.insertAdjacentHTML('beforeend', '<p class="satchel-hint">Your companion leads. Tap up to two more to fight beside it; the bench learns at half XP.</p>');
+  host.insertAdjacentHTML('beforeend', '<p class="satchel-hint">Tap up to two more to fight beside your companion.</p>');
 }

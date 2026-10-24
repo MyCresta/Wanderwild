@@ -33,7 +33,7 @@ export const SLOT_DEFS: Record<Slot, SlotDef> = {
   cloak: { name: 'Cloak', material: 'mistwool', effect: (p) => `${pct(p * PER_POWER.cloak)} party health` },
   boots: { name: 'Boots', material: 'cobbleOre', effect: (p) => `${pct(p * PER_POWER.boots)} stride boost and Wanderlight` },
   lantern: { name: 'Lantern', material: 'gravemoss', effect: (p) => `+${Math.round(p * PER_POWER.lantern)} m reach` },
-  charm: { name: 'Charm', material: 'shrineRelic', effect: (p) => `${pct(p * PER_POWER.charm)} catch chance` },
+  charm: { name: 'Charm', material: 'shrineRelic', effect: (p) => `${pct(p * PER_POWER.charm)} shorter walk to befriend` },
 };
 
 export const RARITIES: Record<GearRarity, { name: string; power: number; color: string }> = {

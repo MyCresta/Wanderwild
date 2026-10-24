@@ -4,33 +4,26 @@ import type { GameState } from '../game/state';
 import { nextUnlock, UNLOCKS } from '../game/wayfarer';
 import { sound } from '../audio/sound';
 import { glyphSvg } from '../game/glyphs';
+import { journal } from '../ui/journal';
 import { formatCount, formatDistance, formatDuration } from './format';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-/** Top bar, realm banner, reward toasts and the satchel panel. */
+/** Top bar, realm banner, reward toasts, and the journal's Wayfarer and settings tabs. */
 export class Hud {
   private readonly levelEl = $('level');
   private readonly xpBar = $('xp-bar');
   private readonly distanceEl = $('distance');
   private readonly coinEl = $('coin');
-  private readonly lightEl = $('wanderlight');
   private readonly realmEl = $('realm');
   private readonly toastEl = $('toast');
-  private readonly satchel = $<HTMLDialogElement>('satchel');
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
+  private realmTimer: ReturnType<typeof setTimeout> | undefined;
   private realm: RealmId | undefined;
 
   constructor(private readonly game: GameState) {
-    $('satchel-open').addEventListener('click', () => {
-      this.renderSatchel();
-      this.satchel.showModal();
-      sound.play('open');
-    });
-    $('satchel-close').addEventListener('click', () => this.satchel.close());
-    this.satchel.addEventListener('click', (e) => {
-      if (e.target === this.satchel) this.satchel.close(); // Tap on the backdrop.
-    });
+    journal.onShow('wayfarer', () => this.renderSatchel());
+    this.setupSoundChoice();
     $('save-export').addEventListener('click', () => this.exportFile());
     const fileInput = $<HTMLInputElement>('save-file');
     $('save-import').addEventListener('click', () => fileInput.click());
@@ -67,30 +60,32 @@ export class Hud {
     const s = this.game.save;
     const lvl = this.game.level;
     this.levelEl.textContent = String(lvl.level);
-    this.xpBar.style.width = lvl.needed ? `${(100 * lvl.into) / lvl.needed}%` : '100%';
+    const xp = lvl.needed ? `${(100 * lvl.into) / lvl.needed}%` : '100%';
+    this.xpBar.style.width = xp;
+    this.levelEl.style.setProperty('--xp', xp);
     this.xpBar.parentElement?.setAttribute('aria-label', `${formatCount(lvl.into)} of ${formatCount(lvl.needed)} XP`);
     this.distanceEl.textContent = formatDistance(s.distanceMetres);
     this.coinEl.textContent = formatCount(s.currencies.coin);
-    this.lightEl.textContent = formatCount(s.currencies.wanderlight);
     document.body.classList.toggle('blessed', this.game.isBlessed());
-    if (this.satchel.open) this.renderSatchel();
+    if (journal.showing('wayfarer')) this.renderSatchel();
   }
 
+  /** Unfurls the realm's name for a few seconds when the Wayfarer walks into it. */
   setRealm(realm: RealmId | undefined): void {
     if (realm === this.realm) return;
     const first = this.realm === undefined;
     this.realm = realm;
+    clearTimeout(this.realmTimer);
     this.realmEl.hidden = !realm;
     if (!realm) return;
     const r = REALMS[realm];
     this.realmEl.style.setProperty('--realm', r.color);
     this.realmEl.innerHTML = `<b>${r.name[0].toUpperCase()}${r.name.slice(1)}</b><span>${r.flavour}</span>`;
-    if (!first) {
-      sound.play('realm');
-      this.realmEl.classList.remove('arrive');
-      void this.realmEl.offsetWidth; // Restart the arrival animation.
-      this.realmEl.classList.add('arrive');
-    }
+    if (!first) sound.play('realm');
+    this.realmEl.classList.remove('arrive');
+    void this.realmEl.offsetWidth; // Restart the arrival animation.
+    this.realmEl.classList.add('arrive');
+    this.realmTimer = setTimeout(() => (this.realmEl.hidden = true), 4500);
   }
 
   private stridePop(ms: number): void {
@@ -115,27 +110,42 @@ export class Hud {
     const s = this.game.save;
     const lvl = this.game.level;
     const next = nextUnlock(lvl.level);
-    $('satchel-level').textContent = `Wayfarer level ${lvl.level}`;
+    journal.setTitle(`Wayfarer level ${lvl.level}`);
     $('satchel-xp').textContent = lvl.needed
       ? `${formatCount(lvl.into)} / ${formatCount(lvl.needed)} XP to level ${lvl.level + 1}`
       : 'Highest level reached';
-    $('satchel-next').textContent = next ? `Next: ${next.what} at level ${next.level}` : 'Everything unlocked';
+    $('satchel-next').textContent = next ? `Next at level ${next.level}: ${next.what}` : 'Everything unlocked';
     $('satchel-unlocks').innerHTML = UNLOCKS.map(
       (u) =>
         `<li class="${u.level <= lvl.level ? 'open' : ''}"><span>${u.level}</span>${u.what}</li>`,
     ).join('');
 
+    // Only what is actually in the satchel; the empty slots were noise.
     const mats = (Object.keys(MATERIALS) as MaterialId[])
-      .map((id) => `<li><b>${formatCount(s.materials[id] ?? 0)}</b> ${MATERIALS[id].name}<small>${MATERIALS[id].from}</small></li>`)
+      .filter((id) => (s.materials[id] ?? 0) > 0)
+      .map((id) => `<li title="${MATERIALS[id].from}"><b>${formatCount(s.materials[id] ?? 0)}</b> ${MATERIALS[id].name}</li>`)
       .join('');
     $('satchel-materials').innerHTML = `
-      <li><b>${formatCount(s.currencies.coin)}</b> Coin<small>from everything</small></li>
-      <li><b>${formatCount(s.currencies.wanderlight)}</b> Wanderlight<small>only from walking</small></li>
+      <li><b>${formatCount(s.currencies.coin)}</b> Coin</li>
+      <li title="Only from walking"><b>${formatCount(s.currencies.wanderlight)}</b> Wanderlight</li>
       ${mats}`;
     $('satchel-stats').innerHTML = `
       <li><b>${formatDistance(s.distanceMetres)}</b> wandered</li>
       <li><b>${formatCount(s.shrinesVisited)}</b> shrine visits</li>
       <li><b>${formatCount(s.visitedCells.length)}</b> map squares walked</li>`;
+  }
+
+  private setupSoundChoice(): void {
+    const row = $('sound-choice');
+    const render = (mode: string) => {
+      for (const b of row.querySelectorAll<HTMLButtonElement>('button')) b.setAttribute('aria-checked', String(b.dataset.mode === mode));
+    };
+    row.addEventListener('click', (e) => {
+      const mode = (e.target as HTMLElement).closest<HTMLButtonElement>('button')?.dataset.mode;
+      if (mode) sound.setMode(mode as typeof sound.mode);
+    });
+    sound.onModeChange(render);
+    render(sound.mode);
   }
 
   private exportFile(): void {
