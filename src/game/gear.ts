@@ -29,7 +29,7 @@ export const PER_POWER = { staff: 0.04, cloak: 0.05, boots: 0.05, lantern: 8, ch
 const pct = (x: number) => `+${Math.round(x * 100)}%`;
 
 export const SLOT_DEFS: Record<Slot, SlotDef> = {
-  staff: { name: 'Staff', material: 'ironbark', effect: (p) => `${pct(p * PER_POWER.staff)} pet damage, Fireball` },
+  staff: { name: 'Staff', material: 'ironbark', effect: (p) => `${pct(p * PER_POWER.staff)} pet damage` },
   cloak: { name: 'Cloak', material: 'mistwool', effect: (p) => `${pct(p * PER_POWER.cloak)} party health` },
   boots: { name: 'Boots', material: 'cobbleOre', effect: (p) => `${pct(p * PER_POWER.boots)} stride boost and Wanderlight` },
   lantern: { name: 'Lantern', material: 'gravemoss', effect: (p) => `+${Math.round(p * PER_POWER.lantern)} m reach` },

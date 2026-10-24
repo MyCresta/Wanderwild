@@ -1,4 +1,5 @@
-import { matchup } from './elements';
+import { beatenBy, matchup } from './elements';
+import { HERO_SPELLS, type HeroPower, type HeroSpellId } from '../game/hero';
 import { FOE_TRAITS, foeScale, type FoeTrait, type Rank } from './foes';
 import type { Rng } from './rng';
 import type { Element, Species } from './species';
@@ -39,15 +40,13 @@ export function makeFighter(
 export type Side = 'pet' | 'foe';
 /** The three attacks every pet knows: a plain Strike, its element move, and its element's art. */
 export type Attack = 'strike' | 'move' | 'art';
-export type SpellId = 'fireball' | 'mending';
 
 export type Action =
   | { kind: Attack; /** 0..1 from the timing ring; 1 is a perfect tap. */ quality?: number }
   | { kind: 'swap'; to: number }
-  | { kind: 'tonic' }
-  | { kind: 'spell'; spell: SpellId };
+  | { kind: 'tonic' };
 
-export type StatusKind = 'guard' | 'dodge' | 'focus' | 'burn' | 'ward-break';
+export type StatusKind = 'guard' | 'dodge' | 'focus' | 'burn' | 'ward-break' | 'hex' | 'howl';
 
 /** Everyone's health right after an event, so the screen can show each blow as it lands. */
 export interface HpSnap {
@@ -75,8 +74,9 @@ export type BattleEvent = (
   | { kind: 'reflect'; damage: number }
   | { kind: 'leech'; amount: number }
   | { kind: 'swap'; to: number }
-  | { kind: 'heal'; targets: number[]; amount: number; source: 'tonic' | 'mending' | 'art' }
-  | { kind: 'fireball'; damage: number }
+  | { kind: 'heal'; targets: number[]; amount: number; source: 'tonic' | 'art' }
+  /** The hero's spell: damage to the foe, health back to `targets`, or neither for a blessing or curse. */
+  | { kind: 'spell'; spell: HeroSpellId; damage?: number; amount?: number; targets?: number[] }
   | { kind: 'faint'; index: number }
 ) & { hp?: HpSnap };
 
@@ -94,7 +94,13 @@ const FOE_CRIT_CHANCE = 0.06;
 export const PARTY_SIZE = 3;
 /** A tonic heals a set amount of health; upgrades raise it through `tonicPower`. */
 export const TONIC_HEAL = 35;
-export const MENDING_HEAL = 0.35;
+export const MENDING_HEAL = 0.2;
+const HEX_TURNS = 3;
+const HEX_SOFTEN = 0.7;
+const HOWL_TURNS = 3;
+const HOWL_POWER = 1.3;
+const WHEELBOLT_POWER = 1.1;
+const STARFALL_POWER = 2.2;
 const BURN_TURNS = 3;
 const BURN_SHARE = 0.07;
 const LEECH_SHARE = 0.4;
@@ -109,20 +115,13 @@ export const ARTS: Record<Element, { name: string; blurb: string }> = {
   lumen: { name: 'Glimmer', blurb: 'Marks the weak spot: the next attack is critical.' },
 };
 
-/** Wayfarer spells, charged by walking since the last time they were cast. */
-export const SPELLS: Record<SpellId, { name: string; metres: number; blurb: string }> = {
-  fireball: { name: 'Fireball', metres: 300, blurb: 'Hurls fire that ignores defence.' },
-  mending: { name: 'Mending', metres: 500, blurb: 'Heals the whole party.' },
-};
-
-export const fireballDamage = (wayfarerLevel: number) => 18 + 4 * wayfarerLevel;
-
 export interface BattleOptions {
   rng?: Rng;
-  wayfarerLevel?: number;
-  /** Gear multipliers on the party's attack (and Fireball) and health. */
+  /** Gear multipliers on the party's attack and health. */
   petDamage?: number;
   petHealth?: number;
+  /** The hero fighting beside the party: stat boosts, talents and spells. */
+  hero?: HeroPower;
   /** Share of health each party member starts with (0..1), from lasting damage. Full when absent. */
   vigor?: number[];
   /** Multiplier on what a tonic heals, for upgrades. */
@@ -146,8 +145,8 @@ interface Guard {
 
 /**
  * A quick turn-based fight between a party of up to three pets and one Blotspawn.
- * Each turn the active pet strikes, uses its element move or art, swaps out, drinks a
- * tonic or the Wayfarer casts a spell; then the foe answers. The foe strikes twice and
+ * Each turn the hero may cast one spell, then the active pet strikes, uses its element
+ * move or art, swaps out or drinks a tonic; then the foe answers. The foe strikes twice and
  * then unleashes a big element attack, always announced a turn ahead.
  */
 export class Battle {
@@ -163,29 +162,35 @@ export class Battle {
   burn = 0;
   /** Warded foes halve damage until hit with their weakness. */
   wardUp: boolean;
+  /** Foe turns left under a Hex, and party turns left under a Pack Howl. */
+  hex = 0;
+  howl = 0;
+  /** The hero has cast this turn; one spell per turn. */
+  cast = false;
+  readonly hero: HeroPower | undefined;
   private foeTurns = 0;
   private readonly rng: Rng;
-  private readonly wayfarerLevel: number;
-  private readonly petDamage: number;
   readonly tonicHeal: number;
 
   constructor(
     readonly party: Fighter[],
     readonly foe: Fighter,
-    { rng = Math.random, wayfarerLevel = 1, petDamage = 1, petHealth = 1, vigor, tonicPower = 1 }: BattleOptions = {},
+    { rng = Math.random, petDamage = 1, petHealth = 1, hero, vigor, tonicPower = 1 }: BattleOptions = {},
   ) {
     this.rng = rng;
-    this.wayfarerLevel = wayfarerLevel;
-    this.petDamage = petDamage;
+    this.hero = hero;
     this.tonicHeal = Math.round(TONIC_HEAL * tonicPower);
     this.cooldowns = party.map(() => ({ move: 0, art: 0 }));
     this.wardUp = foe.traits.includes('warded');
+    const damage = petDamage * (hero?.damage ?? 1);
+    const health = petHealth * (hero?.health ?? 1);
     for (const f of party) {
-      f.atk = Math.round(f.atk * petDamage);
+      f.atk = Math.round(f.atk * damage);
       const full = f.hp === f.maxHp;
-      f.maxHp = Math.round(f.maxHp * petHealth);
+      f.maxHp = Math.round(f.maxHp * health);
       if (full) f.hp = f.maxHp;
     }
+    if (hero?.openingGuard) this.guard = { turns: 1, through: 0.5, reflect: 0 };
     vigor?.forEach((v, i) => {
       const f = party[i];
       if (f) f.hp = Math.max(0, Math.min(f.maxHp, Math.round(f.maxHp * v)));
@@ -209,13 +214,109 @@ export class Battle {
     return this.foe.rank === 'boss' && this.foe.hp * 2 < this.foe.maxHp;
   }
 
+  /** The timing quality a crit needs; Beastcaller talents widen the mark. */
+  get critAt(): number {
+    return CRIT_QUALITY - (this.hero?.critEase ?? 0);
+  }
+
+  private get artCooldown(): number {
+    return Math.max(1, ART_COOLDOWN - (this.hero?.artHaste ?? 0));
+  }
+
+  /**
+   * What a damage spell deals now. It is drawn from the pet in front's strength, so the
+   * hero's magic grows with the party instead of outpacing every foe.
+   */
+  spellDamage(spell: HeroSpellId): number {
+    const eff = spell === 'starfall' ? 1 : matchup(beatenBy(this.foe.species.element), this.foe.species.element);
+    const power = spell === 'starfall' ? STARFALL_POWER : WHEELBOLT_POWER;
+    return Math.round(damage(this.pet.atk, this.foe.def, power, eff, 0.5, false) * PACE * (this.hero?.spellPower ?? 1));
+  }
+
+  /** True when the hero could cast this spell right now (mana aside). */
+  canCast(spell: HeroSpellId): boolean {
+    if (this.winner || this.cast || this.mustSwap || !this.hero?.spells.includes(spell)) return false;
+    const pet = this.pet;
+    if (spell === 'secondWind') return pet.hp < pet.maxHp;
+    if (spell === 'mending') return this.party.some((f) => f.hp > 0 && f.hp < f.maxHp);
+    if (spell === 'wildcall') return this.cooldowns[this.active].move > 0 || this.cooldowns[this.active].art > 0;
+    return true;
+  }
+
+  /**
+   * The hero's spell for this turn. It costs no turn: the pet still acts after it, and the
+   * foe does not answer the spell itself.
+   */
+  castSpell(spell: HeroSpellId): BattleEvent[] {
+    if (!this.canCast(spell)) return [];
+    this.cast = true;
+    const power = (this.hero?.spellPower ?? 1) * (this.hero?.healing ?? 1);
+    const name = HERO_SPELLS[spell].name;
+    const events: BattleEvent[] = [];
+    switch (spell) {
+      case 'mending': {
+        const targets = this.party.map((f, i) => (f.hp > 0 ? i : -1)).filter((i) => i >= 0);
+        const amount = this.restore(targets, (f) => f.maxHp * MENDING_HEAL * power);
+        events.push(this.snap({ kind: 'spell', spell, amount, targets }));
+        break;
+      }
+      case 'secondWind': {
+        const amount = this.restore([this.active], (f) => f.maxHp);
+        events.push(this.snap({ kind: 'spell', spell, amount, targets: [this.active] }));
+        break;
+      }
+      case 'aegis':
+        this.guard = { turns: 2, through: 0.5, reflect: 0 };
+        events.push({ kind: 'spell', spell }, { kind: 'status', target: 'pet', status: 'guard', name });
+        break;
+      case 'wheelbolt':
+      case 'starfall': {
+        const dmg = this.spellDamage(spell);
+        this.foe.hp = Math.max(0, this.foe.hp - dmg);
+        events.push(this.snap({ kind: 'spell', spell, damage: dmg }));
+        // Wheelbolt always strikes the weakness, so it shatters a ward.
+        if (spell === 'wheelbolt' && this.wardUp) {
+          this.wardUp = false;
+          events.push({ kind: 'status', target: 'foe', status: 'ward-break', name: FOE_TRAITS.warded.name });
+        }
+        this.foeDown();
+        break;
+      }
+      case 'hex':
+        this.hex = HEX_TURNS;
+        events.push({ kind: 'spell', spell }, { kind: 'status', target: 'foe', status: 'hex', name });
+        break;
+      case 'frenzy':
+        this.focus = true;
+        events.push({ kind: 'spell', spell }, { kind: 'status', target: 'pet', status: 'focus', name });
+        break;
+      case 'wildcall':
+        this.cooldowns[this.active] = { move: 0, art: 0 };
+        events.push({ kind: 'spell', spell });
+        break;
+      case 'packHowl':
+        this.howl = HOWL_TURNS;
+        events.push({ kind: 'spell', spell }, { kind: 'status', target: 'pet', status: 'howl', name });
+        break;
+    }
+    return events;
+  }
+
+  /** Gives health back to party members, capped at full. Returns the total restored. */
+  private restore(targets: number[], amount: (f: Fighter) => number): number {
+    let total = 0;
+    for (const i of targets) {
+      const f = this.party[i];
+      const add = Math.min(f.maxHp - f.hp, Math.round(amount(f)));
+      f.hp += add;
+      total += add;
+    }
+    return total;
+  }
+
   /** Stamps an event with everyone's health as it stands now. */
   private snap<E extends BattleEvent>(e: E): E {
     return { ...e, hp: { foe: this.foe.hp, party: this.party.map((f) => f.hp) } };
-  }
-
-  get fireball(): number {
-    return Math.round(fireballDamage(this.wayfarerLevel) * this.petDamage);
   }
 
   get pet(): Fighter {
@@ -262,10 +363,10 @@ export class Battle {
     const elemental = action !== 'strike';
     let eff = elemental ? matchup(pet.species.element, this.foe.species.element) : 1;
     const timed = action !== 'art';
-    const crit = this.focus || (timed && quality >= CRIT_QUALITY);
+    const crit = this.focus || (timed && quality >= this.critAt);
     this.focus = false;
     // A well-timed tap also nudges damage up; a missed one still lands.
-    const timing = timed ? 0.85 + 0.15 * Math.min(1, quality / CRIT_QUALITY) : 1;
+    const timing = timed ? 0.85 + 0.15 * Math.min(1, quality / this.critAt) : 1;
     const events: BattleEvent[] = [];
     let warded = false;
     if (this.wardUp) {
@@ -277,7 +378,8 @@ export class Battle {
         eff *= 0.5;
       }
     }
-    const dmg = Math.max(1, Math.round(damage(pet.atk, this.foe.def, power, eff, this.rng(), crit) * timing * PACE));
+    const howl = this.howl > 0 ? HOWL_POWER : 1;
+    const dmg = Math.max(1, Math.round(damage(pet.atk, this.foe.def, power, eff, this.rng(), crit) * timing * howl * PACE));
     this.foe.hp = Math.max(0, this.foe.hp - dmg);
     const name = action === 'move' ? pet.species.move : action === 'art' ? ARTS[pet.species.element].name : 'Strike';
     events.unshift(this.snap({ kind: 'hit', attacker: 'pet', action, name, damage: dmg, effectiveness: elemental ? matchup(pet.species.element, this.foe.species.element) : 1, crit, warded }));
@@ -317,7 +419,7 @@ export class Battle {
   }
 
   /** Heals each target by a share of its health, or by a flat amount when `flat` is given. */
-  private heal(targets: number[], fraction: number, source: 'tonic' | 'mending', flat?: number): BattleEvent {
+  private heal(targets: number[], fraction: number, source: 'tonic', flat?: number): BattleEvent {
     let amount = 0;
     for (const i of targets) {
       const f = this.party[i];
@@ -353,7 +455,9 @@ export class Battle {
     }
     const eff = intent.element ? matchup(intent.element, pet.species.element) : 1;
     const crit = this.rng() < FOE_CRIT_CHANCE;
-    const raw = Math.max(1, Math.round(damage(this.foe.atk, pet.def, intent.big ? BIG_POWER : 1, eff, this.rng(), crit) * FOE_PACE));
+    const soften = this.hex > 0 ? HEX_SOFTEN : 1;
+    if (this.hex > 0) this.hex--;
+    const raw = Math.max(1, Math.round(damage(this.foe.atk, pet.def, intent.big ? BIG_POWER : 1, eff, this.rng(), crit) * soften * FOE_PACE));
     const guard = this.guard;
     const dmg = guard ? Math.max(1, Math.round(raw * guard.through)) : raw;
     pet.hp = Math.max(0, pet.hp - dmg);
@@ -399,7 +503,7 @@ export class Battle {
         else events.push(...this.petHit(kind, kind === 'move' ? MOVE_POWER : 1, action.quality ?? 0.5));
         this.tick();
         if (kind === 'move') cd.move = MOVE_COOLDOWN;
-        if (kind === 'art') cd.art = ART_COOLDOWN;
+        if (kind === 'art') cd.art = this.artCooldown;
         break;
       }
       case 'swap':
@@ -411,18 +515,8 @@ export class Battle {
         events.push(this.heal([this.active], 0, 'tonic', this.tonicHeal));
         this.tick();
         break;
-      case 'spell':
-        if (action.spell === 'fireball') {
-          const dmg = this.fireball;
-          this.foe.hp = Math.max(0, this.foe.hp - dmg);
-          events.push(this.snap({ kind: 'fireball', damage: dmg }));
-        } else {
-          const standing = this.party.map((f, i) => (f.hp > 0 ? i : -1)).filter((i) => i >= 0);
-          events.push(this.heal(standing, MENDING_HEAL, 'mending'));
-        }
-        this.tick();
-        break;
     }
+    this.cast = false;
     if (this.foeDown()) return events;
 
     if (this.burn > 0) {
@@ -444,6 +538,7 @@ export class Battle {
 
   /** A turn passes for every pet's cooldowns. */
   private tick(): void {
+    this.howl = Math.max(0, this.howl - 1);
     for (const cd of this.cooldowns) {
       cd.move = Math.max(0, cd.move - 1);
       cd.art = Math.max(0, cd.art - 1);

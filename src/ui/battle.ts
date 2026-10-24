@@ -4,14 +4,12 @@ import {
   CRIT_QUALITY,
   makeFighter,
   shareXp,
-  SPELLS,
   victoryRewards,
   type Action,
   type Attack,
   type BattleEvent,
   type Fighter,
   type HpSnap,
-  type SpellId,
 } from '../creatures/battle';
 import { STRONG } from '../creatures/elements';
 import { BOSS_TITLES, FOE_TRAITS, RANKS, rankLabel } from '../creatures/foes';
@@ -33,6 +31,7 @@ import type { GameContext } from './context';
 import { h, openSheet, toast, wait } from './dom';
 import { elementTag, wheelHelp } from './wheel';
 import { sound } from '../audio/sound';
+import { HERO_SPELLS, type HeroSpellId } from '../game/hero';
 
 /** How long the timing needle takes to sweep across an attack button. */
 const SWEEP_MS = 850;
@@ -78,7 +77,7 @@ function edgeTag(edge: number): HTMLElement | null {
  * on the button cannot hide it, and a second tap on that same button (or on the bar) as the
  * needle crosses the gold mark lands a critical hit. Resolves with 0..1.
  */
-function timingSweep(btn: HTMLButtonElement, bar: HTMLElement): Promise<number> {
+function timingSweep(btn: HTMLButtonElement, bar: HTMLElement, critAt = CRIT_QUALITY): Promise<number> {
   const needle = h('span', { class: 'sweep-needle' });
   const runner = h('span', { class: 'sweep-runner' }, needle);
   const track = h('span', { class: 'sweep-track', style: `--sweet: ${SWEET * 100}%` }, h('span', { class: 'sweep-zone' }), runner);
@@ -106,8 +105,8 @@ function timingSweep(btn: HTMLButtonElement, bar: HTMLElement): Promise<number> 
       sweep.pause();
       btn.removeEventListener('pointerdown', onTap);
       bar.removeEventListener('pointerdown', onTap);
-      bar.classList.add(quality >= CRIT_QUALITY ? 'sweep-perfect' : quality > 0.4 ? 'sweep-good' : 'sweep-miss');
-      hint.textContent = quality >= CRIT_QUALITY ? 'Perfect!' : quality > 0.4 ? 'Good' : 'Missed the mark';
+      bar.classList.add(quality >= critAt ? 'sweep-perfect' : quality > 0.4 ? 'sweep-good' : 'sweep-miss');
+      hint.textContent = quality >= critAt ? 'Perfect!' : quality > 0.4 ? 'Good' : 'Missed the mark';
       setTimeout(() => {
         btn.classList.remove('sweeping');
         bar.classList.remove('sweeping', 'sweep-perfect', 'sweep-good', 'sweep-miss');
@@ -216,16 +215,17 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   }
 
   const way = ctx.wayfarer;
+  const heroName = way?.heroName?.() ?? 'Your hero';
   const battle = new Battle(
     owned.map((p) => makeFighter(getSpecies(p.speciesId), p.level, p.seed, p.uid)),
     makeFighter(encounter.species, encounter.level, encounter.seed, undefined, encounter),
     {
-      wayfarerLevel: way?.level() ?? 1,
       petDamage: way?.gear().petDamage,
       petHealth: way?.gear().petHealth,
       // Damage lasts between fights; practice bouts start fresh and leave no marks.
       vigor: practice ? undefined : owned.map((p) => vigorNow(p)),
       tonicPower: way?.tonicPower?.() ?? 1,
+      hero: way?.hero(),
     },
   );
   const foe = battle.foe;
@@ -308,14 +308,15 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   const attacks: Record<Attack, HTMLButtonElement> = { strike: cmd('cmd-strike'), move: cmd('cmd-move'), art: cmd('cmd-art') };
   for (const attack of Object.keys(attacks) as Attack[]) attacks[attack].addEventListener('click', () => act({ kind: attack }));
   const tonicBtn = cmd('cmd-way');
-  const spellBtns = (Object.keys(SPELLS) as SpellId[]).map((id) => ({ id, el: cmd('cmd-way') }));
+  const spellBtns = (battle.hero?.spells ?? []).map((id) => ({ id, el: cmd('cmd-way cmd-spell') }));
   const fleeBtn = h('button', { class: 'btn btn-small btn-flee', type: 'button', onclick: () => sheet.close() }, practice ? 'Stop' : 'Flee');
   const bench = h('div', { class: 'party-bench', role: 'group', 'aria-label': 'Party' });
 
   const section = (title: string, ...children: HTMLElement[]) =>
     h('section', { class: 'cmd-section' }, h('h3', { class: 'cmd-title' }, title), ...children);
   const attackSection = section('Attacks', h('div', { class: 'cmd-grid' }, attacks.strike, attacks.move, attacks.art));
-  const waySection = section('Wayfarer', h('div', { class: 'cmd-grid' }, tonicBtn, ...spellBtns.map((s) => s.el)));
+  const waySection = section('Hero', h('div', { class: 'cmd-grid' }, ...spellBtns.map((s) => s.el), tonicBtn));
+  const wayTitle = waySection.querySelector('.cmd-title')!;
   const partySection = section('Party · tap to swap', bench);
   waySection.hidden = !way;
   partySection.hidden = battle.party.length < 2;
@@ -403,17 +404,15 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     const tonics = way?.tonics() ?? 0;
     card(tonicBtn, '⚗ Tonic', tonics ? `Heals ${battle.tonicHeal} · ×${tonics}` : 'None · brew at Hearthstead');
     tonicBtn.disabled = busy || forced || !tonics || pet.hp >= pet.maxHp;
-    const metres = way?.spellMetres() ?? 0;
+    const mana = way?.mana() ?? 0;
+    wayTitle.textContent = battle.cast ? 'Hero · spell cast, now attack' : `Hero · ✦ ${mana} mana · one spell a turn, free`;
     for (const { id, el } of spellBtns) {
-      const spell = SPELLS[id];
-      const ready = metres >= spell.metres;
-      card(
-        el,
-        id === 'fireball' ? `🔥 ${spell.name}` : `✚ ${spell.name}`,
-        ready ? (id === 'fireball' ? `${battle.fireball} damage · ready` : 'Heals party · ready') : `Walk ${Math.max(0, Math.round(spell.metres - metres))} m more`,
-      );
-      el.title = `${spell.blurb} Charged by walking ${spell.metres} m.`;
-      el.disabled = busy || forced || !ready;
+      const spell = HERO_SPELLS[id];
+      const cost = way?.spellCost(id) ?? spell.cost;
+      const sub = spell.kind === 'damage' ? `${battle.spellDamage(id)} damage` : spell.blurb.replace(/\.$/, '');
+      card(el, `${spell.glyph} ${spell.name}`, `✦${cost} · ${sub}`);
+      el.title = spell.blurb;
+      el.disabled = busy || forced || mana < cost || !battle.canCast(id);
     }
     fleeBtn.disabled = busy;
     showHp();
@@ -445,6 +444,10 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
             return `${e.name}! The weak spot glows. Next attack is critical.`;
           case 'burn':
             return `${foe.species.name} catches fire!`;
+          case 'hex':
+            return `${foe.species.name} is hexed and hits softer.`;
+          case 'howl':
+            return 'The party howls back, hitting harder!';
           case 'ward-break':
             return 'The ward shatters!';
         }
@@ -460,11 +463,13 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       case 'heal':
         return e.source === 'tonic'
           ? `A tonic restores ${e.amount} health.`
-          : e.source === 'art'
-            ? `${battle.party[shown.active].species.name} draws on a Wellspring (+${e.amount}).`
-            : `Mending light washes over the party (+${e.amount}).`;
-      case 'fireball':
-        return `You hurl a Fireball for ${e.damage}!`;
+          : `${battle.party[shown.active].species.name} draws on a Wellspring (+${e.amount}).`;
+      case 'spell':
+        return e.damage
+          ? `${heroName} casts ${HERO_SPELLS[e.spell].name} for ${e.damage}!`
+          : e.amount !== undefined
+            ? `${heroName} casts ${HERO_SPELLS[e.spell].name} (+${e.amount}).`
+            : `${heroName} casts ${HERO_SPELLS[e.spell].name}.`;
       case 'faint':
         return battle.winner ? `${battle.party[e.index].species.name} is worn out.` : `${battle.party[e.index].species.name} is worn out. Send in another!`;
     }
@@ -521,13 +526,20 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       floatText(foeSpot, `+${e.amount}`, 'heal');
       applySnap(e);
       await wait(360);
-    } else if (e.kind === 'fireball') {
-      foeSpot.classList.add('hit', 'burn');
-      sound.play('crit');
-      floatText(foeSpot, `-${e.damage}`, 'big');
+    } else if (e.kind === 'spell') {
+      if (e.damage) {
+        foeSpot.classList.add('hit', 'burn');
+        sound.play('crit');
+        floatText(foeSpot, `-${e.damage}`, 'big');
+      } else {
+        petSpot.classList.add('healed');
+        sound.play(e.amount ? 'reward' : 'spell');
+        floatText(petSpot, e.amount ? `+${e.amount}` : HERO_SPELLS[e.spell].name, e.amount ? 'heal' : 'word');
+      }
       applySnap(e);
       await wait(550);
       foeSpot.classList.remove('hit', 'burn');
+      petSpot.classList.remove('healed');
     } else if (e.kind === 'heal') {
       petSpot.classList.add('healed');
       sound.play('reward');
@@ -593,12 +605,11 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   const act = async (action: Action) => {
     if (busy) return;
     if (action.kind === 'tonic' && !way?.useTonic()) return;
-    if (action.kind === 'spell' && !way?.spendSpell(SPELLS[action.spell].metres)) return;
     busy = true;
     all().forEach((b) => ((b as HTMLButtonElement).disabled = true));
     fleeBtn.disabled = true;
     if ((action.kind === 'strike' || action.kind === 'move') && battle.ready(action.kind)) {
-      action = { ...action, quality: await timingSweep(attacks[action.kind], sweepBar) };
+      action = { ...action, quality: await timingSweep(attacks[action.kind], sweepBar, battle.critAt) };
     }
     panel.classList.add('cmd-waiting');
     let foeTurn = false;
@@ -615,7 +626,18 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     else refresh();
   };
 
-  for (const { id, el } of spellBtns) el.addEventListener('click', () => act({ kind: 'spell', spell: id }));
+  /** The hero's spell comes before the pet's move and takes no turn. */
+  const cast = async (spell: HeroSpellId) => {
+    if (busy || !battle.canCast(spell) || !way?.spendMana(spell)) return;
+    busy = true;
+    all().forEach((b) => ((b as HTMLButtonElement).disabled = true));
+    for (const e of battle.castSpell(spell)) await play(e);
+    busy = false;
+    if (battle.winner) end();
+    else refresh();
+  };
+
+  for (const { id, el } of spellBtns) el.addEventListener('click', () => cast(id));
   tonicBtn.addEventListener('click', () => act({ kind: 'tonic' }));
   refresh();
 }

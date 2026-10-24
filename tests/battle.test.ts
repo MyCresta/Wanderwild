@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Battle, fireballDamage, makeFighter, MOVE_COOLDOWN, shareXp, victoryRewards, type BattleEvent } from '../src/creatures/battle';
+import { Battle, makeFighter, MOVE_COOLDOWN, shareXp, victoryRewards, type BattleEvent } from '../src/creatures/battle';
 import { beatenBy, matchup, STRONG, WEAK, WHEEL } from '../src/creatures/elements';
 import { rollFoe } from '../src/creatures/foes';
 import { creatureForSpawn } from '../src/creatures/stats';
@@ -8,7 +8,8 @@ import { addPet, emptyCollection, partyPets, togglePartyMember } from '../src/cr
 import { mulberry32 } from '../src/creatures/rng';
 import { getSpecies } from '../src/creatures/species';
 import { newSave } from '../src/game/save';
-import { GameState, SPELL_CHARGE_MAX_M } from '../src/game/state';
+import { GameState } from '../src/game/state';
+import { heroPower, newHero, type HeroClass } from '../src/game/hero';
 
 const pet = (id: string, level = 5, seed = 1) => makeFighter(getSpecies(id), level, seed);
 /** A pet that cannot faint, for watching many turns go by. */
@@ -48,20 +49,40 @@ describe('party battles', () => {
     expect(battle.winner).toBe('foe');
   });
 
-  it('casts Fireball for fixed damage and Mending heals everyone standing', () => {
+  it('lets the hero cast one free spell a turn before the pet acts', () => {
+    const hero = (cls: HeroClass, level = 12) => heroPower({ ...newHero(), cls }, level);
     const a = pet('bramblet');
     const b = pet('emberkit');
     a.hp = 5;
     b.hp = 5;
     const foe = pet('smudgeling', 30);
     foe.atk = 1;
-    const battle = new Battle([a, b], foe, { rng: mulberry32(9), wayfarerLevel: 4 });
-    const before = foe.hp;
-    battle.turn({ kind: 'spell', spell: 'fireball' });
-    expect(before - foe.hp).toBe(fireballDamage(4));
-    const heal = battle.turn({ kind: 'spell', spell: 'mending' })[0];
-    expect(heal).toMatchObject({ kind: 'heal', targets: [0, 1], source: 'mending' });
+    const warden = new Battle([a, b], foe, { rng: mulberry32(9), hero: hero('warden') });
+    const [mend] = warden.castSpell('mending');
+    expect(mend).toMatchObject({ kind: 'spell', spell: 'mending', targets: [0, 1] });
     expect(b.hp).toBeGreaterThan(5);
+    // One spell per turn, and casting did not hand the foe a turn.
+    expect(warden.canCast('secondWind')).toBe(false);
+    warden.turn({ kind: 'strike' });
+    expect(warden.castSpell('secondWind')).toHaveLength(1);
+    expect(warden.pet.hp).toBe(warden.pet.maxHp);
+    // Spells the hero's class does not teach are not offered.
+    expect(warden.canCast('starfall')).toBe(false);
+
+    const tough = pet('smudgeling', 30);
+    const arcanist = new Battle([pet('bramblet')], tough, { rng: mulberry32(9), hero: hero('arcanist', 4) });
+    const before = tough.hp;
+    arcanist.castSpell('wheelbolt');
+    expect(before - tough.hp).toBe(arcanist.spellDamage('wheelbolt'));
+    // Wheelbolt always lands on the weakness, so it outhits a plain strike from the same pet.
+    expect(arcanist.spellDamage('wheelbolt')).toBeGreaterThan(arcanist.spellDamage('starfall') / 2);
+  });
+
+  it('boosts the party with the hero\'s stats', () => {
+    const plain = new Battle([pet('bramblet')], pet('smudgeling'));
+    const led = new Battle([pet('bramblet')], pet('smudgeling'), { hero: heroPower({ ...newHero(), cls: 'beastcaller' }, 30) });
+    expect(led.pet.atk).toBeGreaterThan(plain.pet.atk);
+    expect(led.pet.maxHp).toBeGreaterThanOrEqual(plain.pet.maxHp);
   });
 
   it('shares experience: full for pets that fought, half for the bench', () => {
@@ -201,14 +222,16 @@ describe('the party', () => {
 });
 
 describe('wayfarer support in battle', () => {
-  it('charges spells by walking and spends tonics', () => {
+  it('fills mana by walking, up to a cap, and spends tonics', () => {
     const game = new GameState(newSave(0));
+    game.chooseClass('arcanist');
     game.recordWalk(350, 0);
-    expect(game.save.spellChargeM).toBe(350);
-    expect(game.spendSpell(300)).toBe(true);
-    expect(game.spendSpell(300)).toBe(false);
+    expect(game.mana).toBe(14);
+    expect(game.spendMana('wheelbolt')).toBe(true);
+    expect(game.mana).toBe(8);
+    expect(game.spendMana('starfall')).toBe(false);
     game.recordWalk(5000, 0);
-    expect(game.save.spellChargeM).toBe(SPELL_CHARGE_MAX_M);
+    expect(game.mana).toBe(game.maxMana);
     expect(game.useTonic()).toBe(false);
     game.save.supplies.tonic = 1;
     expect(game.useTonic()).toBe(true);

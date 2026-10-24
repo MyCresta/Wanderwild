@@ -241,6 +241,7 @@ body {
 
 .player-figure {
   position: relative;
+  display: block;
   width: 100%;
   height: 100%;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
@@ -1904,17 +1905,6 @@ body:has(> .catch-scene) .parchment-overlay {
   }
 }
 
-/* ---------- Gear on the token ---------- */
-
-.player-lantern {
-  display: none;
-}
-
-.has-lantern .player-lantern {
-  display: inline;
-  filter: drop-shadow(0 0 4px #f3d27a);
-}
-
 /* ---------- The Forge ---------- */
 
 .forge-card {
@@ -3079,6 +3069,329 @@ body:has(> .catch-scene) .parchment-overlay {
   color: #fff8e1;
   font-size: 11px;
   white-space: nowrap;
+}
+
+.player-figure svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- The hero page ---------- */
+
+.journal-open {
+  padding: 0;
+}
+
+/* A bust, not the whole figure: the face reads at button size. */
+.hero-bust {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.journal-open .hero-art {
+  width: 100%;
+  height: 100%;
+  transform: translateY(16%) scale(1.6);
+}
+
+.hero-orb {
+  animation: rune-pulse 2.4s ease-in-out infinite;
+}
+
+.hero-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hero-portrait {
+  flex: none;
+  padding: 4px 6px 0;
+  border: 2px solid var(--leather);
+  border-radius: 14px;
+  background: radial-gradient(circle at 50% 40%, #fff8e1, var(--parchment-dark));
+  cursor: pointer;
+}
+
+.hero-portrait svg {
+  display: block;
+}
+
+.hero-id {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.hero-name {
+  font-size: 20px;
+}
+
+.hero-id small {
+  font-size: 12px;
+  color: var(--leather);
+}
+
+.class-chip {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--cls);
+  color: #fff8e1;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.meter {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgba(74, 51, 32, 0.2);
+}
+
+.meter > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #a8772e, var(--gold));
+}
+
+.meter-mana > span {
+  background: linear-gradient(90deg, #5b2f78, #9b7fd4);
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr) 1.5fr;
+  gap: 6px;
+  margin: 12px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.hero-stats li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 8px;
+  background: rgba(255, 248, 225, 0.55);
+  font-size: 11px;
+  text-align: center;
+}
+
+.hero-stats b {
+  font-size: 15px;
+}
+
+.hero-spells,
+.talent-rows,
+.hero-gear {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hero-spell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.hero-spell div {
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-spell small,
+.talent small {
+  display: block;
+  font-size: 12px;
+  color: var(--leather);
+}
+
+.hero-spell.locked {
+  opacity: 0.45;
+}
+
+.spell-glyph {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--leather);
+  color: var(--gold);
+}
+
+.spell-cost {
+  font-size: 13px;
+  font-weight: bold;
+  color: #5b2f78;
+}
+
+.talent-row {
+  display: grid;
+  grid-template-columns: 26px 1fr 1fr;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.talent-level {
+  align-self: center;
+  font-size: 12px;
+  color: var(--leather);
+  text-align: center;
+}
+
+.talent {
+  padding: 6px 8px;
+  border: 2px solid var(--parchment-dark);
+  border-radius: 10px;
+  background: rgba(255, 248, 225, 0.6);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.talent[aria-pressed='true'] {
+  border-color: #2f6b55;
+  background: rgba(47, 107, 85, 0.15);
+}
+
+.talent:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.talent-open .talent {
+  border-color: var(--gold);
+  box-shadow: 0 0 6px rgba(243, 210, 122, 0.8);
+}
+
+.link-button {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--leather);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.hero-gear {
+  grid-template-columns: repeat(5, 1fr);
+  text-align: center;
+}
+
+.hero-gear li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 11px;
+}
+
+.class-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.class-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px 10px;
+  border: 2px solid var(--cls);
+  border-radius: 12px;
+  background: rgba(255, 248, 225, 0.65);
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.class-card strong {
+  color: var(--cls);
+}
+
+.class-card small {
+  font-size: 12px;
+}
+
+.class-card .class-spells {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--leather);
+}
+
+.second-class {
+  margin-top: 10px;
+  padding: 8px;
+  border: 2px dashed var(--gold);
+  border-radius: 12px;
+}
+
+.second-class h3 {
+  margin-top: 0;
+}
+
+.look-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.look {
+  padding: 4px 6px 0;
+  border: 2px solid var(--parchment-dark);
+  border-radius: 12px;
+  background: rgba(255, 248, 225, 0.6);
+  cursor: pointer;
+}
+
+.look[aria-checked='true'] {
+  border-color: var(--leather);
+  box-shadow: 0 0 0 2px var(--gold);
+}
+
+.hero-name-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.hero-name-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+  border: 2px solid var(--leather);
+  border-radius: 8px;
+  background: #fff8e1;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.cmd-spell {
+  --el: #5b2f78;
 }
 
 /* ---------- Bosses, elite tiers and lasting wounds ---------- */

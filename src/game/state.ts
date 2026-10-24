@@ -4,6 +4,18 @@ import { pruneSave, storeSave, type SaveData } from './save';
 import { MATERIALS, type MaterialId, type RealmId } from './realms';
 import { BLESSING_MS, BLESSING_XP_BONUS, rollShrineReward, SHRINE_COOLDOWN_MS, type Shrine } from './shrines';
 import { levelFromXp, unlocksBetween, type Unlock } from './wayfarer';
+import {
+  canPickSecond,
+  heroPower,
+  manaFromWalk,
+  maxMana,
+  spellCost,
+  talentKey,
+  talentRows,
+  type HeroClass,
+  type HeroPower,
+  type HeroSpellId,
+} from './hero';
 import { EGG_SHRINE_CHANCE, EGG_SLOTS, rollEgg, walkEggs, type Hatchling } from './eggs';
 import {
   BUILDINGS,
@@ -62,8 +74,6 @@ export const WALK_REWARD_STEP_M = 100;
 export const WALK_REWARD = { wanderlight: 1, xp: 30, coin: 2 };
 export const VISITED_CELL_M = 50;
 export const EGG_UNLOCK_LEVEL = 8;
-/** Walking banks spell charge up to this many metres. */
-export const SPELL_CHARGE_MAX_M = 1000;
 /** Chance a shrine gives a rune once runes are unlocked. */
 export const RUNE_SHRINE_CHANCE = 0.06;
 
@@ -130,7 +140,6 @@ export class GameState {
   recordWalk(metres: number, now = Date.now()): number {
     const s = this.save;
     s.distanceMetres += metres;
-    s.spellChargeM = Math.min(SPELL_CHARGE_MAX_M, s.spellChargeM + metres);
     const steps = Math.floor((s.distanceMetres - s.rewardedMetres) / WALK_REWARD_STEP_M);
     if (steps > 0) {
       s.rewardedMetres += steps * WALK_REWARD_STEP_M;
@@ -147,6 +156,8 @@ export class GameState {
       const extra = Math.floor(steps * (bonus.stride - 1) + seededRandom(hashString(`wl:${s.rewardedMetres}`))());
       if (extra > 0) s.currencies.wanderlight += extra;
     }
+    // After the walk's XP, so a level gained on the way already counts toward the cap.
+    this.fillMana(manaFromWalk(s.hero, this.level.level, metres));
     for (const hatchling of walkEggs(s.eggs, metres * this.bonuses().eggSpeed, now)) {
       s.hatchlings.push(hatchling);
       this.emit({ kind: 'hatch', hatchling });
@@ -162,11 +173,67 @@ export class GameState {
     return true;
   }
 
-  spendSpell(metres: number): boolean {
-    if (this.save.spellChargeM < metres) return false;
-    this.save.spellChargeM -= metres;
+  // ---- The hero ----
+
+  get maxMana(): number {
+    return maxMana(this.save.hero, this.level.level);
+  }
+
+  /** Whole points of mana ready to spend. */
+  get mana(): number {
+    return Math.floor(Math.min(this.save.hero.mana, this.maxMana));
+  }
+
+  fillMana(amount: number): void {
+    const hero = this.save.hero;
+    hero.mana = Math.min(this.maxMana, hero.mana + amount);
+  }
+
+  heroPower(): HeroPower {
+    return heroPower(this.save.hero, this.level.level);
+  }
+
+  spellCost(spell: HeroSpellId): number {
+    return spellCost(this.save.hero, this.level.level, spell);
+  }
+
+  spendMana(spell: HeroSpellId): boolean {
+    const cost = this.spellCost(spell);
+    if (this.mana < cost) return false;
+    this.save.hero.mana = Math.min(this.save.hero.mana, this.maxMana) - cost;
     this.changed();
     return true;
+  }
+
+  /** Picks the first class (once), or the second from level 20. */
+  chooseClass(cls: HeroClass): boolean {
+    const hero = this.save.hero;
+    if (!hero.cls) hero.cls = cls;
+    else if (canPickSecond(hero, this.level.level) && cls !== hero.cls) hero.second = cls;
+    else return false;
+    this.changed();
+    return true;
+  }
+
+  pickTalent(cls: HeroClass, row: number, pick: 0 | 1): boolean {
+    const open = talentRows(this.save.hero).some((r) => r.cls === cls && r.row === row && r.level <= this.level.level);
+    if (!open) return false;
+    this.save.hero.talents[talentKey(cls, row)] = pick;
+    this.changed();
+    return true;
+  }
+
+  /** Talents can be changed freely: clearing them all is the respec. */
+  resetTalents(): void {
+    this.save.hero.talents = {};
+    this.changed();
+  }
+
+  setHeroLook(name: string, look: number): void {
+    const hero = this.save.hero;
+    hero.name = name.trim().slice(0, 24) || hero.name;
+    hero.look = look;
+    this.changed();
   }
 
   // ---- Gear and the Forge ----
