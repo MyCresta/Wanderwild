@@ -64,15 +64,17 @@ function edgeTag(edge: number): HTMLElement | null {
 }
 
 /**
- * The timing tap, on the same button that was pressed: a needle sweeps across it and a
- * second tap as it crosses the gold mark lands a critical hit. Resolves with 0..1.
+ * The timing tap: a needle sweeps along a wide bar just above the attacks, where the thumb
+ * on the button cannot hide it, and a second tap on that same button (or on the bar) as the
+ * needle crosses the gold mark lands a critical hit. Resolves with 0..1.
  */
-function timingSweep(btn: HTMLButtonElement): Promise<number> {
+function timingSweep(btn: HTMLButtonElement, bar: HTMLElement): Promise<number> {
   const needle = h('span', { class: 'sweep-needle' });
   const runner = h('span', { class: 'sweep-runner' }, needle);
   const track = h('span', { class: 'sweep-track', style: `--sweet: ${SWEET * 100}%` }, h('span', { class: 'sweep-zone' }), runner);
   const hint = h('span', { class: 'sweep-hint' }, 'Tap again on the gold!');
-  btn.append(track, hint);
+  bar.replaceChildren(hint, track);
+  bar.classList.add('sweeping');
   btn.classList.add('sweeping');
   btn.disabled = false;
   // A transform animation runs on the compositor, so the needle glides even when the page is busy,
@@ -93,12 +95,13 @@ function timingSweep(btn: HTMLButtonElement): Promise<number> {
       done = true;
       sweep.pause();
       btn.removeEventListener('pointerdown', onTap);
-      btn.classList.add(quality >= CRIT_QUALITY ? 'sweep-perfect' : quality > 0.4 ? 'sweep-good' : 'sweep-miss');
+      bar.removeEventListener('pointerdown', onTap);
+      bar.classList.add(quality >= CRIT_QUALITY ? 'sweep-perfect' : quality > 0.4 ? 'sweep-good' : 'sweep-miss');
       hint.textContent = quality >= CRIT_QUALITY ? 'Perfect!' : quality > 0.4 ? 'Good' : 'Missed the mark';
       setTimeout(() => {
-        btn.classList.remove('sweeping', 'sweep-perfect', 'sweep-good', 'sweep-miss');
-        track.remove();
-        hint.remove();
+        btn.classList.remove('sweeping');
+        bar.classList.remove('sweeping', 'sweep-perfect', 'sweep-good', 'sweep-miss');
+        bar.replaceChildren();
       }, 420);
       resolve(quality);
     };
@@ -107,6 +110,7 @@ function timingSweep(btn: HTMLButtonElement): Promise<number> {
       finish(Math.max(0, 1 - Math.abs(at(e.timeStamp) - SWEET) / SWEET_SPREAD));
     };
     btn.addEventListener('pointerdown', onTap);
+    bar.addEventListener('pointerdown', onTap);
     sweep.finished.then(
       () => finish(0.2),
       () => finish(0.2),
@@ -227,7 +231,9 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   partySection.hidden = battle.party.length < 2;
   const panel = h('div', { class: 'cmd-panel' }, attackSection, waySection, partySection);
   const footer = h('div', { class: 'battle-footer' }, wheelHelp(foe.species.element), fleeBtn);
-  sheet.body.append(arena, log, panel, footer);
+  // The crit bar lies over the log, so it shows above the attacks without shifting the buttons.
+  const sweepBar = h('div', { class: 'sweep-bar', 'aria-live': 'polite' });
+  sheet.body.append(arena, h('div', { class: 'log-wrap' }, log, sweepBar), panel, footer);
 
   let busy = false;
   const all = () => [...Object.values(attacks), tonicBtn, ...spellBtns.map((s) => s.el), ...bench.querySelectorAll('button')];
@@ -501,7 +507,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     all().forEach((b) => ((b as HTMLButtonElement).disabled = true));
     fleeBtn.disabled = true;
     if ((action.kind === 'strike' || action.kind === 'move') && battle.ready(action.kind)) {
-      action = { ...action, quality: await timingSweep(attacks[action.kind]) };
+      action = { ...action, quality: await timingSweep(attacks[action.kind], sweepBar) };
     }
     panel.classList.add('cmd-waiting');
     let foeTurn = false;
