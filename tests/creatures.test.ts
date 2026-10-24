@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Battle, makeFighter, victoryRewards } from '../src/creatures/battle';
-import { addPet, emptyCollection, METRES_PER_SEAL, walkRewards } from '../src/creatures/collection';
+import { addPet, emptyCollection, walkRewards } from '../src/creatures/collection';
 import { mulberry32 } from '../src/creatures/rng';
 import { spawnsNear } from '../src/game/spawns';
 import { ALL_SPECIES, getSpecies, MONSTERS, PETS } from '../src/creatures/species';
@@ -82,12 +82,10 @@ describe('battle', () => {
 });
 
 describe('walking', () => {
-  it('earns seals and companion experience', () => {
+  it('earns companion experience', () => {
     const c = emptyCollection();
     const pet = addPet(c, { species: getSpecies('emberkit'), level: 1, seed: 7 });
-    const seals = c.seals;
-    walkRewards(c, METRES_PER_SEAL * 2 + 30);
-    expect(c.seals).toBe(seals + 2);
+    walkRewards(c, 230);
     expect(pet.xp + pet.level).toBeGreaterThan(1);
   });
 });

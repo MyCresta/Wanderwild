@@ -27,7 +27,7 @@ import { CompanionMarker, CreatureMarkers, FollowerMarker, ResidentMarkers } fro
 import { addPet, companion, loadCollection, saveCollection, walkRewards } from './creatures/collection';
 import { spawnsNear, type Spawn } from './game/spawns';
 import { getSpecies } from './creatures/species';
-import { creatureForSpawn, type Encounter } from './creatures/stats';
+import { creatureForSpawn, individualFromSeed, type Encounter } from './creatures/stats';
 import { wildlingWanted } from './creatures/scarcity';
 import type { GameContext } from './ui/context';
 import { openBattle } from './ui/battle';
@@ -61,7 +61,7 @@ const SIM_SPEED_MPS = 1.4;
 /** Re-check spawns after moving this far or this long. */
 const SPAWN_REFRESH_M = 25;
 const SPAWN_REFRESH_MS = 30_000;
-/** Wayfarer XP for binding a Wildling or driving off Blotspawn, by spawn rarity. */
+/** Wayfarer XP for befriending a Wildling or driving off Blotspawn, by rarity. */
 const CREATURE_XP: Record<Spawn['rarity'], number> = { common: 60, uncommon: 90, rare: 150, epic: 250, legendary: 400 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -171,7 +171,6 @@ creatureGame.wayfarer = {
 };
 creatureGame.changed();
 deeds = new DeedKeeper(game, collection, $('wayfarer-title'));
-hud.seals = () => collection.seals;
 journal.onShow('wayfarer', () => renderParty($('satchel-party'), creatureGame));
 new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame, forge);
 
@@ -241,10 +240,12 @@ function clearSpawn(spawn: Spawn, won: boolean, kind: 'pet' | 'monster', remote 
 /** A follower has been won over, or has given up and wandered off. */
 function settleFollower(outcome: FollowOutcome): void {
   if (outcome?.kind === 'joined') {
-    const rarity = getSpecies(outcome.pet.speciesId).rarity;
-    game.grantXp(CREATURE_XP[rarity]);
+    const species = getSpecies(outcome.pet.speciesId);
+    game.grantXp(CREATURE_XP[species.rarity]);
     game.changed();
-    deeds?.win('pet', rarity);
+    // Deeds count a rare friend as their "epic" find and a Gilded one as "legendary".
+    const gilded = individualFromSeed(outcome.pet.seed, 'pet').gilded;
+    deeds?.win('pet', gilded ? 'legendary' : species.rarity === 'rare' ? 'epic' : species.rarity);
     openJoined(creatureGame, outcome.pet);
   } else if (outcome?.kind === 'left') {
     toast(`${outcome.name} lost interest and wandered back into the margins.`);
@@ -403,14 +404,10 @@ function takeCurio(curio: Curio): void {
   const reward = game.findCurio(curio, realmAt(map, curio.lng, curio.lat) ?? currentRealm ?? 'hearthfields', here);
   curioLayer.remove(curio.id);
   if (!reward) return;
-  if (reward.seals) {
-    collection.seals += reward.seals;
-    creatureGame.changed();
-  }
   const parts = [
     reward.coin && `+${reward.coin} coin`,
     reward.xp && `+${reward.xp} XP`,
-    reward.seals && `+${reward.seals} binding seal${reward.seals > 1 ? 's' : ''}`,
+    reward.wanderlight && `+${reward.wanderlight} Wanderlight`,
     ...Object.entries(reward.materials).map(([id, n]) => `+${n} ${MATERIALS[id as MaterialId].name}`),
   ].filter(Boolean);
   sound.play('coin');
@@ -448,10 +445,6 @@ const hunts = new HuntController({
   game,
   position: () => lastFix,
   realmAt: (lat, lng) => realmAt(map, lng, lat),
-  addSeals(n) {
-    collection.seals += n;
-    creatureGame.changed();
-  },
   stopFollowing: () => setFollowing(false),
   onChange: () => refreshWorld(),
 });
@@ -505,10 +498,6 @@ function onFix(fix: Fix): void {
     if (pet && reward.levels > 0 && before !== pet.level) {
       sound.play('levelUp');
       toast(`${getSpecies(pet.speciesId).name} grew to level ${pet.level} on the road!`);
-    }
-    if (reward.seals > 0) {
-      sound.play('coin');
-      toast(`Found ${reward.seals > 1 ? `${reward.seals} binding seals` : 'a binding seal'} along the way.`);
     }
     if (collection.follower) settleFollower(followerTrust(collection, metres));
     const readyToEvolve = walkInRealm(collection, metres, currentRealm);

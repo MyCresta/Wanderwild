@@ -341,7 +341,6 @@ export interface Treasure {
   coin: number;
   xp: number;
   wanderlight: number;
-  seals: number;
   /** Number of realm materials; the realm decides which. */
   materials: number;
   relic: boolean;
@@ -360,7 +359,6 @@ export function rollTreasure(hunt: ActiveHunt): Treasure {
     coin: Math.round((30 + length / 12 + rand() * 20) * skill),
     xp: Math.round((150 + length / 3) * skill),
     wanderlight: hunt.hints <= 1 ? 3 : 1,
-    seals: hunt.hints <= 1 ? 2 : 1,
     materials: 2 + Math.floor(rand() * 3) + (hunt.hints === 0 ? 2 : 0),
     relic: hunt.hints <= 1 || rand() < 0.4,
     title: CHEST_TITLES[Math.min(hunt.hints, CHEST_TITLES.length - 1)],

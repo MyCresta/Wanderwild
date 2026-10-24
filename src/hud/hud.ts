@@ -128,16 +128,12 @@ export class Hud {
     $('satchel-materials').innerHTML = `
       <li><b>${formatCount(s.currencies.coin)}</b> Coin</li>
       <li title="Only from walking"><b>${formatCount(s.currencies.wanderlight)}</b> Wanderlight</li>
-      <li title="Walk 100 m to earn one"><b>${formatCount(this.seals())}</b> Binding seals</li>
       ${mats}`;
     $('satchel-stats').innerHTML = `
       <li><b>${formatDistance(s.distanceMetres)}</b> wandered</li>
       <li><b>${formatCount(s.shrinesVisited)}</b> shrine visits</li>
       <li><b>${formatCount(s.visitedCells.length)}</b> map squares walked</li>`;
   }
-
-  /** Binding seals live with the creatures; main.ts supplies them. */
-  seals: () => number = () => 0;
 
   private setupSoundChoice(): void {
     const row = $('sound-choice');

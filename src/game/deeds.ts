@@ -136,14 +136,14 @@ export const DEEDS: readonly Deed[] = [
   { id: 'gravewalker', group: 'explore', name: 'Lantern in the Barrows', text: 'Enter the Barrows after dark.', title: 'Gravewalker', secret: true, tier: 2, goal: 1, progress: (s) => +c(s).feats.includes('barrowsAtNight') },
 
   // Wildlings
-  { id: 'first-binding', group: 'bind', name: 'First Binding', text: 'Bind a wild Wildling.', tier: 1, goal: 1, progress: (s) => c(s).petsBound },
-  { id: 'beastbinder', group: 'bind', name: 'Beastbinder', text: 'Bind 10 Wildlings.', title: 'Beastbinder', tier: 2, goal: 10, progress: (s) => c(s).petsBound },
-  { id: 'menagerie', group: 'bind', name: 'A Fine Menagerie', text: 'Bind 50 Wildlings.', title: 'Keeper of Beasts', tier: 3, goal: 50, progress: (s) => c(s).petsBound },
+  { id: 'first-binding', group: 'bind', name: 'First Friend', text: 'Befriend a wild Wildling.', tier: 1, goal: 1, progress: (s) => c(s).petsBound },
+  { id: 'beastbinder', group: 'bind', name: 'Beastfriend', text: 'Befriend 5 Wildlings.', title: 'Beastfriend', tier: 2, goal: 5, progress: (s) => c(s).petsBound },
+  { id: 'menagerie', group: 'bind', name: 'A Full Band', text: 'Befriend 12 Wildlings.', title: 'Keeper of Beasts', tier: 3, goal: 12, progress: (s) => c(s).petsBound },
   { id: 'curious', group: 'bind', name: 'Curious Mind', text: 'Own 3 kinds of Wildling.', tier: 1, goal: 3, progress: (s) => s.speciesBound },
   { id: 'all-wildlings', group: 'bind', name: 'Every Wildling', text: `Own all ${PETS.length} kinds of Wildling.`, title: 'Loremaster', tier: 3, goal: PETS.length, progress: (s) => s.speciesBound },
   { id: 'inkbound-scholar', group: 'bind', name: 'Inkbound Scholar', text: `Meet all ${ALL_SPECIES.length} creatures of the bestiary.`, title: 'the Scholar', tier: 3, goal: ALL_SPECIES.length, progress: (s) => s.speciesSeen },
-  { id: 'lucky-find', group: 'bind', name: 'Lucky Find', text: 'Bind an epic Wildling.', tier: 2, goal: 1, progress: (s) => c(s).epicBound + c(s).legendaryBound },
-  { id: 'legend-binder', group: 'bind', name: 'Legend-Binder', text: 'Bind a legendary Wildling.', title: 'Legend-Binder', tier: 4, goal: 1, progress: (s) => c(s).legendaryBound },
+  { id: 'lucky-find', group: 'bind', name: 'Lucky Find', text: 'Befriend a rare Wildling.', tier: 2, goal: 1, progress: (s) => c(s).epicBound + c(s).legendaryBound },
+  { id: 'legend-binder', group: 'bind', name: 'Gilded Bond', text: 'Befriend a Gilded Wildling.', title: 'the Gilded', tier: 4, goal: 1, progress: (s) => c(s).legendaryBound },
   { id: 'bonded', group: 'bind', name: 'Bonded', text: 'Raise a Wildling to level 10.', tier: 2, goal: 10, progress: (s) => s.bestPetLevel },
   { id: 'soulbound', group: 'bind', name: 'Soulbound', text: 'Raise a Wildling to level 25.', title: 'Soulbound', tier: 3, goal: 25, progress: (s) => s.bestPetLevel },
 

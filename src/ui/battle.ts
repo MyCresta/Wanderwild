@@ -15,7 +15,7 @@ import {
 } from '../creatures/battle';
 import { STRONG } from '../creatures/elements';
 import { FOE_TRAITS, RANKS } from '../creatures/foes';
-import { grantPetXp, markSeen, MAX_SEALS, partyPets } from '../creatures/collection';
+import { grantPetXp, markSeen, partyPets } from '../creatures/collection';
 import { ELEMENTS, getSpecies } from '../creatures/species';
 import type { Encounter } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
@@ -471,13 +471,12 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
         owned.forEach((p, i) => {
           if (grantPetXp(p, shares[i]) > 0) grew.push(`${getSpecies(p.speciesId).name} grew to level ${p.level}!`);
         });
-        ctx.collection.seals = Math.min(MAX_SEALS, ctx.collection.seals + reward.seals);
         ctx.changed();
         log.replaceChildren(
           `${encounter.species.name} dissolves into a puddle of harmless ink. `,
           h('strong', {}, `+${reward.xp} XP`),
           owned.length > 1 ? ' to each pet that fought (half to the rest)' : '',
-          `, +${reward.seals} seal${reward.seals > 1 ? 's' : ''}.`,
+          '.',
           ...grew.map((g) => h('strong', { class: 'level-up' }, ` ${g}`)),
         );
       }

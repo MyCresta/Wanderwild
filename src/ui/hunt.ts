@@ -35,8 +35,6 @@ export interface HuntDeps {
   /** The latest GPS fix, if any. */
   position(): Fix | null;
   realmAt(lat: number, lng: number): RealmId | undefined;
-  /** Gives binding seals, which the creatures code owns. */
-  addSeals(n: number): void;
   /** Stops the map following the player, as a hand pan does. */
   stopFollowing(): void;
   /** Called after a hunt starts, ends or moves on. */
@@ -166,7 +164,6 @@ export class HuntController {
     game.addMaterials(materials);
     game.grantXp(t.xp);
     game.changed();
-    this.deps.addSeals(t.seals);
     return MATERIALS[material].name;
   }
 
@@ -196,7 +193,6 @@ export class HuntController {
       `${t.coin} coin`,
       `${t.xp} Wayfarer XP`,
       `${t.wanderlight} Wanderlight`,
-      `${t.seals} binding ${t.seals === 1 ? 'seal' : 'seals'}`,
       `${t.materials} ${found.material}`,
       t.relic && `1 ${MATERIALS.shrineRelic.name}`,
     ];

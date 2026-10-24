@@ -8,7 +8,7 @@ export function renderParty(host: HTMLElement, ctx: GameContext): void {
   const c = ctx.collection;
   const lead = companion(c);
   if (!lead) {
-    host.innerHTML = '<p class="satchel-hint">Bind a Wildling to start your party.</p>';
+    host.innerHTML = '<p class="satchel-hint">Befriend a Wildling to start your party.</p>';
     return;
   }
   const inParty = new Set(partyPets(c).map((p) => p.uid));
