@@ -158,7 +158,7 @@ function openBossGate(ctx: GameContext, encounter: Encounter, onFight: () => voi
   const gap = encounter.level - level;
   const sheet = openSheet(foeName(encounter), { className: 'sheet-boss' });
   const weak = encounter.species.kind === 'monster' ? encounter.species.weakTo : null;
-  const verdict = gap <= -2 ? 'Your party should handle it.' : gap <= 1 ? 'A hard fight. Bring pets strong against it, and tonics.' : `Too strong for now: it is level ${encounter.level}, your party about ${level}.`;
+  const verdict = gap <= -2 ? 'Your party should handle it.' : gap <= 1 ? 'A hard fight. Bring Wildlings strong against it, and tonics.' : `Too strong for now: it is level ${encounter.level}, your party about ${level}.`;
   sheet.body.append(
     h('div', { class: 'boss-gate' }, createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 120, facing: -1 })),
     h(
@@ -335,7 +335,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     panel.classList.toggle('cmd-waiting', side !== 'pet');
     turnBanner.hidden = !side;
     turnBanner.className = `turn-banner${side === 'foe' ? ' turn-banner-foe' : ''}`;
-    turnBanner.textContent = side === 'foe' ? `${foe.species.name}'s turn` : battle.mustSwap ? 'Send in a pet' : 'Your turn';
+    turnBanner.textContent = side === 'foe' ? `${foe.species.name}'s turn` : battle.mustSwap ? 'Send in a Wildling' : 'Your turn';
   };
 
   const refreshStatus = () => {
@@ -584,7 +584,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
         log.replaceChildren(
           `${foeName(encounter)} dissolves into a puddle of harmless ink. `,
           h('strong', {}, `+${reward.xp} XP`),
-          owned.length > 1 ? ' to each pet that fought (half to the rest)' : '',
+          owned.length > 1 ? ' to each Wildling that fought (half to the rest)' : '',
           '.',
           ...grew.map((g) => h('strong', { class: 'level-up' }, ` ${g}`)),
         );
@@ -594,8 +594,8 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       finish(false);
       sheet.setTitle('Driven back');
       log.textContent = practice
-        ? 'Worn out, but it was only practice. Try leading with a pet that is strong against it.'
-        : 'Your party is worn out and retreats. Their wounds stay until they rest (about an hour to full) or drink a tonic. Bring pets strong against it and try again.';
+        ? 'Worn out, but it was only practice. Try leading with a Wildling that is strong against it.'
+        : 'Your party is worn out and retreats. Their wounds stay until they rest (about an hour to full) or drink a tonic. Bring Wildlings strong against it and try again.';
     }
     panel.replaceChildren(h('button', { class: 'btn btn-primary btn-continue', type: 'button', onclick: () => sheet.close() }, 'Continue'));
     panel.classList.remove('cmd-waiting');

@@ -1,6 +1,6 @@
 import { mulberry32, pick, range } from './rng';
 import {
-  MONSTERS,
+  FOES,
   PETS,
   RARITY_WEIGHT,
   type BaseStats,
@@ -144,7 +144,9 @@ export function creatureForSpawn(spawn: SpawnSeed, companionLevel: number): Enco
     RARITY_WEIGHT[s.rarity] * (s.rarity === tier ? 3 : 1) * (favoured.includes(s.element) ? 3 : 1);
 
   const isMonster = rng() < monsterChance;
-  const species: Species = isMonster ? weightedPick<MonsterSpecies>(rng, MONSTERS, weight) : weightedPick(rng, PETS, weight);
+  // There are many Taken, so each is rarer than an old Blotspawn: together about two foes in five.
+  const foeWeight = (s: MonsterSpecies) => weight(s) * (s.id.startsWith('taken-') ? 0.25 : 1);
+  const species: Species = isMonster ? weightedPick<MonsterSpecies>(rng, FOES, foeWeight) : weightedPick(rng, PETS, weight);
   const bonus = spawn.rarity === 'legendary' ? 4 : spawn.rarity === 'epic' ? 2 : 0;
   const level = isMonster
     ? companionLevel + Math.round(rng() * 4 - 2) + bonus

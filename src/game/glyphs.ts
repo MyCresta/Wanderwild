@@ -249,7 +249,7 @@ export const GLYPHS: Record<GlyphKind, { name: string; how: string; effect: stri
   knot: {
     name: 'Knot',
     how: 'Pass through the same street corner three times within 15 minutes.',
-    effect: 'Sets a Waymark there, where a creature always waits.',
+    effect: 'Sets a Waymark there, where a Wildling or Blotspawn always waits.',
   },
 };
 

@@ -58,10 +58,10 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   kennel: {
     id: 'kennel',
     name: 'Kennel',
-    blurb: 'Trains pets while you are away.',
+    blurb: 'Trains Wildlings while you are away.',
     unlockLevel: 6,
     product: { kind: 'supply', id: 'petXp' },
-    productName: 'Pet XP',
+    productName: 'Wildling XP',
     baseRate: 25,
     upgradeMaterial: 'hearthgrain',
   },

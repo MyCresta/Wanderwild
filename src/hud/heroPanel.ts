@@ -222,7 +222,7 @@ export function openLookChoice(game: GameState, cls: HeroClass, onDone?: () => v
 export function openHeroChoice(game: GameState, onDone: () => void): void {
   const sheet = openSheet('Who walks the map?', { closable: false, className: 'sheet-hero' });
   sheet.body.append(
-    h('p', { class: 'lore' }, 'Pick a path. Your hero fights beside your creatures. A second path opens at level 20.'),
+    h('p', { class: 'lore' }, 'Pick a path. Your hero fights beside your Wildlings. A second path opens at level 20.'),
     classPicker(HERO_CLASSES, (cls) => openLookChoice(game, cls, onDone)),
   );
 }

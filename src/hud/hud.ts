@@ -44,7 +44,7 @@ export class Hud {
         this.stridePop(event.skippedMs);
       } else if (event.kind === 'hatch') {
         sound.play('hatch');
-        this.toast(`Your ${event.hatchling.fromKm} km egg hatched! A ${event.hatchling.rarity} creature joins you.`, 6000, true);
+        this.toast(`Your ${event.hatchling.fromKm} km egg hatched! A ${event.hatchling.rarity} Wildling joins you.`, 6000, true);
       } else if (event.kind === 'glyph') {
         sound.play('spell');
         this.toast(event.text, 6000, true, glyphSvg(event.glyph, 44));
