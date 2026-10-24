@@ -22,17 +22,13 @@
           <span class="hud-xp" role="img" aria-label="XP"><span id="xp-bar"></span></span>
         </div>
         <div class="hud-stat hud-distance">
-          <span class="hud-label">Wandered</span>
           <span class="hud-value" id="distance">0 m</span>
           <span class="stride-pop" id="stride-pop" aria-live="polite"></span>
         </div>
         <div class="hud-purse">
           <span class="hud-coin" title="Coin"><i aria-hidden="true"></i><span id="coin">0</span></span>
-          <span class="hud-light" title="Wanderlight"><i aria-hidden="true"></i><span id="wanderlight">0</span></span>
-          <span class="hud-seals" title="Binding seals: walk 100 m to earn one"><i aria-hidden="true"></i><span id="seals">0</span></span>
         </div>
       </div>
-      <div class="title-ribbon" id="wayfarer-title" title="Your title" hidden></div>
       <div class="realm-banner" id="realm" role="status" hidden></div>
       <div class="hud-toast" id="toast" role="status" hidden></div>
       <div class="notice" id="notice" role="status" hidden></div>
@@ -50,7 +46,7 @@
     <!-- Map buttons stack upward from the bottom corners; the first child sits lowest.
          Buttons marked rail-extra stay folded behind the "more" button until it is opened. -->
     <nav class="rail rail-left" id="rail-left" aria-label="Wayfarer">
-      <button class="satchel-open" id="satchel-open" type="button" aria-label="Open satchel">
+      <button class="journal-open" id="journal-open" type="button" aria-label="Open satchel and journal">
         <svg viewBox="0 0 48 48" aria-hidden="true">
           <path d="M14 18c0-7 4-11 10-11s10 4 10 11" fill="none" stroke="currentColor" stroke-width="3" />
           <path d="M8 18h32l-3 22H11z" fill="currentColor" />
@@ -58,32 +54,11 @@
           <circle cx="24" cy="28" r="3" fill="#e8d9b5" />
         </svg>
       </button>
-      <button class="hearthstead-open" id="hearthstead-open" type="button" aria-label="Open Hearthstead" hidden>
-        <svg viewBox="0 0 48 48" aria-hidden="true">
-          <path d="M6 24L24 9l18 15" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" />
-          <path d="M11 22v18h26V22L24 11z" fill="currentColor" />
-          <path d="M20 40V30h8v10" fill="#e8d9b5" opacity=".5" />
-          <path d="M31 14v-5h4v8" fill="currentColor" />
-        </svg>
-      </button>
-      <button class="demesne-open" id="demesne-open" type="button" aria-label="Open your Demesne">
-        <svg viewBox="0 0 48 48" aria-hidden="true">
-          <path d="M10 14q14-8 28 0 6 12 0 22-14 8-28 0-6-10 0-22z" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="5 3" />
-          <path d="M24 13v22M17 20h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
-          <circle cx="24" cy="30" r="3" fill="#e8d9b5" />
-        </svg>
-      </button>
-      <button class="install" id="install" type="button" aria-label="Install Wanderwild" hidden>
-        <svg viewBox="0 0 48 48" aria-hidden="true">
-          <path d="M24 8v20M15 20l9 9 9-9" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="M10 32v6h28v-6" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-        <span>Install</span>
-      </button>
     </nav>
 
     <nav class="rail rail-right" id="rail-right" aria-label="Map tools">
-      <button class="recenter" id="recenter" type="button" aria-label="Follow me" aria-pressed="true">
+      <!-- Shown only once the camera has left the Wayfarer. -->
+      <button class="recenter" id="recenter" type="button" aria-label="Back to me" aria-pressed="true" hidden>
         <svg viewBox="0 0 48 48" aria-hidden="true">
           <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="2" />
           <path d="M24 4l4 20-4 20-4-20z" fill="currentColor" />
@@ -91,40 +66,9 @@
           <circle cx="24" cy="24" r="3" fill="#e8d9b5" />
         </svg>
       </button>
-      <button class="rail-more" id="rail-more" type="button" aria-label="More" aria-expanded="false" aria-controls="sound-toggle deeds">
-        <svg viewBox="0 0 48 48" aria-hidden="true">
-          <circle cx="12" cy="24" r="4" fill="currentColor" />
-          <circle cx="24" cy="24" r="4" fill="currentColor" />
-          <circle cx="36" cy="24" r="4" fill="currentColor" />
-        </svg>
-      </button>
-      <button class="sound-toggle rail-extra" id="sound-toggle" type="button" aria-label="Sound"></button>
-      <button class="deeds-button rail-extra" id="deeds" type="button" aria-label="Open deeds and titles">
-        <svg viewBox="0 0 48 48" aria-hidden="true">
-          <path d="M17 30l-6 13 8-3 4 5 4-12M31 30l6 13-8-3-4 5-4-12" fill="#8e2b22" />
-          <circle cx="24" cy="20" r="14" fill="currentColor" />
-          <path d="M24 10l3 6.5 7 .7-5.3 4.6 1.6 7L24 25.2l-6.3 3.6 1.6-7-5.3-4.6 7-.7z" fill="#4a3320" />
-        </svg>
-      </button>
     </nav>
 
     <div class="banners" id="banners"></div>
-
-    <dialog class="satchel" id="demesne" aria-labelledby="demesne-title">
-      <div class="satchel-body">
-        <button class="satchel-close" id="demesne-close" type="button" aria-label="Close">×</button>
-        <h2 id="demesne-title">The Inked Demesne</h2>
-        <div id="demesne-content"></div>
-      </div>
-    </dialog>
-
-    <dialog class="satchel" id="hearthstead" aria-labelledby="hearthstead-title">
-      <div class="satchel-body">
-        <button class="satchel-close" id="hearthstead-close" type="button" aria-label="Close">×</button>
-        <h2 id="hearthstead-title">The Hearthstead</h2>
-        <div id="hearthstead-content"></div>
-      </div>
-    </dialog>
 
     <dialog class="satchel" id="forge" aria-labelledby="forge-title">
       <div class="satchel-body">
@@ -134,28 +78,55 @@
       </div>
     </dialog>
 
-    <dialog class="satchel" id="satchel" aria-labelledby="satchel-level">
-      <div class="satchel-body">
-        <button class="satchel-close" id="satchel-close" type="button" aria-label="Close">×</button>
-        <h2 id="satchel-level">Wayfarer level 1</h2>
+    <dialog class="satchel journal" id="journal" aria-labelledby="journal-title">
+      <header class="journal-head">
+        <h2 id="journal-title">Wayfarer level 1</h2>
+        <button class="satchel-close" id="journal-close" type="button" aria-label="Close">×</button>
+        <div class="tabs journal-tabs" role="tablist">
+          <button class="tab" id="journal-tab-wayfarer" type="button" role="tab">Wayfarer</button>
+          <button class="tab" id="journal-tab-hearth" type="button" role="tab" hidden>Hearth</button>
+          <button class="tab" id="journal-tab-demesne" type="button" role="tab">Demesne</button>
+          <button class="tab" id="journal-tab-deeds" type="button" role="tab">Deeds</button>
+          <button class="tab" id="journal-tab-settings" type="button" role="tab" aria-label="Settings">⚙</button>
+        </div>
+      </header>
+      <section class="journal-pane" id="journal-wayfarer" role="tabpanel">
+        <p class="journal-title" id="wayfarer-title" hidden></p>
         <p id="satchel-xp"></p>
         <p class="satchel-next" id="satchel-next"></p>
         <h3>Satchel</h3>
         <ul class="satchel-grid" id="satchel-materials"></ul>
-        <h3>Journey</h3>
-        <ul class="satchel-grid" id="satchel-stats"></ul>
         <h3>Party</h3>
         <div id="satchel-party"></div>
-        <h3>Path of the Wayfarer</h3>
-        <ol class="satchel-unlocks" id="satchel-unlocks"></ol>
+        <div id="satchel-hunt"></div>
+        <details class="journal-more">
+          <summary>Journey and unlocks</summary>
+          <ul class="satchel-grid" id="satchel-stats"></ul>
+          <ol class="satchel-unlocks" id="satchel-unlocks"></ol>
+        </details>
+      </section>
+      <section class="journal-pane" id="journal-hearth" role="tabpanel" hidden></section>
+      <section class="journal-pane" id="journal-demesne" role="tabpanel" hidden></section>
+      <section class="journal-pane" id="journal-deeds" role="tabpanel" hidden></section>
+      <section class="journal-pane" id="journal-settings" role="tabpanel" hidden>
+        <h3>Sound</h3>
+        <div class="choice-row" id="sound-choice" role="radiogroup" aria-label="Sound">
+          <button type="button" role="radio" data-mode="all">Music and effects</button>
+          <button type="button" role="radio" data-mode="effects">Effects</button>
+          <button type="button" role="radio" data-mode="off">Off</button>
+        </div>
+        <div id="install-row" hidden>
+          <h3>App</h3>
+          <div class="satchel-actions"><button type="button" id="install">Install Wanderwild</button></div>
+        </div>
         <h3>Save</h3>
-        <p class="satchel-hint">Progress is kept on this phone. Export a copy to move it to another device.</p>
+        <p class="satchel-hint">Kept on this phone. Export a copy to move it to another device.</p>
         <div class="satchel-actions">
           <button type="button" id="save-export">Export save</button>
           <button type="button" id="save-import">Import save</button>
           <input type="file" id="save-file" accept="application/json,.json" hidden />
         </div>
-      </div>
+      </section>
     </dialog>
 
     <script type="module" src="./src/main.ts"></script>

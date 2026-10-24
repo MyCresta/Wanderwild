@@ -22,7 +22,8 @@ import type { RealmId } from '../game/realms';
 import type { Rarity } from '../game/spawns';
 import type { GameState } from '../game/state';
 import { formatCount } from '../hud/format';
-import { h, openSheet, type Sheet } from './dom';
+import { h } from './dom';
+import { journal } from './journal';
 
 const TIER_COLORS: Record<Deed['tier'], [string, string]> = {
   1: ['#c98b52', '#7a4a22'],
@@ -55,15 +56,18 @@ export class DeedKeeper {
   private unseen = 0;
   private queue: Deed[] = [];
   private showing = false;
-  private sheet: Sheet | null = null;
+  private readonly pane = journal.pane('deeds');
 
   constructor(
     private readonly game: GameState,
     private readonly collection: Collection,
-    private readonly button: HTMLElement,
     private readonly titleEl: HTMLElement,
   ) {
-    button.addEventListener('click', () => this.open());
+    journal.onShow('deeds', () => {
+      this.unseen = 0;
+      this.renderButton();
+      this.renderSheet();
+    });
     game.on((event) => event.kind === 'change' && this.check());
     this.check();
     this.renderTitle();
@@ -137,7 +141,7 @@ export class DeedKeeper {
       this.game.changed();
       this.renderButton();
       this.renderTitle();
-      if (this.sheet) this.renderSheet(this.sheet);
+      if (journal.showing('deeds')) this.renderSheet();
       void this.announce();
     } finally {
       this.checking = false;
@@ -174,7 +178,7 @@ export class DeedKeeper {
   }
 
   private renderButton(): void {
-    this.button.dataset.unseen = this.unseen ? String(Math.min(this.unseen, 99)) : '';
+    journal.setBadge('deeds', this.unseen ? String(Math.min(this.unseen, 99)) : '');
   }
 
   private renderTitle(): void {
@@ -184,25 +188,21 @@ export class DeedKeeper {
   }
 
   open(): void {
-    this.unseen = 0;
-    this.renderButton();
-    const sheet = openSheet('Deeds & Titles', { className: 'deeds-sheet' });
-    this.sheet = sheet;
-    sheet.onClose(() => this.sheet === sheet && (this.sheet = null));
-    this.renderSheet(sheet);
+    journal.open('deeds');
   }
 
-  private renderSheet(sheet: Sheet): void {
+  private renderSheet(): void {
     const stats = this.stats();
     const earned = this.state.earned;
     const titles = DEEDS.filter((d) => d.title && d.id in earned);
-    const scroll = sheet.body.scrollTop;
+    const scroll = this.pane.scrollTop;
+    const open = new Set([...this.pane.querySelectorAll<HTMLDetailsElement>('details[open]')].map((d) => d.dataset.group));
 
     const choose = (id: string | null) => {
       wearTitle(this.state, id);
       this.renderTitle();
       this.game.changed();
-      this.renderSheet(sheet);
+      this.renderSheet();
     };
 
     const titleRow = h(
@@ -222,22 +222,34 @@ export class DeedKeeper {
               ),
             ),
           )
-        : h('p', { class: 'deeds-hint' }, 'Earn deeds marked with a title to wear one beside your name.'),
+        : null,
     );
+
+    // The few deeds closest to done, so the sheet opens on something to aim for.
+    const closest = DEEDS.filter((d) => !(d.id in earned) && !d.secret)
+      .map((d) => ({ d, f: deedProgress(d, stats) }))
+      .sort((a, b) => b.f - a.f)
+      .slice(0, 3)
+      .map(({ d }) => this.deedRow(d, stats, false));
 
     const groups = (Object.keys(DEED_GROUPS) as DeedGroup[]).map((group) => {
       const deeds = DEEDS.filter((d) => d.group === group);
       const done = deeds.filter((d) => d.id in earned).length;
       return h(
-        'section',
-        { class: 'deed-group' },
-        h('h3', {}, DEED_GROUPS[group], h('small', {}, ` ${done}/${deeds.length}`)),
+        'details',
+        { class: 'deed-group', 'data-group': group, open: open.has(group) },
+        h('summary', {}, DEED_GROUPS[group], h('small', {}, ` ${done}/${deeds.length}`)),
         h('ul', { class: 'deed-list' }, ...deeds.map((d) => this.deedRow(d, stats, d.id in earned))),
       );
     });
 
-    sheet.body.replaceChildren(titleRow, ...groups);
-    sheet.body.scrollTop = scroll;
+    this.pane.replaceChildren(
+      titleRow,
+      ...(closest.length ? [h('h3', {}, 'Nearly there'), h('ul', { class: 'deed-list' }, ...closest)] : []),
+      h('h3', {}, 'All deeds'),
+      ...groups,
+    );
+    this.pane.scrollTop = scroll;
   }
 
   private deedRow(deed: Deed, stats: DeedStats, earned: boolean): HTMLElement {
@@ -269,12 +281,7 @@ export class DeedKeeper {
               h('small', {}, progressText(deed, stats)),
             ),
       ),
-      h(
-        'div',
-        { class: 'deed-reward' },
-        deed.title && h('span', { class: 'deed-title-tag' }, deed.title),
-        h('small', {}, `${reward.coin} coin · ${reward.xp} XP`),
-      ),
+      h('div', { class: 'deed-reward', title: `${reward.coin} coin · ${reward.xp} XP` }, deed.title && h('span', { class: 'deed-title-tag' }, deed.title)),
     );
   }
 }

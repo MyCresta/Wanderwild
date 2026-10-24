@@ -32,20 +32,3 @@ export function watchLayout(): void {
   addEventListener('resize', update);
   update();
 }
-
-/** The "more" button folds the rail's less-used buttons away; touching anything else folds them again. */
-export function setupRailMenu(): void {
-  const more = document.getElementById('rail-more');
-  const rail = more?.parentElement;
-  if (!more || !rail) return;
-  const setOpen = (open: boolean) => {
-    rail.classList.toggle('open', open);
-    more.setAttribute('aria-expanded', String(open));
-  };
-  more.addEventListener('click', () => setOpen(!rail.classList.contains('open')));
-  document.addEventListener('pointerdown', (e) => {
-    if (!rail.contains(e.target as Node)) setOpen(false);
-  });
-  // Opening the deeds sheet is a destination, so the menu has done its job.
-  document.getElementById('deeds')?.addEventListener('click', () => setOpen(false));
-}
