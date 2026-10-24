@@ -10,7 +10,8 @@ const ICONS: Record<CurioKind, string> = {
 
 /** Today's curios as small tappable finds on the map. */
 export class CurioLayer {
-  private markers = new globalThis.Map<string, Marker>();
+  private markers = new globalThis.Map<string, { marker: Marker; curio: Curio }>();
+  private inReach: (curio: Curio) => boolean = () => true;
 
   constructor(
     private readonly map: Map,
@@ -19,7 +20,7 @@ export class CurioLayer {
 
   show(curios: Curio[]): void {
     const keep = new Set(curios.map((c) => c.id));
-    for (const [id, marker] of this.markers)
+    for (const [id, { marker }] of this.markers)
       if (!keep.has(id)) {
         marker.remove();
         this.markers.delete(id);
@@ -35,12 +36,19 @@ export class CurioLayer {
         e.stopPropagation();
         this.onTap(curio);
       });
-      this.markers.set(curio.id, new Marker({ element: el, anchor: 'bottom' }).setLngLat([curio.lng, curio.lat]).addTo(this.map));
+      this.markers.set(curio.id, { marker: new Marker({ element: el, anchor: 'bottom' }).setLngLat([curio.lng, curio.lat]).addTo(this.map), curio });
     }
+    this.markReach(this.inReach);
+  }
+
+  /** Dims curios outside the reach ring, so the ring shows what can be picked up. */
+  markReach(inReach: (curio: Curio) => boolean): void {
+    this.inReach = inReach;
+    for (const { marker, curio } of this.markers.values()) marker.getElement().classList.toggle('out-of-reach', !inReach(curio));
   }
 
   remove(id: string): void {
-    this.markers.get(id)?.remove();
+    this.markers.get(id)?.marker.remove();
     this.markers.delete(id);
   }
 }

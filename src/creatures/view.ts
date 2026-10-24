@@ -28,20 +28,49 @@ interface Live {
   art: Art;
   start: number;
   attached: boolean;
+  /** Whether it stands on the map, under any sheet or scene that opens. */
+  onMap: boolean;
+  /** Whether any of it is on screen; nothing is redrawn for creatures nobody can see. */
+  visible: boolean;
 }
 
 const live = new Set<Live>();
+const bySvg = new WeakMap<Element, Live>();
 let frame = 0;
 const reducedMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+const seen =
+  typeof IntersectionObserver === 'function'
+    ? new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          const item = bySvg.get(entry.target);
+          if (item) item.visible = entry.isIntersecting;
+        }
+      })
+    : null;
+
+/** A sheet or scene over the map: map creatures underneath can rest until it closes. */
+const mapCovered = () => !!document.body?.querySelector(':scope > .sheet-backdrop, :scope > .catch-scene');
+
+let beat = 0;
+
 function loop(now: number): void {
+  const covered = mapCovered();
+  // Small map creatures idle at half rate, which reads the same and halves the redraws on the busiest screen.
+  const mapBeat = (beat++ & 1) === 0;
   for (const item of live) {
-    if (item.svg.isConnected) item.attached = true;
-    else if (item.attached) {
+    if (item.svg.isConnected) {
+      if (!item.attached) {
+        item.attached = true;
+        item.onMap = !!item.svg.closest('#map');
+        seen?.observe(item.svg);
+      }
+    } else if (item.attached) {
       live.delete(item);
+      seen?.unobserve(item.svg);
       continue;
     }
-    if (item.attached) item.art.tick((now - item.start) / 1000);
+    if (item.attached && item.visible && !(item.onMap && (covered || !mapBeat))) item.art.tick((now - item.start) / 1000);
   }
   frame = live.size ? requestAnimationFrame(loop) : 0;
 }
@@ -77,7 +106,9 @@ export function createCreatureSvg(options: CreatureOptions): SVGSVGElement {
 
   art.tick(0.6);
   if (!still && !reducedMotion) {
-    live.add({ svg, art, start: performance.now() - Math.random() * 4000, attached: false });
+    const item: Live = { svg, art, start: performance.now() - Math.random() * 4000, attached: false, onMap: false, visible: true };
+    live.add(item);
+    bySvg.set(svg, item);
     if (!frame) frame = requestAnimationFrame(loop);
   }
   return svg;

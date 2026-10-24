@@ -10,14 +10,13 @@ import { grantPetXp, partyPets } from '../creatures/collection';
 import { getSpecies } from '../creatures/species';
 import type { GameContext } from '../ui/context';
 import type { ForgePanel } from './forgePanel';
+import { journal } from '../ui/journal';
 
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const HEARTHSTEAD_LEVEL = Math.min(...BUILDING_IDS.map((id) => BUILDINGS[id].unlockLevel));
 
-/** The Hearthstead dialog: buildings to build, collect and upgrade, plus the egg incubator. */
+/** The journal's Hearth tab: buildings to build, collect and upgrade, expeditions and the egg incubator. */
 export class HearthsteadPanel {
-  private readonly dialog = $<HTMLDialogElement>('hearthstead');
-  private readonly body = $('hearthstead-content');
+  private readonly body = journal.pane('hearth');
 
   constructor(
     private readonly game: GameState,
@@ -25,14 +24,11 @@ export class HearthsteadPanel {
     private readonly creatures: GameContext,
     private readonly forge: ForgePanel,
   ) {
-    $('hearthstead-open').addEventListener('click', () => {
+    journal.onShow('hearth', () => {
       game.tickHearthstead();
       this.render();
-      this.dialog.showModal();
     });
-    $('hearthstead-close').addEventListener('click', () => this.dialog.close());
-    this.dialog.addEventListener('click', (e) => {
-      if (e.target === this.dialog) return this.dialog.close();
+    this.body.addEventListener('click', (e) => {
       const button = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-act]');
       if (!button) return;
       if (button.dataset.act === 'forge') return this.forge.open();
@@ -49,10 +45,10 @@ export class HearthsteadPanel {
     });
     game.on((event) => {
       if (event.kind !== 'change') return;
-      if (this.dialog.open) this.render();
+      if (journal.showing('hearth')) this.render();
       else this.markReady();
     });
-    // Keep the hearth button's glow in step with what is ready to collect.
+    // Keep the hearth tab's dot in step with what is ready to collect.
     setInterval(() => this.markReady(), 20_000);
     this.markReady();
   }
@@ -81,7 +77,7 @@ export class HearthsteadPanel {
 
   private expeditionsHtml(): string {
     const level = this.game.level.level;
-    if (level < EXPEDITION_LEVEL) return `<p class="satchel-hint">Pet expeditions unlock at Wayfarer level ${EXPEDITION_LEVEL}.</p>`;
+    if (level < EXPEDITION_LEVEL) return `<p class="satchel-hint">Opens at level ${EXPEDITION_LEVEL}.</p>`;
     const s = this.game.save;
     const c = this.creatures.collection;
     const now = Date.now();
@@ -110,8 +106,7 @@ export class HearthsteadPanel {
         <ul class="exp-pets">${free
           .map((p) => `<li><button type="button" data-act="exp-send" data-pet="${p.uid}">Send ${getSpecies(p.speciesId).name} <small>Lv ${p.level}</small></button></li>`)
           .join('')}</ul>`;
-    return `${active ? `<ul class="buildings">${active}</ul>` : ''}${form}
-      <p class="satchel-hint">Walking speeds expeditions up just like the buildings.</p>`;
+    return `${active ? `<ul class="buildings">${active}</ul>` : ''}${form}`;
   }
 
   private markReady(): void {
@@ -120,8 +115,8 @@ export class HearthsteadPanel {
       const b = h.buildings[id];
       return b && stored(BUILDINGS[id], b) >= storageCap(BUILDINGS[id], b) * 0.25;
     });
-    $('hearthstead-open').classList.toggle('ready', ready);
-    $('hearthstead-open').hidden = this.game.level.level < HEARTHSTEAD_LEVEL;
+    journal.setBadge('hearth', ready);
+    journal.setTabHidden('hearth', this.game.level.level < HEARTHSTEAD_LEVEL);
   }
 
   render(): void {
@@ -140,8 +135,8 @@ export class HearthsteadPanel {
       if (!b) {
         const locked = level < def.unlockLevel;
         return `<li class="building ${locked ? 'locked' : ''}">
-          <div class="building-head"><b>${def.name}</b><small>${def.blurb}</small></div>
-          ${locked ? `<p class="building-lock">Unlocks at Wayfarer level ${def.unlockLevel}</p>` : `<button type="button" data-act="build" data-id="${id}">Build</button>`}
+          <div class="building-head"><b>${def.name}</b><small>${locked ? `Level ${def.unlockLevel}` : def.blurb}</small></div>
+          ${locked ? '' : `<button type="button" data-act="build" data-id="${id}">Build</button>`}
         </li>`;
       }
       const have = stored(def, b);
@@ -150,20 +145,21 @@ export class HearthsteadPanel {
       const maxed = b.level >= MAX_BUILDING_LEVEL;
       const full = msUntilFull(b);
       return `<li class="building">
-        <div class="building-head"><b>${def.name}</b><span class="building-level">Lv ${b.level}</span><small>${def.blurb}</small></div>
+        <div class="building-head" title="${def.blurb}"><b>${def.name}</b><span class="building-level">Lv ${b.level}</span></div>
         <div class="building-bar" aria-hidden="true"><span style="width:${(100 * b.progressMs) / capMs(b.level)}%"></span></div>
-        <p class="building-stats">${formatCount(have)} / ${formatCount(cap)} ${def.productName} · ${formatCount(ratePerHour(def, b.level))}/h · ${full ? `full in ${formatDuration(full)}` : '<b>storage full</b>'}</p>
+        <p class="building-stats">${formatCount(have)} / ${formatCount(cap)} ${def.productName} · ${full ? `full in ${formatDuration(full)}` : '<b>full</b>'}</p>
         <div class="building-actions">
           <button type="button" data-act="collect" data-id="${id}" ${have ? '' : 'disabled'}>Collect</button>
-          <button type="button" data-act="upgrade" data-id="${id}" ${this.game.canUpgrade(id) ? '' : 'disabled'}>
-            ${maxed ? 'Max level' : `Upgrade · ${formatCount(cost.coin)} coin, ${cost.amount} ${MATERIALS[cost.material].name}`}
+          <button type="button" data-act="upgrade" data-id="${id}" ${this.game.canUpgrade(id) ? '' : 'disabled'}
+            title="${maxed ? '' : `${formatCount(ratePerHour(def, b.level))}/h now`}">
+            ${maxed ? 'Max level' : `Upgrade · ${formatCount(cost.coin)}c, ${cost.amount} ${MATERIALS[cost.material].name}`}
           </button>
         </div>
       </li>`;
     }).join('');
     const eggs =
       level < EGG_UNLOCK_LEVEL
-        ? `<p class="satchel-hint">Wild eggs unlock at Wayfarer level ${EGG_UNLOCK_LEVEL}. Shrines sometimes hold one.</p>`
+        ? `<p class="satchel-hint">Opens at level ${EGG_UNLOCK_LEVEL}.</p>`
         : s.eggs.length
           ? `<ul class="eggs">${s.eggs
               .map(
@@ -175,12 +171,12 @@ export class HearthsteadPanel {
           : '<p class="satchel-hint">No eggs yet. Touch shrines to find one.</p>';
     const forge =
       level >= FORGE_LEVEL
-        ? `<li class="building forge-card"><div class="building-head"><b>The Forge</b><small>Craft and upgrade staff, cloak, boots, lantern and charm.</small></div><button type="button" data-act="forge">Enter the Forge</button></li>`
-        : `<li class="building locked"><div class="building-head"><b>The Forge</b><small>Craft and upgrade your gear.</small></div><p class="building-lock">Unlocks at Wayfarer level ${FORGE_LEVEL}</p></li>`;
+        ? `<li class="building forge-card"><div class="building-head"><b>The Forge</b><small>Gear for you and your pets</small></div><button type="button" data-act="forge">Enter</button></li>`
+        : '';
     this.body.innerHTML = `
-      <p class="stride-note">Every 100 m you walk moves all timers forward 10 minutes. Today: <b>${formatDuration(STRIDE_DAILY_CAP_MS - left)}</b> of ${formatDuration(STRIDE_DAILY_CAP_MS)} skipped.</p>
+      <p class="stride-note" title="Every 100 m you walk moves all timers forward 10 minutes">Walking skips time: <b>${formatDuration(STRIDE_DAILY_CAP_MS - left)}</b> of ${formatDuration(STRIDE_DAILY_CAP_MS)} today</p>
       <ul class="buildings">${forge}${cards}</ul>
-      <p class="satchel-hint">Supplies: ${formatCount(s.supplies.tonic)} Tonic, ${formatCount(s.supplies.petXp)} Pet XP</p>
+      <p class="satchel-hint">${formatCount(s.supplies.tonic)} Tonic · ${formatCount(s.supplies.petXp)} Pet XP</p>
       <h3>Expeditions</h3>
       ${this.expeditionsHtml()}
       <h3>Incubator</h3>

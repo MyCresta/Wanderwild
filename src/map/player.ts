@@ -59,13 +59,19 @@ export class PlayerMarker {
         source: ACCURACY_SOURCE,
         paint: { 'line-color': '#a8772e', 'line-width': 1, 'line-dasharray': [2, 2], 'line-opacity': 0.6 },
       });
-      // How far the player can reach creatures and shrines, so "near" on screen matches the game.
+      // How far the player can reach creatures, shrines and curios, so "near" on screen matches the game.
       map.addSource(REACH_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'player-reach-fill',
+        type: 'fill',
+        source: REACH_SOURCE,
+        paint: { 'fill-color': '#6b3fa0', 'fill-opacity': 0.08 },
+      });
       map.addLayer({
         id: 'player-reach-edge',
         type: 'line',
         source: REACH_SOURCE,
-        paint: { 'line-color': '#6b3fa0', 'line-width': 2.5, 'line-dasharray': [3, 2], 'line-opacity': 0.75 },
+        paint: { 'line-color': '#6b3fa0', 'line-width': 3, 'line-opacity': 0.85 },
       });
       if (this.last) this.update(this.last);
     };

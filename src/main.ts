@@ -12,7 +12,7 @@ import { watchLocation } from './geo/location';
 import { setupInstallButton } from './install';
 import { loadSave } from './game/save';
 import { GameState } from './game/state';
-import { SHRINE_REACH_M, type Shrine } from './game/shrines';
+import type { Shrine } from './game/shrines';
 import { isNight, RARITIES } from './game/gear';
 import { MATERIALS, type MaterialId, type RealmId } from './game/realms';
 import { installProbeLayers, realmAt, shrinesNear } from './map/realmProbe';
@@ -20,6 +20,7 @@ import { ShrineLayer } from './map/shrineLayer';
 import { Hud } from './hud/hud';
 import { HearthsteadPanel } from './hud/hearthsteadPanel';
 import { renderParty } from './hud/partyPanel';
+import { journal } from './ui/journal';
 import { ForgePanel } from './hud/forgePanel';
 import { formatWait } from './hud/format';
 import { CompanionMarker, CreatureMarkers, FollowerMarker, ResidentMarkers } from './map/creatures';
@@ -36,15 +37,14 @@ import { openJoined, openMeeting } from './ui/meet';
 import { BLOT_TRUST_M, followerTrust, type FollowOutcome } from './creatures/befriend';
 import { DeedKeeper } from './ui/deeds';
 import { sound } from './audio/sound';
-import { setupSoundButton } from './ui/soundButton';
 import { HuntController } from './ui/hunt';
 import { Trace } from './game/glyphs';
 import { realmShares, samplePoints, waymarkSpawn } from './game/demesne';
 import { DemesneLayer } from './map/demesneLayer';
 import { DemesnePanel } from './hud/demesnePanel';
 import { ringInRealm, walkInRealm } from './creatures/evolution';
-import { creatureReach } from './geo/reach';
-import { setupRailMenu, watchLayout } from './ui/layout';
+import { playerReach } from './geo/reach';
+import { watchLayout } from './ui/layout';
 import { installOrbitCamera } from './map/orbitCamera';
 import { FightBoard, type FoeNear } from './ui/fightBoard';
 import { Farsight } from './ui/farsight';
@@ -67,10 +67,8 @@ const CREATURE_XP: Record<Spawn['rarity'], number> = { common: 60, uncommon: 90,
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const noticeEl = $('notice');
 const recenterEl = $<HTMLButtonElement>('recenter');
-const sealsEl = $('seals');
 
 watchLayout();
-setupRailMenu();
 
 function showNotice(text: string | null): void {
   noticeEl.hidden = !text;
@@ -120,6 +118,7 @@ function setFollowing(value: boolean): void {
   if (value && farsight.active) return farsight.set(false);
   following = value;
   recenterEl.setAttribute('aria-pressed', String(value));
+  recenterEl.hidden = value;
   if (value && lastFix) map.easeTo({ center: [lastFix.lng, lastFix.lat], zoom: Math.max(map.getZoom(), 15) });
 }
 
@@ -129,8 +128,7 @@ recenterEl.addEventListener('click', () => setFollowing(true));
 function useShrine(shrine: Shrine): void {
   if (!lastFix) return hud.toast('Find your location first to reach a shrine.');
   const away = haversine(lastFix, shrine);
-  const reach = SHRINE_REACH_M + game.bonuses().reachM;
-  if (away > reach) return hud.toast(`${shrine.name} is ${Math.round(away)} m away. Walk within ${Math.round(reach)} m to touch it.`);
+  if (!onFoot(shrine)) return hud.toast(`${shrine.name} is ${Math.round(away)} m away. Walk until it is inside your ring to touch it.`);
   const wait = game.shrineReadyAt(shrine) - Date.now();
   if (wait > 0) return hud.toast(`${shrine.name} is gathering its power. Ready in ${formatWait(wait)}.`);
   if (game.useShrine(shrine, realmAt(map, shrine.lng, shrine.lat) ?? currentRealm ?? 'hearthfields')) sound.play('shrine');
@@ -138,6 +136,7 @@ function useShrine(shrine: Shrine): void {
 }
 
 const shrines = new ShrineLayer(map, useShrine);
+const curioLayer = new CurioLayer(map, (curio) => takeCurio(curio));
 
 // Creatures: the collection, wild spawns around the player, and the companion at their side.
 const collection = loadCollection();
@@ -151,7 +150,6 @@ const creatureGame: GameContext = {
   collection,
   changed() {
     saveCollection(collection);
-    sealsEl.textContent = String(collection.seals);
     companionMarker.setPet(companion(collection));
     followerMarker.set(collection.follower);
     // A companion sent back to the wild no longer lives in the Demesne.
@@ -172,8 +170,9 @@ creatureGame.wayfarer = {
   },
 };
 creatureGame.changed();
-deeds = new DeedKeeper(game, collection, $('deeds'), $('wayfarer-title'));
-$('satchel-open').addEventListener('click', () => renderParty($('satchel-party'), creatureGame));
+deeds = new DeedKeeper(game, collection, $('wayfarer-title'));
+hud.seals = () => collection.seals;
+journal.onShow('wayfarer', () => renderParty($('satchel-party'), creatureGame));
 new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame, forge);
 
 // Glyphwalking: the shape of the walk, kept in memory only, and the Demesne it claims.
@@ -254,7 +253,7 @@ function settleFollower(outcome: FollowOutcome): void {
 }
 
 /** Within the purple ring of where the Wayfarer actually stands. */
-const onFoot = (p: { lat: number; lng: number }) => !!lastFix && haversine(lastFix, p) <= creatureReach(lastFix, game.bonuses().reachM);
+const onFoot = (p: { lat: number; lng: number }) => !!lastFix && haversine(lastFix, p) <= playerReach(lastFix, game.bonuses().reachM);
 
 function meet(spawn: Spawn, encounter: Encounter): void {
   // By Farsight anything on the map can be met, for a smaller reward; in person it pays in full.
@@ -262,9 +261,9 @@ function meet(spawn: Spawn, encounter: Encounter): void {
   if (remote && !farsight.active) {
     if (!lastFix) return;
     const metres = haversine(lastFix, spawn);
-    const reach = creatureReach(lastFix, game.bonuses().reachM);
+    const reach = playerReach(lastFix, game.bonuses().reachM);
     sound.play('error');
-    toast(`That ${encounter.species.name} is ${Math.round(metres)} m away. Walk ${Math.ceil(metres - reach)} m closer, or reach it by Farsight 👁 for ${Math.round(FARSIGHT_SHARE * 100)}% rewards.`);
+    toast(`${encounter.species.name} is ${Math.ceil(metres - reach)} m out of reach. Walk closer, or use Farsight 👁.`);
     return;
   }
   if (encounter.species.kind === 'pet') {
@@ -314,9 +313,10 @@ const farsight = new Farsight({
   enter() {
     following = false;
     recenterEl.setAttribute('aria-pressed', 'false');
+    recenterEl.hidden = false;
     orbit.setFree(true);
     if (!seenFarsightHint()) {
-      hud.toast(`Farsight: drag anywhere to explore. Fight, sketch and pick up curios from here for ${Math.round(FARSIGHT_SHARE * 100)}% rewards. Walking still pays full.`, 6000);
+      hud.toast(`Farsight: drag to explore and play from here for ${Math.round(FARSIGHT_SHARE * 100)}% rewards. Walking pays full.`, 5000);
     }
     refreshAround(true);
   },
@@ -366,10 +366,13 @@ function refreshSpawns(force = false): void {
 function showReach(): void {
   const fix = focus();
   if (!fix) return;
-  const reach = lastFix ? creatureReach(lastFix, game.bonuses().reachM) : 0;
+  const reach = lastFix ? playerReach(lastFix, game.bonuses().reachM) : 0;
   if (lastFix) player.setReach(reach);
   // By Farsight everything shown is in reach, so nothing is dimmed.
   creatures.markReach((spawn) => farsight.active || onFoot(spawn));
+  // Shrines need the Wayfarer in person; curios can still be taken by Farsight for a share.
+  shrines.markReach(onFoot);
+  curioLayer.markReach((curio) => farsight.active || onFoot(curio));
   const foes: FoeNear[] = shown
     .filter(({ spawn, encounter }) => encounter.species.kind === 'monster' && !(spawn.id in collection.cleared))
     .map(({ spawn, encounter }) => {
@@ -379,7 +382,7 @@ function showReach(): void {
   fights.update(foes);
   if (!foeHinted && companion(collection) && foes.some((f) => f.inReach)) {
     foeHinted = true;
-    toast('A Blotspawn is close enough to fight! Tap it, or the ⚔ button.');
+    toast('A Blotspawn is in reach! Tap it to fight.');
   }
 }
 game.on((e) => e.kind === 'change' && showReach());
@@ -388,7 +391,6 @@ setInterval(() => refreshSpawns(), SPAWN_REFRESH_MS);
 map.once('idle', () => refreshSpawns(true));
 
 // Curios: small daily finds. Walk past one to pick it up in full, or tap it by Farsight for a share.
-const curioLayer = new CurioLayer(map, (curio) => takeCurio(curio));
 
 function takeCurio(curio: Curio): void {
   const here = onFoot(curio);
@@ -568,7 +570,6 @@ document.addEventListener('visibilitychange', () => {
 });
 
 sound.install();
-setupSoundButton($<HTMLButtonElement>('sound-toggle'));
 
 registerSW({ immediate: true });
-setupInstallButton($<HTMLButtonElement>('install'), showNotice);
+setupInstallButton($<HTMLButtonElement>('install'), showNotice, $('install-row'));

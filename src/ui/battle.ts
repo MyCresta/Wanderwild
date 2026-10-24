@@ -69,18 +69,29 @@ function edgeTag(edge: number): HTMLElement | null {
  */
 function timingSweep(btn: HTMLButtonElement): Promise<number> {
   const needle = h('span', { class: 'sweep-needle' });
-  const track = h('span', { class: 'sweep-track', style: `--sweet: ${SWEET * 100}%` }, h('span', { class: 'sweep-zone' }), needle);
+  const runner = h('span', { class: 'sweep-runner' }, needle);
+  const track = h('span', { class: 'sweep-track', style: `--sweet: ${SWEET * 100}%` }, h('span', { class: 'sweep-zone' }), runner);
   const hint = h('span', { class: 'sweep-hint' }, 'Tap again on the gold!');
   btn.append(track, hint);
   btn.classList.add('sweeping');
   btn.disabled = false;
+  // A transform animation runs on the compositor, so the needle glides even when the page is busy,
+  // and the tap is scored from its own timestamp against the animation's clock: what you see is what counts.
+  const sweep = runner.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(100%)' }], {
+    duration: SWEEP_MS,
+    easing: 'linear',
+    fill: 'forwards',
+  });
   return new Promise((resolve) => {
-    const start = performance.now();
     let done = false;
-    const at = (t: number) => Math.min(1, (t - start) / SWEEP_MS);
+    const at = (t: number) => {
+      const start = sweep.startTime;
+      return typeof start === 'number' ? Math.min(1, Math.max(0, (t - start) / SWEEP_MS)) : 0;
+    };
     const finish = (quality: number) => {
       if (done) return;
       done = true;
+      sweep.pause();
       btn.removeEventListener('pointerdown', onTap);
       btn.classList.add(quality >= CRIT_QUALITY ? 'sweep-perfect' : quality > 0.4 ? 'sweep-good' : 'sweep-miss');
       hint.textContent = quality >= CRIT_QUALITY ? 'Perfect!' : quality > 0.4 ? 'Good' : 'Missed the mark';
@@ -93,16 +104,13 @@ function timingSweep(btn: HTMLButtonElement): Promise<number> {
     };
     const onTap = (e: Event) => {
       e.preventDefault();
-      finish(Math.max(0, 1 - Math.abs(at(performance.now()) - SWEET) / SWEET_SPREAD));
+      finish(Math.max(0, 1 - Math.abs(at(e.timeStamp) - SWEET) / SWEET_SPREAD));
     };
     btn.addEventListener('pointerdown', onTap);
-    const frame = (t: number) => {
-      if (done) return;
-      needle.style.left = `${at(t) * 100}%`;
-      if (t - start >= SWEEP_MS) finish(0.2);
-      else requestAnimationFrame(frame);
-    };
-    requestAnimationFrame(frame);
+    sweep.finished.then(
+      () => finish(0.2),
+      () => finish(0.2),
+    );
   });
 }
 
