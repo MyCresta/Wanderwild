@@ -14,13 +14,23 @@ import {
   type SpellId,
 } from '../creatures/battle';
 import { STRONG } from '../creatures/elements';
-import { FOE_TRAITS, RANKS } from '../creatures/foes';
-import { grantPetXp, markSeen, partyPets } from '../creatures/collection';
+import { BOSS_TITLES, FOE_TRAITS, RANKS, rankLabel } from '../creatures/foes';
+import {
+  FIT_TO_FIGHT,
+  fitToFight,
+  grantPetXp,
+  markSeen,
+  partyPets,
+  REST_FULL_MS,
+  setVigor,
+  vigorNow,
+  type OwnedPet,
+} from '../creatures/collection';
 import { ELEMENTS, getSpecies } from '../creatures/species';
 import type { Encounter } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
 import type { GameContext } from './context';
-import { h, openSheet, wait } from './dom';
+import { h, openSheet, toast, wait } from './dom';
 import { elementTag, wheelHelp } from './wheel';
 import { sound } from '../audio/sound';
 
@@ -126,12 +136,79 @@ function card(btn: HTMLButtonElement, name: string, sub: string, tag?: HTMLEleme
 export interface BattleOpts {
   /** A practice bout: no rewards and nothing at stake. */
   practice?: boolean;
+  /** The boss check has been shown and the player chose to fight. */
+  gateSeen?: boolean;
+}
+
+/** What a foe is called on screen: bosses carry a title, ranked foes a badge. */
+export function foeName(encounter: Encounter): string {
+  if (encounter.rank === 'boss') return `${encounter.species.name} ${BOSS_TITLES[(encounter.tier ?? 1) - 1]}`;
+  return encounter.species.name;
+}
+
+/** Average level of the pets fit to fight, to weigh against a boss. */
+const partyLevel = (pets: OwnedPet[]) => (pets.length ? Math.round(pets.reduce((sum, p) => sum + p.level, 0) / pets.length) : 0);
+
+/**
+ * Before a boss: what it is, what it is weak to, and how ready the party is. Bosses do not
+ * scale with you, so this is the moment to turn back, rest or bring other pets.
+ */
+function openBossGate(ctx: GameContext, encounter: Encounter, onFight: () => void): void {
+  const pets = partyPets(ctx.collection);
+  const level = partyLevel(pets.filter((p) => fitToFight(p)));
+  const gap = encounter.level - level;
+  const sheet = openSheet(foeName(encounter), { className: 'sheet-boss' });
+  const weak = encounter.species.kind === 'monster' ? encounter.species.weakTo : null;
+  const verdict = gap <= -2 ? 'Your party should handle it.' : gap <= 1 ? 'A hard fight. Bring pets strong against it, and tonics.' : `Too strong for now: it is level ${encounter.level}, your party about ${level}.`;
+  sheet.body.append(
+    h('div', { class: 'boss-gate' }, createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 120, facing: -1 })),
+    h(
+      'p',
+      { class: 'boss-meta' },
+      h('span', { class: 'rank-chip rank-boss' }, rankLabel('boss', encounter.tier)),
+      ` Level ${encounter.level} `,
+      elementTag(encounter.species.element),
+      weak ? ' weak to ' : '',
+      weak ? elementTag(weak) : '',
+    ),
+    h('p', { class: 'hint' }, (encounter.traits ?? []).map((t) => `${FOE_TRAITS[t].glyph} ${FOE_TRAITS[t].name}: ${FOE_TRAITS[t].blurb}`).join(' '), ' Below half health it grows enraged.'),
+    h(
+      'ul',
+      { class: 'gate-party' },
+      ...pets.map((p) => {
+        const v = vigorNow(p);
+        return h(
+          'li',
+          {},
+          createCreatureSvg({ speciesId: p.speciesId, seed: p.seed, size: 40, still: true }),
+          h('span', {}, `${getSpecies(p.speciesId).name} · Lv ${p.level}`),
+          h('span', { class: 'bench-hp' }, h('span', { style: { width: `${v * 100}%` } })),
+        );
+      }),
+    ),
+    h('p', { class: `gate-verdict${gap > 1 ? ' gate-risky' : ''}` }, verdict),
+    h(
+      'div',
+      { class: 'actions' },
+      h('button', { class: 'btn', type: 'button', onclick: () => sheet.close() }, 'Not yet'),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: () => (sheet.close(), onFight()) }, 'Fight'),
+    ),
+  );
 }
 
 /** A quick turn-based fight between the party and a Blotspawn. */
 export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won: boolean) => void, opts: BattleOpts = {}): void {
   const owned = partyPets(ctx.collection);
   if (!owned.length) return;
+  if (!owned.some((p) => fitToFight(p))) {
+    const soonest = Math.ceil(Math.min(...owned.map((p) => (FIT_TO_FIGHT - vigorNow(p)) * REST_FULL_MS)) / 60_000);
+    toast(`Your party is worn out. Let them rest${soonest > 0 ? ` about ${soonest} min` : ''}, or give a tonic from the satchel.`);
+    return;
+  }
+  if (encounter.rank === 'boss' && !opts.gateSeen) {
+    openBossGate(ctx, encounter, () => openBattle(ctx, encounter, onDone, { ...opts, gateSeen: true }));
+    return;
+  }
   const practice = !!opts.practice;
   if (!practice) {
     markSeen(ctx.collection, encounter.species.id);
@@ -142,17 +219,29 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   const battle = new Battle(
     owned.map((p) => makeFighter(getSpecies(p.speciesId), p.level, p.seed, p.uid)),
     makeFighter(encounter.species, encounter.level, encounter.seed, undefined, encounter),
-    { wayfarerLevel: way?.level() ?? 1, petDamage: way?.gear().petDamage, petHealth: way?.gear().petHealth },
+    {
+      wayfarerLevel: way?.level() ?? 1,
+      petDamage: way?.gear().petDamage,
+      petHealth: way?.gear().petHealth,
+      // Damage lasts between fights; practice bouts start fresh and leave no marks.
+      vigor: practice ? undefined : owned.map((p) => vigorNow(p)),
+      tonicPower: way?.tonicPower?.() ?? 1,
+    },
   );
   const foe = battle.foe;
-  const rankName = foe.rank === 'normal' ? '' : `${RANKS[foe.rank].name} `;
-  const sheet = openSheet(practice ? 'Practice bout' : `${rankName}${encounter.species.name} blocks the way`, {
+  const rankName = foe.rank === 'rare' || foe.rank === 'elite' ? `${RANKS[foe.rank].name} ` : '';
+  const sheet = openSheet(practice ? 'Practice bout' : `${rankName}${foeName(encounter)} blocks the way`, {
     className: `sheet-battle battle-rank-${foe.rank}`,
   });
   let reported = false;
   const finish = (won: boolean) => {
     if (reported) return;
     reported = true;
+    if (!practice) {
+      const now = Date.now();
+      battle.vigorLeft().forEach((v, i) => setVigor(owned[i], v, now));
+      ctx.changed();
+    }
     onDone(won);
   };
   const endMusic = sound.scene('battle');
@@ -162,7 +251,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   });
 
   // What the screen shows, which trails the battle's own state until each blow is played out.
-  const shown: HpSnap & { active: number } = { foe: foe.hp, party: battle.party.map((f) => f.hp), active: 0 };
+  const shown: HpSnap & { active: number } = { foe: foe.hp, party: battle.party.map((f) => f.hp), active: battle.active };
 
   const foeSvg = createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 150, facing: -1 });
   const intent = h('div', { class: 'intent', 'aria-live': 'polite' });
@@ -193,10 +282,11 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   const foeTags = h(
     'div',
     { class: 'status-row' },
-    foe.rank !== 'normal' && h('span', { class: `rank-chip rank-${foe.rank}` }, foe.rank === 'elite' ? '♛ Elite' : '✦ Rare'),
+    foe.rank !== 'normal' && h('span', { class: `rank-chip rank-${foe.rank}` }, rankLabel(foe.rank, foe.tier)),
     elementTag(foe.species.element),
     ...foe.traits.map((t) => h('span', { class: 'trait-chip', title: FOE_TRAITS[t].blurb }, `${FOE_TRAITS[t].glyph} ${FOE_TRAITS[t].name}`)),
   );
+  const enragedChip = h('span', { class: 'trait-chip chip-enraged', title: 'Its big attack comes every other turn' }, '🔥 Enraged');
   const wardChip = foe.traits.includes('warded') ? foeTags.querySelectorAll('.trait-chip')[foe.traits.indexOf('warded')] : null;
   const turnBanner = h('div', { class: 'turn-banner', 'aria-live': 'polite' });
   const arena = h(
@@ -257,6 +347,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       ].filter((n): n is HTMLSpanElement => !!n),
     );
     if (wardChip) wardChip.classList.toggle('chip-broken', !battle.wardUp);
+    if (battle.enraged && !enragedChip.isConnected) foeTags.append(enragedChip);
     foeSpot.classList.toggle('burning', battle.burn > 0);
   };
 
@@ -310,7 +401,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     );
 
     const tonics = way?.tonics() ?? 0;
-    card(tonicBtn, '⚗ Tonic', tonics ? `Heals half · ×${tonics}` : 'None · brew at Hearthstead');
+    card(tonicBtn, '⚗ Tonic', tonics ? `Heals ${battle.tonicHeal} · ×${tonics}` : 'None · brew at Hearthstead');
     tonicBtn.disabled = busy || forced || !tonics || pet.hp >= pet.maxHp;
     const metres = way?.spellMetres() ?? 0;
     for (const { id, el } of spellBtns) {
@@ -479,7 +570,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
         });
         ctx.changed();
         log.replaceChildren(
-          `${encounter.species.name} dissolves into a puddle of harmless ink. `,
+          `${foeName(encounter)} dissolves into a puddle of harmless ink. `,
           h('strong', {}, `+${reward.xp} XP`),
           owned.length > 1 ? ' to each pet that fought (half to the rest)' : '',
           '.',
@@ -492,7 +583,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       sheet.setTitle('Driven back');
       log.textContent = practice
         ? 'Worn out, but it was only practice. Try leading with a pet that is strong against it.'
-        : 'Your party is worn out and retreats to rest. Bring a pet strong against it, brew tonics and charge spells by walking, then try again.';
+        : 'Your party is worn out and retreats. Their wounds stay until they rest (about an hour to full) or drink a tonic. Bring pets strong against it and try again.';
     }
     panel.replaceChildren(h('button', { class: 'btn btn-primary btn-continue', type: 'button', onclick: () => sheet.close() }, 'Continue'));
     panel.classList.remove('cmd-waiting');

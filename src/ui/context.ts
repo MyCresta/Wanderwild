@@ -6,6 +6,8 @@ export interface WayfarerHooks {
   tonics(): number;
   /** Spends a Herb Garden tonic. Returns false when there are none. */
   useTonic(): boolean;
+  /** Multiplier on what a tonic heals, once tonics can be upgraded. */
+  tonicPower?(): number;
   /** Metres walked toward spells since the last cast. */
   spellMetres(): number;
   spendSpell(metres: number): boolean;

@@ -37,7 +37,7 @@ export class CreatureMarkers {
       const rank = encounter.rank && encounter.rank !== 'normal' ? ` map-creature-rank-${encounter.rank}` : '';
       el.className = `map-creature map-creature-${encounter.species.kind} map-creature-${encounter.species.rarity}${rank}`;
       el.dataset.lngLat = `${spawn.lng},${spawn.lat}`;
-      const rankName = encounter.rank === 'elite' ? 'Elite ' : encounter.rank === 'rare' ? 'Rare ' : '';
+      const rankName = encounter.rank === 'boss' ? 'Boss ' : encounter.rank === 'elite' ? 'Elite ' : encounter.rank === 'rare' ? 'Rare ' : '';
       el.setAttribute('aria-label', `${encounter.species.kind === 'pet' ? 'Wild' : `Hostile ${rankName}`}${encounter.species.name}, level ${encounter.level}`);
       el.appendChild(createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 64 }));
       el.addEventListener('click', (event) => {
