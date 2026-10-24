@@ -3,14 +3,14 @@ import type { Map } from 'maplibre-gl';
 /** Degrees of bearing per pixel dragged sideways, and of tilt per pixel dragged up or down. */
 const BEARING_PER_PX = 0.35;
 const PITCH_PER_PX = 0.25;
-/** How far a finger moves before the drag picks an axis; smaller moves stay taps. */
-const LOCK_PX = 8;
+/** How far a finger moves before a drag starts orbiting; smaller moves stay taps. */
+const START_PX = 8;
 const MIN_PITCH = 0;
 
 /**
  * Pokémon Go style camera: the view stays centred (on the Wayfarer while following).
  * A one-finger or mouse drag orbits instead of panning: sideways turns the bearing around
- * the centre, up and down tilts. Pinch, two-finger twist and the wheel zoom and turn
+ * the centre and up and down tilts, both at once, so a diagonal drag swings the view freely. Pinch, two-finger twist and the wheel zoom and turn
  * around the centre too. While an orbit is under way, callers should re-centre with jumpTo
  * rather than easeTo, which would fight the finger for the bearing. Taps are left alone, so markers, layers and `?walk` still get clicks.
  */
@@ -52,7 +52,7 @@ export function installOrbitCamera(map: Map): OrbitCamera {
   const pointers = new Set<number>();
   // A finished orbit swallows the click the browser may still send, so it is not read as a tap.
   let swallowClick = false;
-  let drag: { id: number; x: number; y: number; lastX: number; lastY: number; axis?: 'x' | 'y'; below: boolean } | null = null;
+  let drag: { id: number; x: number; y: number; lastX: number; lastY: number; moving: boolean; below: boolean } | null = null;
 
   el.addEventListener('pointerdown', (e) => {
     if (free) return;
@@ -66,16 +66,16 @@ export function installOrbitCamera(map: Map): OrbitCamera {
     }
     const rect = el.getBoundingClientRect();
     const centreY = rect.top + map.project(map.getCenter()).y;
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, below: e.clientY >= centreY };
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, moving: false, below: e.clientY >= centreY };
   });
 
   window.addEventListener('pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return;
-    if (!drag.axis) {
+    if (!drag.moving) {
       const dx = e.clientX - drag.x;
       const dy = e.clientY - drag.y;
-      if (Math.hypot(dx, dy) < LOCK_PX) return;
-      drag.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+      if (Math.hypot(dx, dy) < START_PX) return;
+      drag.moving = true;
       swallowClick = true;
       map.stop();
     }
@@ -83,13 +83,10 @@ export function installOrbitCamera(map: Map): OrbitCamera {
     const dy = e.clientY - drag.lastY;
     drag.lastX = e.clientX;
     drag.lastY = e.clientY;
-    if (drag.axis === 'x') {
-      // Drag the ground beneath the finger: below the centre it turns one way, above it the other.
-      map.setBearing(map.getBearing() + (drag.below ? 1 : -1) * dx * BEARING_PER_PX);
-    } else {
-      const pitch = Math.min(map.getMaxPitch(), Math.max(MIN_PITCH, map.getPitch() - dy * PITCH_PER_PX));
-      map.setPitch(pitch);
-    }
+    // Drag the ground beneath the finger: below the centre it turns one way, above it the other.
+    const bearing = map.getBearing() + (drag.below ? 1 : -1) * dx * BEARING_PER_PX;
+    const pitch = Math.min(map.getMaxPitch(), Math.max(MIN_PITCH, map.getPitch() - dy * PITCH_PER_PX));
+    map.jumpTo({ bearing, pitch });
   });
 
   const end = (e: PointerEvent) => {
@@ -109,7 +106,7 @@ export function installOrbitCamera(map: Map): OrbitCamera {
     true,
   );
   return {
-    orbiting: () => !!drag?.axis,
+    orbiting: () => !!drag?.moving,
     setFree(value) {
       if (value === free) return;
       free = value;
