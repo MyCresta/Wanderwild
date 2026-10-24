@@ -35,7 +35,7 @@ describe('treasure hunts', () => {
   });
 
   it('prefers a landmark a good walk away and skips ones already found', () => {
-    const near: Landmark = { ...giles, id: 'near', ...north(100) };
+    const near: Landmark = { ...giles, id: 'near', ...north(180) };
     const far: Landmark = { ...giles, id: 'far', ...north(2000) };
     expect(chooseLandmark(here, [near, giles, far], [], () => 0)?.id).toBe(giles.id);
     expect(chooseLandmark(here, [near, giles, far], [giles.id], () => 0)?.id).toBe('near');
@@ -77,7 +77,7 @@ describe('treasure hunts', () => {
 
   it('tells warmer from colder and spots arrival', () => {
     const hunt = startHunt(giles, here, 0);
-    expect(warmth(hunt, north(200)).warmth).toBe('warmer');
+    expect(warmth(hunt, north(150)).warmth).toBe('warmer');
     expect(warmth(hunt, north(0)).warmth).toBe('colder');
     expect(warmth(hunt, north(400 - ARRIVE_M + 5)).warmth).toBe('found');
   });

@@ -43,7 +43,7 @@ const SOURCE = 'openmaptiles';
 // the spec's TypeScript types are too strict for the shared expression helpers below.
 type Layer = Record<string, unknown>;
 // Storybook fonts, served from public/fonts with a Noto Sans fallback (see glyphs.ts).
-const FONT_REGULAR = ['IM Fell English Regular'];
+export const FONT_REGULAR = ['IM Fell English Regular'];
 const FONT_ITALIC = ['IM Fell English Italic'];
 const FONT_CAPS = ['IM Fell English SC Regular'];
 

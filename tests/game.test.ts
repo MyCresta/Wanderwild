@@ -4,7 +4,7 @@ import { pointInPolygon, realmFromFeatures, distanceToLineM } from '../src/game/
 import { exportSave, importSave, migrate, newSave } from '../src/game/save';
 import { rollShrineReward, shrineKind, SHRINE_COOLDOWN_MS, type Shrine } from '../src/game/shrines';
 import { spawnsInCell, spawnsNear, SPAWN_WINDOW_MS } from '../src/game/spawns';
-import { GameState } from '../src/game/state';
+import { GameState, STEP_XP, STRIDE_M } from '../src/game/state';
 import { levelFromXp, nextUnlock, xpForLevel } from '../src/game/wayfarer';
 
 describe('wayfarer levels', () => {
@@ -136,14 +136,28 @@ describe('shrines', () => {
 });
 
 describe('game state', () => {
-  it('pays Wanderlight, coin and XP for each full 100 m walked', () => {
+  it('pays Wanderlight and coin for each full 100 m walked, and XP for every step', () => {
     const game = new GameState(newSave(0));
     game.recordWalk(250, 0);
     expect(game.save.currencies.wanderlight).toBe(2);
-    expect(game.save.wayfarer.xp).toBe(60);
+    expect(game.save.wayfarer.xp).toBe(Math.floor(250 / STRIDE_M) * STEP_XP);
     game.recordWalk(60, 0);
     expect(game.save.currencies.wanderlight).toBe(3);
     expect(game.save.distanceMetres).toBe(310);
+  });
+
+  it('counts steps per day and starts again the next morning', () => {
+    const day = new Date(2026, 9, 24, 9).getTime();
+    const game = new GameState(newSave(day));
+    game.recordWalk(75, day);
+    game.recordWalk(0.4, day);
+    game.recordWalk(0.4, day);
+    expect(game.stepsToday(day)).toBe(101);
+    const tomorrow = day + 24 * 60 * 60 * 1000;
+    expect(game.stepsToday(tomorrow)).toBe(0);
+    game.recordWalk(7.5, tomorrow);
+    expect(game.stepsToday(tomorrow)).toBe(10);
+    expect(migrate(JSON.parse(JSON.stringify(game.save)), tomorrow).steps).toEqual(game.save.steps);
   });
 
   it('does not pay out distance walked before the save existed', () => {

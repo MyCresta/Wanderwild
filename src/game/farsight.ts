@@ -11,6 +11,11 @@ import { hashString, seededRandom, weightedPick } from './rng';
 
 /** Share of XP and curio loot paid for deeds done by Farsight rather than in person. */
 export const FARSIGHT_SHARE = 0.5;
+/**
+ * How far from the Wayfarer the eye may roam, drawn as a dashed ring. Inside it there are
+ * roughly 30 Blotspawn every 15 minutes and 50 curios a day (see tests/farsight.test.ts).
+ */
+export const FARSIGHT_RANGE_M = 750;
 
 // ---- Curios: small finds scattered over the map, a fresh set every day ----
 

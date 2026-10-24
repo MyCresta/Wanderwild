@@ -1,6 +1,6 @@
 import { exportSave, importSave } from '../game/save';
 import { MATERIALS, REALMS, type MaterialId, type RealmId } from '../game/realms';
-import type { GameState } from '../game/state';
+import { STEP_XP, type GameState } from '../game/state';
 import { UNLOCKS } from '../game/wayfarer';
 import { sound } from '../audio/sound';
 import { glyphSvg } from '../game/glyphs';
@@ -13,7 +13,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 export class Hud {
   private readonly levelEl = $('level');
   private readonly xpBar = $('xp-bar');
-  private readonly distanceEl = $('distance');
+  private readonly stepsEl = $('steps-today');
   private readonly coinEl = $('coin');
   private readonly realmEl = $('realm');
   private readonly toastEl = $('toast');
@@ -23,6 +23,7 @@ export class Hud {
 
   constructor(private readonly game: GameState) {
     journal.onShow('wayfarer', () => this.renderSatchel());
+    $('steps').addEventListener('click', () => this.toast(`${formatCount(game.stepsToday())} steps today. Every step gives ${STEP_XP} XP.`));
     this.setupSoundChoice();
     $('save-export').addEventListener('click', () => this.exportFile());
     const fileInput = $<HTMLInputElement>('save-file');
@@ -64,7 +65,7 @@ export class Hud {
     this.xpBar.style.width = xp;
     this.levelEl.style.setProperty('--xp', xp);
     this.xpBar.parentElement?.setAttribute('aria-label', `${formatCount(lvl.into)} of ${formatCount(lvl.needed)} XP`);
-    this.distanceEl.textContent = formatDistance(s.distanceMetres);
+    this.stepsEl.textContent = formatCount(this.game.stepsToday());
     this.coinEl.textContent = formatCount(s.currencies.coin);
     document.body.classList.toggle('blessed', this.game.isBlessed());
     if (journal.showing('wayfarer')) this.renderSatchel();
