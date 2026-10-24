@@ -60,8 +60,8 @@
 
 
 .hunt-x {
-  width: 40px;
-  height: 40px;
+  width: calc(40px * var(--marker-scale, 1));
+  height: calc(40px * var(--marker-scale, 1));
   pointer-events: none;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
   animation: hunt-x-ink 0.6s ease-out;

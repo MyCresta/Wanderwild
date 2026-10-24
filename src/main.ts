@@ -6,6 +6,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { createFantasyStyle } from './map/fantasyStyle';
 import { installFantasyImages } from './map/fantasyImages';
 import { transformGlyphRequest } from './map/glyphs';
+import { installMarkerScale } from './map/markerScale';
 import { PlayerMarker } from './map/player';
 import { haversine, WalkTracker, type Fix } from './geo/distance';
 import { watchLocation } from './geo/location';
@@ -90,6 +91,7 @@ const map = new Map({
 installFantasyImages(map);
 map.addControl(new AttributionControl({ compact: true }), 'bottom-left');
 const orbit = installOrbitCamera(map);
+installMarkerScale(map);
 
 installProbeLayers(map);
 
