@@ -91,7 +91,7 @@ body {
 /*
  * Screen layout. Round map buttons live in two rails that stack upward from the
  * bottom corners and wrap into a second column when the screen is short, and
- * every passing banner (notices, toasts, deeds) stacks in one column under the
+ * every passing banner (notices, toasts) stacks in one column under the
  * top bar. New buttons go in a rail and new banners in #banners, never at a
  * fixed spot of their own, so nothing lands on top of anything else.
  * --rail-top and --hud-bottom are kept up to date by src/ui/layout.ts.
@@ -2432,209 +2432,6 @@ body:has(.catch-scene) .banners {
   font: inherit;
 }
 
-/* ---------- Deeds and titles ---------- */
-
-.deed-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 360px;
-  padding: 6px 12px;
-  border: 2px solid var(--gold);
-  border-radius: 12px;
-  background: linear-gradient(var(--leather), var(--leather-dark));
-  color: var(--gold);
-  font: inherit;
-  text-align: left;
-  box-shadow: 0 0 0 3px rgba(243, 210, 122, 0.25), 0 6px 18px rgba(0, 0, 0, 0.5);
-  animation: deed-unroll 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
-  transition: opacity 0.4s, transform 0.4s;
-  cursor: pointer;
-}
-
-.deed-banner .deed-medal {
-  width: 38px;
-  height: 38px;
-  animation: deed-spin 0.9s ease-out;
-}
-
-.deed-banner-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.deed-banner-text small {
-  font-size: 11px;
-  font-variant: small-caps;
-  letter-spacing: 0.12em;
-  opacity: 0.85;
-}
-
-.deed-banner-text b {
-  font-size: 16px;
-}
-
-.deed-banner-text span {
-  color: #f0e4c4;
-  font-size: 13px;
-}
-
-.deed-banner-out {
-  opacity: 0;
-  transform: translateY(-12px);
-}
-
-@keyframes deed-unroll {
-  from {
-    transform: scaleY(0.2) translateY(-20px);
-    opacity: 0;
-  }
-}
-
-@keyframes deed-spin {
-  from {
-    transform: rotateY(540deg) scale(0.4);
-  }
-}
-
-.deed-medal {
-  flex: none;
-  width: 40px;
-  height: 40px;
-}
-
-.deed-medal svg {
-  width: 100%;
-  height: 100%;
-}
-
-.deeds-summary {
-  margin: 0 0 8px;
-  font-style: italic;
-}
-
-.deeds-hint {
-  margin: 0 0 8px;
-  font-size: 14px;
-}
-
-.title-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.title-chip {
-  min-height: 36px;
-  padding: 4px 12px;
-  border: 1px solid var(--leather);
-  border-radius: 999px;
-  background: rgba(255, 250, 235, 0.6);
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-  font-style: italic;
-  cursor: pointer;
-}
-
-.title-chip[aria-checked='true'] {
-  border-color: var(--leather-dark);
-  background: linear-gradient(#8e2b22, #6a1d16);
-  color: var(--gold);
-}
-
-.deed-group > summary {
-  margin: 14px 0 6px;
-  font-variant: small-caps;
-  letter-spacing: 0.04em;
-}
-
-.deed-group > summary small {
-  font-weight: normal;
-  opacity: 0.7;
-}
-
-.deed-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.deed {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px dashed rgba(74, 51, 32, 0.3);
-}
-
-.deed:not(.deed-earned) .deed-text b {
-  opacity: 0.75;
-}
-
-.deed-text {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  font-size: 14px;
-}
-
-.deed-text small {
-  opacity: 0.75;
-}
-
-.deed-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 3px;
-}
-
-.deed-track {
-  flex: 1;
-  height: 6px;
-  overflow: hidden;
-  border-radius: 3px;
-  background: rgba(74, 51, 32, 0.2);
-}
-
-.deed-fill {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, #9a7212, var(--gold));
-}
-
-.deed-reward {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  max-width: 34%;
-  text-align: right;
-}
-
-.deed-reward small {
-  font-size: 11px;
-  opacity: 0.7;
-}
-
-.deed-title-tag {
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: #8e2b22;
-  color: #fdf6e3;
-  font-size: 11px;
-  font-style: italic;
-}
-
-.deed-secret .deed-text {
-  font-style: italic;
-  opacity: 0.7;
-}
-
 /* ---- Glyphwalking and the Inked Demesne ---- */
 .toast-glyph {
   float: left;
@@ -2955,116 +2752,11 @@ body:has(.catch-scene) .banners {
   line-height: 1.9;
 }
 
-/* The ⚔ map button and the Blotspawn board. */
-
-.fight-button {
-  border: 2px solid var(--leather-dark);
-  border-radius: 50%;
-  background: linear-gradient(var(--leather), var(--leather-dark));
-  color: var(--parchment);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-
-.fight-button svg {
-  width: 100%;
-  height: 100%;
-}
-
-.fight-button.fight-ready {
-  color: var(--gold);
-}
-
-/* The ready glow is a ring that only fades in and out, which the compositor does without repainting. */
-.fight-button.fight-ready::before {
-  content: '';
-  position: absolute;
-  inset: -8px;
-  border-radius: 50%;
-  box-shadow: 0 0 0 6px rgba(142, 43, 34, 0.35);
-  pointer-events: none;
-  opacity: 0;
-  animation: ring-glow 1.6s ease-in-out infinite;
-}
-
+/* A glow that fades a ring in and out, cheaper than animating a box-shadow. */
 @keyframes ring-glow {
   50% {
     opacity: 1;
   }
-}
-
-.fight-button:not([data-count=''])[data-count]::after {
-  content: attr(data-count);
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border-radius: 10px;
-  background: #8e2b22;
-  color: #fff8e6;
-  font-size: 12px;
-  font-weight: bold;
-  line-height: 20px;
-  text-align: center;
-}
-
-.foe-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0 0 10px;
-  padding: 0;
-  list-style: none;
-}
-
-.foe-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px;
-  border: 1px solid var(--leather);
-  border-radius: 12px;
-  background: rgba(255, 248, 230, 0.5);
-}
-
-.foe-row .creature {
-  flex: none;
-  width: 56px;
-  height: 56px;
-}
-
-.foe-rare {
-  border-color: #c99a3a;
-  box-shadow: inset 0 0 0 1px #f3d27a;
-}
-
-.foe-elite {
-  border: 2px solid #8e2b22;
-}
-
-.foe-far {
-  opacity: 0.75;
-}
-
-.foe-info {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  font-size: 14px;
-}
-
-.foe-meta,
-.foe-traits,
-.foe-dist {
-  font-size: 12px;
-}
-
-.foe-dist {
-  opacity: 0.75;
 }
 
 /* Blotspawn on the map sit in a pool of spilled ink, so they read as foes at a glance. */
@@ -3562,7 +3254,7 @@ body:has(.catch-scene) .banners {
   height: 100%;
 }
 
-/* Something waits inside: a ready building, a full parcel, a new deed. */
+/* Something waits inside: a ready building, a full parcel. */
 .journal-open:not([data-badge=''])[data-badge]::after {
   content: '';
   position: absolute;
@@ -3667,18 +3359,12 @@ body:has(.catch-scene) .banners {
   margin-top: 14px;
 }
 
-.journal-more > summary,
-.deed-group > summary {
+.journal-more > summary {
   padding: 6px 0;
   color: var(--leather);
   font-size: 14px;
   font-weight: bold;
   cursor: pointer;
-}
-
-.deed-group > summary small {
-  font-weight: normal;
-  opacity: 0.75;
 }
 
 .journal-more .satchel-unlocks {

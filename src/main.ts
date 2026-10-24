@@ -33,7 +33,6 @@ import { openBattle } from './ui/battle';
 import { openBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
 import { openEncounter } from './ui/encounter';
-import { DeedKeeper } from './ui/deeds';
 import { sound } from './audio/sound';
 import { HuntController } from './ui/hunt';
 import { Trace } from './game/glyphs';
@@ -44,7 +43,6 @@ import { ringInRealm, walkInRealm } from './creatures/evolution';
 import { playerReach } from './geo/reach';
 import { watchLayout } from './ui/layout';
 import { installOrbitCamera } from './map/orbitCamera';
-import { FightBoard, type FoeNear } from './ui/fightBoard';
 import { Farsight } from './ui/farsight';
 import { CurioLayer } from './map/curioLayer';
 import { CURIO_KINDS, curiosNear, FARSIGHT_SHARE, type Curio } from './game/farsight';
@@ -139,8 +137,6 @@ const curioLayer = new CurioLayer(map, (curio) => takeCurio(curio));
 // Creatures: the collection, wild spawns around the player, and the companion at their side.
 const collection = loadCollection();
 const companionMarker = new CompanionMarker(map);
-// Deeds read the collection, so they are set up just after it.
-let deeds: DeedKeeper | undefined;
 // The Demesne's residents redraw when pets change; that layer is set up further down.
 let refreshResidents: (() => void) | undefined;
 const creatureGame: GameContext = {
@@ -148,7 +144,6 @@ const creatureGame: GameContext = {
   changed() {
     saveCollection(collection);
     companionMarker.setPet(companion(collection));
-    deeds?.check();
     refreshResidents?.();
   },
 };
@@ -164,7 +159,6 @@ creatureGame.wayfarer = {
   },
 };
 creatureGame.changed();
-deeds = new DeedKeeper(game, collection, $('wayfarer-title'));
 hud.seals = () => collection.seals;
 journal.onShow('wayfarer', () => renderParty($('satchel-party'), creatureGame));
 new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame, forge);
@@ -221,7 +215,7 @@ game.on((event) => event.kind === 'hatch' && claimHatchlings());
 if (game.save.hatchlings.length) claimHatchlings();
 
 /** Removes a spawn that was caught, beaten or fled; only the first two earn Wayfarer XP, less by Farsight. */
-function clearSpawn(spawn: Spawn, won: boolean, kind: 'pet' | 'monster', remote = false): void {
+function clearSpawn(spawn: Spawn, won: boolean, remote = false): void {
   collection.cleared[spawn.id] = spawn.expiresAt;
   creatures.remove(spawn.id);
   if (won) {
@@ -229,7 +223,6 @@ function clearSpawn(spawn: Spawn, won: boolean, kind: 'pet' | 'monster', remote 
     game.changed();
   }
   creatureGame.changed();
-  if (won) deeds?.win(kind, spawn.rarity);
 }
 
 /** Within the purple ring of where the Wayfarer actually stands. */
@@ -247,27 +240,18 @@ function meet(spawn: Spawn, encounter: Encounter): void {
     return;
   }
   if (encounter.species.kind === 'pet') {
-    openEncounter(creatureGame, encounter, (caught, fled) => (caught || fled) && clearSpawn(spawn, caught, 'pet', remote));
+    openEncounter(creatureGame, encounter, (caught, fled) => (caught || fled) && clearSpawn(spawn, caught, remote));
   } else if (!companion(collection)) {
     toast('You need a companion to face Blotspawn.');
   } else {
-    openBattle(creatureGame, encounter, (won) => won && clearSpawn(spawn, true, 'monster', remote));
+    openBattle(creatureGame, encounter, (won) => won && clearSpawn(spawn, true, remote));
   }
 }
 
 const creatures = new CreatureMarkers(map, meet);
-/** What stands on the map right now, so the Fight board can list the Blotspawn. */
+/** What stands on the map right now. */
 let shown: { spawn: Spawn; encounter: Encounter }[] = [];
 let foeHinted = false;
-const fights = new FightBoard({
-  fight: meet,
-  show(spawn) {
-    setFollowing(false);
-    map.flyTo({ center: [spawn.lng, spawn.lat], zoom: Math.max(map.getZoom(), 17) });
-  },
-  practice: (encounter) => openBattle(creatureGame, encounter, () => {}, { practice: true }),
-  companionLevel: () => companion(collection)?.level ?? null,
-});
 
 function seenFarsightHint(): boolean {
   try {
@@ -342,14 +326,10 @@ function showReach(): void {
   // Shrines need the Wayfarer in person; curios can still be taken by Farsight for a share.
   shrines.markReach(onFoot);
   curioLayer.markReach((curio) => farsight.active || onFoot(curio));
-  const foes: FoeNear[] = shown
-    .filter(({ spawn, encounter }) => encounter.species.kind === 'monster' && !(spawn.id in collection.cleared))
-    .map(({ spawn, encounter }) => {
-      const metres = haversine(fix, spawn);
-      return { spawn, encounter, metres, inReach: farsight.active || onFoot(spawn) };
-    });
-  fights.update(foes);
-  if (!foeHinted && companion(collection) && foes.some((f) => f.inReach)) {
+  const foeInReach = shown.some(
+    ({ spawn, encounter }) => encounter.species.kind === 'monster' && !(spawn.id in collection.cleared) && (farsight.active || onFoot(spawn)),
+  );
+  if (!foeHinted && companion(collection) && foeInReach) {
     foeHinted = true;
     toast('A Blotspawn is in reach! Tap it to fight.');
   }
@@ -433,7 +413,6 @@ function refreshWorld(): void {
     currentRealm = realm;
     game.visitRealm(realm);
     hud.setRealm(realm);
-    deeds?.enterRealm(realm);
     sound.setRealm(realm);
   }
   const now = Date.now();
@@ -484,7 +463,6 @@ function onFix(fix: Fix): void {
       toast(`${getSpecies(readyToEvolve.speciesId).name} is glowing… it's ready to evolve! Open the bestiary.`);
     }
     creatureGame.changed();
-    deeds?.walk(metres, fix.time);
   }
   game.walkBorders(fix.lat, fix.lng, metres);
   if (fix.accuracy <= 30) {

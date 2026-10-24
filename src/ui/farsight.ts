@@ -23,10 +23,8 @@ export class Farsight {
     this.button = h('button', { class: 'farsight-button', id: 'farsight', type: 'button', 'aria-label': 'Farsight: explore the map from here', 'aria-pressed': 'false' });
     this.button.innerHTML = EYE;
     this.button.addEventListener('click', () => this.set(!this.on));
-    // Just above the ⚔ button, so both thumb buttons sit together.
-    const rail = railButtons('right');
-    const fight = document.getElementById('fight');
-    rail.insertBefore(this.button, fight?.nextSibling ?? document.getElementById('recenter')?.nextSibling ?? null);
+    // Bottom right, under the thumb; the compass sits below it when shown.
+    railButtons('right').append(this.button);
 
     this.pill = h(
       'button',
