@@ -24,6 +24,8 @@ function shrineElement(shrine: Shrine): HTMLButtonElement {
 /** Shows nearby wayshrines as tappable map pins. */
 export class ShrineLayer {
   private markers = new globalThis.Map<string, { marker: Marker; el: HTMLElement }>();
+  private inReach: (shrine: Shrine) => boolean = () => true;
+  private shown: Shrine[] = [];
 
   constructor(
     private readonly map: Map,
@@ -32,6 +34,7 @@ export class ShrineLayer {
 
   /** Replaces the shown shrines; `coolingIds` are drawn faded. */
   set(shrines: Shrine[], coolingIds: Set<string>): void {
+    this.shown = shrines;
     const keep = new Set(shrines.map((s) => s.id));
     for (const [id, { marker }] of this.markers) {
       if (!keep.has(id)) {
@@ -53,5 +56,12 @@ export class ShrineLayer {
       }
       entry.el.classList.toggle('cooling', coolingIds.has(shrine.id));
     }
+    this.markReach(this.inReach);
+  }
+
+  /** Dims shrines outside the reach ring, so the ring shows what can be touched. */
+  markReach(inReach: (shrine: Shrine) => boolean): void {
+    this.inReach = inReach;
+    for (const shrine of this.shown) this.markers.get(shrine.id)?.el.classList.toggle('out-of-reach', !inReach(shrine));
   }
 }
