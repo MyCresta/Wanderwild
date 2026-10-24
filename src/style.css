@@ -1024,6 +1024,27 @@ body {
   text-align: center;
 }
 
+/*
+ * While a sheet or scene is up, the map underneath stays still: its looping marker animations
+ * pause, and under a full-screen scene the map and its parchment wash are not drawn at all,
+ * so every frame goes to what you are looking at.
+ */
+body:has(> .sheet-backdrop, > .catch-scene) #map *,
+body:has(> .sheet-backdrop, > .catch-scene) .hud *,
+body:has(> .sheet-backdrop, > .catch-scene) .rail * {
+  animation-play-state: paused !important;
+}
+
+body:has(> .catch-scene) #map,
+body:has(> .catch-scene) .parchment-overlay {
+  visibility: hidden;
+}
+
+/* Lunges and shakes move the fighter on its own layer instead of repainting the arena. */
+.fighter {
+  will-change: transform;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sheet,
   .sheet-backdrop,
@@ -3186,12 +3207,23 @@ body:has(.catch-scene) .banners {
 
 .fight-button.fight-ready {
   color: var(--gold);
-  animation: fight-glow 1.6s ease-in-out infinite;
 }
 
-@keyframes fight-glow {
+/* The ready glow is a ring that only fades in and out, which the compositor does without repainting. */
+.fight-button.fight-ready::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 6px rgba(142, 43, 34, 0.35);
+  pointer-events: none;
+  opacity: 0;
+  animation: ring-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes ring-glow {
   50% {
-    box-shadow: 0 0 0 6px rgba(142, 43, 34, 0.35), 0 3px 10px rgba(0, 0, 0, 0.35);
+    opacity: 1;
   }
 }
 
@@ -3452,6 +3484,14 @@ body:has(.catch-scene) .banners {
   border-radius: 6px;
   background: var(--gold);
   box-shadow: 0 0 8px var(--gold);
+}
+
+/* Spans the track so translateX(100%) carries the needle to the far end. */
+.sweep-runner {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  pointer-events: none;
 }
 
 .sweep-needle {
