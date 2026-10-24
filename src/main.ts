@@ -6,6 +6,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { createFantasyStyle } from './map/fantasyStyle';
 import { installFantasyImages } from './map/fantasyImages';
 import { transformGlyphRequest } from './map/glyphs';
+import { installMarkerScale } from './map/markerScale';
 import { PlayerMarker } from './map/player';
 import { haversine, WalkTracker, type Fix } from './geo/distance';
 import { watchLocation } from './geo/location';
@@ -33,6 +34,7 @@ import { creatureForSpawn, type Encounter } from './creatures/stats';
 import { wildlingWanted } from './creatures/scarcity';
 import type { GameContext } from './ui/context';
 import { openBattle } from './ui/battle';
+import { lairsNear } from './game/lairs';
 import { openBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
 import { openJoined, openMeeting } from './ui/meet';
@@ -92,6 +94,7 @@ const map = new Map({
 installFantasyImages(map);
 map.addControl(new AttributionControl({ compact: true }), 'bottom-left');
 const orbit = installOrbitCamera(map);
+installMarkerScale(map);
 
 installProbeLayers(map);
 
@@ -340,9 +343,14 @@ function refreshSpawns(force = false): void {
     }
     spawn.realm = spawnRealms.get(spawn.id);
   }
-  shown = live
-    .map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) }))
-    .filter(({ spawn, encounter }) => wildlingWanted(spawn.id, encounter, collection));
+  // Boss lairs hold the same spot all week, at their own level.
+  const lairs = lairsNear(fix.lat, fix.lng, now).filter(({ spawn }) => !(spawn.id in collection.cleared));
+  shown = [
+    ...live
+      .map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) }))
+      .filter(({ spawn, encounter }) => wildlingWanted(spawn.id, encounter, collection)),
+    ...lairs,
+  ];
   creatures.show(shown);
   showReach();
 }

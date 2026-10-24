@@ -10,7 +10,7 @@ import {
   type Species,
 } from './species';
 import { matchup } from './elements';
-import { rollFoe, type FoeTrait, type Rank } from './foes';
+import { ELITE_TIERS, rollFoe, type FoeTrait, type Rank } from './foes';
 
 export const MAX_LEVEL = 30;
 
@@ -129,6 +129,8 @@ export interface Encounter {
   seed: number;
   /** Blotspawn only: Rare and Elite foes are tougher and carry quirks. */
   rank?: Rank;
+  /** Elite tier 1-3, boss tier 1-5. */
+  tier?: number;
   traits?: FoeTrait[];
 }
 
@@ -148,5 +150,8 @@ export function creatureForSpawn(spawn: SpawnSeed, companionLevel: number): Enco
     ? companionLevel + Math.round(rng() * 4 - 2) + bonus
     : 1 + Math.floor(rng() * (companionLevel + 2)) + bonus;
   const encounter: Encounter = { species, level: Math.min(MAX_LEVEL, Math.max(1, level)), seed: Math.floor(rng() * 2 ** 32) };
-  return isMonster ? { ...encounter, ...rollFoe(spawn.rarity, spawn.seed) } : encounter;
+  if (!isMonster) return encounter;
+  const foe = rollFoe(spawn.rarity, spawn.seed);
+  const extra = foe.rank === 'elite' ? ELITE_TIERS[foe.tier - 1].levels : 0;
+  return { ...encounter, ...foe, level: Math.min(MAX_LEVEL, encounter.level + extra) };
 }

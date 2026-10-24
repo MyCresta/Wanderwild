@@ -1,4 +1,4 @@
-import { addXp, individualFromSeed, type Encounter } from './stats';
+import { addXp, individualFromSeed, statsAt, type Encounter } from './stats';
 import { getSpecies } from './species';
 
 /** A Wildling the player has bound. */
@@ -15,6 +15,9 @@ export interface OwnedPet {
   homeRing?: boolean;
   /** How well it was sketched when it was bound (from before Wildlings were befriended). */
   sketch?: string;
+  /** Share of its health left after a fight (0..1) and when; it rests back to full over time. Absent means full. */
+  vigor?: number;
+  vigorAt?: number;
 }
 
 /** A wild Wildling walking along with the Wayfarer, deciding whether to stay. */
@@ -151,4 +154,43 @@ export function walkRewards(c: Collection, metres: number): { levels: number } {
   const pet = companion(c);
   const levels = pet && xp > 0 ? grantPetXp(pet, xp) : 0;
   return { levels };
+}
+
+/** A pet worn out to nothing is fully rested again after this long; part-hurt pets sooner. */
+export const REST_FULL_MS = 60 * 60 * 1000;
+/** Pets below this share of health are too worn out to fight until they rest a little. */
+export const FIT_TO_FIGHT = 0.1;
+
+/** Share of health a pet has now (0..1), counting the rest it has had since it was hurt. */
+export function vigorNow(pet: OwnedPet, now = Date.now()): number {
+  if (pet.vigor === undefined) return 1;
+  return Math.min(1, Math.max(0, pet.vigor + (now - (pet.vigorAt ?? now)) / REST_FULL_MS));
+}
+
+export function setVigor(pet: OwnedPet, vigor: number, now = Date.now()): void {
+  if (vigor >= 1) {
+    delete pet.vigor;
+    delete pet.vigorAt;
+  } else {
+    pet.vigor = Math.max(0, vigor);
+    pet.vigorAt = now;
+  }
+}
+
+/** Minutes until a pet is back to full health by resting. */
+export function minutesToRested(pet: OwnedPet, now = Date.now()): number {
+  return Math.ceil(((1 - vigorNow(pet, now)) * REST_FULL_MS) / 60_000);
+}
+
+export const fitToFight = (pet: OwnedPet, now = Date.now()) => vigorNow(pet, now) >= FIT_TO_FIGHT;
+
+/** Health at full, before gear. */
+export function petMaxHp(pet: OwnedPet): number {
+  const species = getSpecies(pet.speciesId);
+  return statsAt(species.base, pet.level, individualFromSeed(pet.seed, species.kind).trait).hp;
+}
+
+/** Heals a pet by a flat amount of health outside battle, e.g. with a tonic. */
+export function healPet(pet: OwnedPet, amount: number, now = Date.now()): void {
+  setVigor(pet, vigorNow(pet, now) + amount / petMaxHp(pet), now);
 }

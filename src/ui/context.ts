@@ -7,6 +7,8 @@ export interface WayfarerHooks {
   tonics(): number;
   /** Spends a Herb Garden tonic. Returns false when there are none. */
   useTonic(): boolean;
+  /** Multiplier on what a tonic heals, once tonics can be upgraded. */
+  tonicPower?(): number;
   /** The hero beside the party: stat boosts, talents and known spells. */
   hero(): HeroPower;
   heroName?(): string;
