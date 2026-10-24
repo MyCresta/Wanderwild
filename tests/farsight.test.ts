@@ -24,7 +24,7 @@ describe('curios', () => {
     for (const curio of curiosNear(here.lat, here.lng, noon)) {
       const full = curioReward(curio, 'wildwood', true);
       const far = curioReward(curio, 'wildwood', false);
-      const total = (r: typeof full) => r.coin + r.xp + r.seals + Object.values(r.materials).reduce((s, n) => s + (n ?? 0), 0);
+      const total = (r: typeof full) => r.coin + r.xp + r.wanderlight + Object.values(r.materials).reduce((s, n) => s + (n ?? 0), 0);
       expect(total(full)).toBeGreaterThan(0);
       expect(total(far)).toBeLessThanOrEqual(total(full));
       expect(total(far)).toBeGreaterThanOrEqual(Math.floor(total(full) * FARSIGHT_SHARE) - 1);

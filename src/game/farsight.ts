@@ -25,7 +25,7 @@ export const CURIO_KINDS: Record<CurioKind, { name: string; blurb: string }> = {
   cache: { name: 'Lost coin cache', blurb: 'A pouch someone buried and forgot.' },
   bundle: { name: 'Forager’s bundle', blurb: 'Gathered goods of the realm, tied with twine.' },
   page: { name: 'Torn map page', blurb: 'A scrap of an older Wayfarer’s chart.' },
-  cairn: { name: 'Seal cairn', blurb: 'Binding seals tucked under a heap of stones.' },
+  cairn: { name: 'Wayfarer’s cairn', blurb: 'Stones stacked by an older Wayfarer, with Wanderlight tucked beneath.' },
 };
 
 const KIND_WEIGHTS: Record<CurioKind, number> = { cache: 35, bundle: 30, page: 25, cairn: 10 };
@@ -44,7 +44,7 @@ export interface Curio {
 export interface CurioReward {
   coin: number;
   xp: number;
-  seals: number;
+  wanderlight: number;
   materials: Partial<Record<MaterialId, number>>;
 }
 
@@ -75,7 +75,7 @@ export function curiosNear(lat: number, lng: number, time: number, found: Record
 export function curioReward(curio: Curio, realm: RealmId, onFoot: boolean): CurioReward {
   const rand = seededRandom(curio.seed);
   const share = (n: number) => (n <= 0 ? 0 : onFoot ? n : Math.max(1, Math.round(n * FARSIGHT_SHARE)));
-  const base: CurioReward = { coin: 0, xp: 0, seals: 0, materials: {} };
+  const base: CurioReward = { coin: 0, xp: 0, wanderlight: 0, materials: {} };
   switch (curio.kind) {
     case 'cache':
       base.coin = 8 + Math.floor(rand() * 13);
@@ -87,13 +87,13 @@ export function curioReward(curio: Curio, realm: RealmId, onFoot: boolean): Curi
       base.xp = 60 + Math.floor(rand() * 61);
       break;
     case 'cairn':
-      base.seals = 1 + Math.floor(rand() * 2);
+      base.wanderlight = 1 + Math.floor(rand() * 2);
       break;
   }
   return {
     coin: share(base.coin),
     xp: share(base.xp),
-    seals: share(base.seals),
+    wanderlight: share(base.wanderlight),
     materials: Object.fromEntries(Object.entries(base.materials).map(([id, n]) => [id, share(n)])),
   };
 }

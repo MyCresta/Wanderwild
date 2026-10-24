@@ -23,16 +23,18 @@ import { renderParty } from './hud/partyPanel';
 import { journal } from './ui/journal';
 import { ForgePanel } from './hud/forgePanel';
 import { formatWait } from './hud/format';
-import { CompanionMarker, CreatureMarkers, ResidentMarkers } from './map/creatures';
+import { CompanionMarker, CreatureMarkers, FollowerMarker, ResidentMarkers } from './map/creatures';
 import { addPet, companion, loadCollection, saveCollection, walkRewards } from './creatures/collection';
 import { spawnsNear, type Spawn } from './game/spawns';
 import { getSpecies } from './creatures/species';
 import { creatureForSpawn, type Encounter } from './creatures/stats';
+import { wildlingWanted } from './creatures/scarcity';
 import type { GameContext } from './ui/context';
 import { openBattle } from './ui/battle';
 import { openBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
-import { openEncounter } from './ui/encounter';
+import { openJoined, openMeeting } from './ui/meet';
+import { BLOT_TRUST_M, followerTrust, type FollowOutcome } from './creatures/befriend';
 import { sound } from './audio/sound';
 import { HuntController } from './ui/hunt';
 import { Trace } from './game/glyphs';
@@ -57,7 +59,7 @@ const SIM_SPEED_MPS = 1.4;
 /** Re-check spawns after moving this far or this long. */
 const SPAWN_REFRESH_M = 25;
 const SPAWN_REFRESH_MS = 30_000;
-/** Wayfarer XP for binding a Wildling or driving off Blotspawn, by spawn rarity. */
+/** Wayfarer XP for befriending a Wildling or driving off Blotspawn, by rarity. */
 const CREATURE_XP: Record<Spawn['rarity'], number> = { common: 60, uncommon: 90, rare: 150, epic: 250, legendary: 400 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -137,6 +139,7 @@ const curioLayer = new CurioLayer(map, (curio) => takeCurio(curio));
 // Creatures: the collection, wild spawns around the player, and the companion at their side.
 const collection = loadCollection();
 const companionMarker = new CompanionMarker(map);
+const followerMarker = new FollowerMarker(map);
 // The Demesne's residents redraw when pets change; that layer is set up further down.
 let refreshResidents: (() => void) | undefined;
 const creatureGame: GameContext = {
@@ -144,6 +147,9 @@ const creatureGame: GameContext = {
   changed() {
     saveCollection(collection);
     companionMarker.setPet(companion(collection));
+    followerMarker.set(collection.follower);
+    // A companion sent back to the wild no longer lives in the Demesne.
+    for (const parcel of game.save.parcels) parcel.residents = parcel.residents.filter((uid) => collection.pets.some((p) => p.uid === uid));
     refreshResidents?.();
   },
 };
@@ -159,7 +165,6 @@ creatureGame.wayfarer = {
   },
 };
 creatureGame.changed();
-hud.seals = () => collection.seals;
 journal.onShow('wayfarer', () => renderParty($('satchel-party'), creatureGame));
 new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame, forge);
 
@@ -225,6 +230,19 @@ function clearSpawn(spawn: Spawn, won: boolean, remote = false): void {
   creatureGame.changed();
 }
 
+/** A follower has been won over, or has given up and wandered off. */
+function settleFollower(outcome: FollowOutcome): void {
+  if (outcome?.kind === 'joined') {
+    const species = getSpecies(outcome.pet.speciesId);
+    game.grantXp(CREATURE_XP[species.rarity]);
+    game.changed();
+    openJoined(creatureGame, outcome.pet);
+  } else if (outcome?.kind === 'left') {
+    toast(`${outcome.name} lost interest and wandered back into the margins.`);
+  }
+  creatureGame.changed();
+}
+
 /** Within the purple ring of where the Wayfarer actually stands. */
 const onFoot = (p: { lat: number; lng: number }) => !!lastFix && haversine(lastFix, p) <= playerReach(lastFix, game.bonuses().reachM);
 
@@ -240,11 +258,20 @@ function meet(spawn: Spawn, encounter: Encounter): void {
     return;
   }
   if (encounter.species.kind === 'pet') {
-    openEncounter(creatureGame, encounter, (caught, fled) => (caught || fled) && clearSpawn(spawn, caught, remote));
+    if (remote) {
+      toast(`Wildlings only trust you in person. Walk up to ${encounter.species.name} to meet it.`);
+      return;
+    }
+    openMeeting(creatureGame, spawn.id, encounter, () => clearSpawn(spawn, false));
   } else if (!companion(collection)) {
     toast('You need a companion to face Blotspawn.');
   } else {
-    openBattle(creatureGame, encounter, (won) => won && clearSpawn(spawn, true, remote));
+    openBattle(creatureGame, encounter, (won) => {
+      if (!won) return;
+      clearSpawn(spawn, true, remote);
+      // A Wildling that sees you drive off a Blotspawn trusts you all the faster.
+      if (collection.follower && !remote) settleFollower(followerTrust(collection, BLOT_TRUST_M));
+    });
   }
 }
 
@@ -310,7 +337,9 @@ function refreshSpawns(force = false): void {
     }
     spawn.realm = spawnRealms.get(spawn.id);
   }
-  shown = live.map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) }));
+  shown = live
+    .map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) }))
+    .filter(({ spawn, encounter }) => wildlingWanted(spawn.id, encounter, collection));
   creatures.show(shown);
   showReach();
 }
@@ -352,14 +381,10 @@ function takeCurio(curio: Curio): void {
   const reward = game.findCurio(curio, realmAt(map, curio.lng, curio.lat) ?? currentRealm ?? 'hearthfields', here);
   curioLayer.remove(curio.id);
   if (!reward) return;
-  if (reward.seals) {
-    collection.seals += reward.seals;
-    creatureGame.changed();
-  }
   const parts = [
     reward.coin && `+${reward.coin} coin`,
     reward.xp && `+${reward.xp} XP`,
-    reward.seals && `+${reward.seals} binding seal${reward.seals > 1 ? 's' : ''}`,
+    reward.wanderlight && `+${reward.wanderlight} Wanderlight`,
     ...Object.entries(reward.materials).map(([id, n]) => `+${n} ${MATERIALS[id as MaterialId].name}`),
   ].filter(Boolean);
   sound.play('coin');
@@ -397,10 +422,6 @@ const hunts = new HuntController({
   game,
   position: () => lastFix,
   realmAt: (lat, lng) => realmAt(map, lng, lat),
-  addSeals(n) {
-    collection.seals += n;
-    creatureGame.changed();
-  },
   stopFollowing: () => setFollowing(false),
   onChange: () => refreshWorld(),
 });
@@ -442,6 +463,7 @@ function onFix(fix: Fix): void {
   showNotice(null);
   player.update(fix);
   companionMarker.update(fix.lng, fix.lat);
+  followerMarker.update(fix.lng, fix.lat);
 
   const metres = walk.add(fix);
   if (metres > 0) {
@@ -453,10 +475,7 @@ function onFix(fix: Fix): void {
       sound.play('levelUp');
       toast(`${getSpecies(pet.speciesId).name} grew to level ${pet.level} on the road!`);
     }
-    if (reward.seals > 0) {
-      sound.play('coin');
-      toast(`Found ${reward.seals > 1 ? `${reward.seals} binding seals` : 'a binding seal'} along the way.`);
-    }
+    if (collection.follower) settleFollower(followerTrust(collection, metres));
     const readyToEvolve = walkInRealm(collection, metres, currentRealm);
     if (readyToEvolve) {
       sound.play('discover');

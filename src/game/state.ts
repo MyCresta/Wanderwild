@@ -484,12 +484,13 @@ export class GameState {
     return true;
   }
 
-  /** Picks up a curio once; returns what it held (seals are for the caller to hand to the collection). */
+  /** Picks up a curio once and pays it out; returns what it held. */
   findCurio(curio: Curio, realm: RealmId, onFoot: boolean): CurioReward | null {
     if (curio.id in this.save.curiosFound) return null;
     const reward = curioReward(curio, realm, onFoot);
     this.save.curiosFound[curio.id] = curio.expiresAt;
     this.save.currencies.coin += reward.coin;
+    this.save.currencies.wanderlight += reward.wanderlight;
     this.addMaterials(reward.materials);
     this.grantXp(reward.xp);
     this.changed();

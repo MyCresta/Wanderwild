@@ -422,20 +422,17 @@ export class Battle {
 /** Arts that deal damage, and so care about the wheel. */
 const hurts = (e: Element) => e === 'ember' || e === 'gale';
 
-const RANK_REWARD: Record<Rank, { xp: number; seals: number }> = {
-  normal: { xp: 1, seals: 1 },
-  rare: { xp: 1.6, seals: 2 },
-  elite: { xp: 2.6, seals: 4 },
+const RANK_REWARD: Record<Rank, { xp: number }> = {
+  normal: { xp: 1 },
+  rare: { xp: 1.6 },
+  elite: { xp: 2.6 },
 };
 
-/** Experience for each pet and seals found after driving a monster off. */
-export function victoryRewards(foe: Fighter): { xp: number; seals: number } {
+/** Experience for each pet after driving a monster off. */
+export function victoryRewards(foe: Fighter): { xp: number } {
   const rarityBonus = foe.species.rarity === 'rare' ? 1.6 : foe.species.rarity === 'uncommon' ? 1.25 : 1;
   const rank = RANK_REWARD[foe.rank];
-  return {
-    xp: Math.round(14 * foe.level * rarityBonus * rank.xp),
-    seals: rank.seals + (foe.species.rarity === 'common' ? 0 : 1),
-  };
+  return { xp: Math.round(14 * foe.level * rarityBonus * rank.xp) };
 }
 
 /** Pets that fought share full experience; the rest of the party learns by watching, at half. */

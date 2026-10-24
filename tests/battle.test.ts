@@ -158,7 +158,6 @@ describe('rare and elite Blotspawn', () => {
     const elite = makeFighter(MONSTERS[0], 10, 3, undefined, { rank: 'elite', traits: [] });
     expect(elite.maxHp).toBeGreaterThan(plain.maxHp * 1.5);
     expect(victoryRewards(elite).xp).toBeGreaterThan(victoryRewards(plain).xp * 2);
-    expect(victoryRewards(elite).seals).toBeGreaterThan(victoryRewards(plain).seals);
   });
 
   it('come from rarer spawns, with one quirk for Rare and two for Elite', () => {
