@@ -27,6 +27,7 @@ import { addPet, companion, loadCollection, saveCollection, walkRewards } from '
 import { spawnsNear, type Spawn } from './game/spawns';
 import { getSpecies } from './creatures/species';
 import { creatureForSpawn, type Encounter } from './creatures/stats';
+import { wildlingWanted } from './creatures/scarcity';
 import type { GameContext } from './ui/context';
 import { openBattle } from './ui/battle';
 import { openBestiary, openStarterChoice } from './ui/bestiary';
@@ -326,7 +327,9 @@ function refreshSpawns(force = false): void {
     }
     spawn.realm = spawnRealms.get(spawn.id);
   }
-  shown = live.map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) }));
+  shown = live
+    .map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) }))
+    .filter(({ spawn, encounter }) => wildlingWanted(spawn.id, encounter, collection));
   creatures.show(shown);
   showReach();
 }
