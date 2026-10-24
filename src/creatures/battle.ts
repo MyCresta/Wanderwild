@@ -1,5 +1,5 @@
 import { matchup } from './elements';
-import { FOE_TRAITS, RANKS, type FoeTrait, type Rank } from './foes';
+import { FOE_TRAITS, foeScale, type FoeTrait, type Rank } from './foes';
 import type { Rng } from './rng';
 import type { Element, Species } from './species';
 import { damage, individualFromSeed, statsAt } from './stats';
@@ -14,6 +14,8 @@ export interface Fighter {
   /** The owned pet's uid, for party members. */
   uid?: string;
   rank: Rank;
+  /** Elite tier 1-3 or boss tier 1-5. */
+  tier: number;
   traits: FoeTrait[];
 }
 
@@ -22,15 +24,16 @@ export function makeFighter(
   level: number,
   seed: number,
   uid?: string,
-  foe: { rank?: Rank; traits?: FoeTrait[] } = {},
+  foe: { rank?: Rank; tier?: number; traits?: FoeTrait[] } = {},
 ): Fighter {
   const stats = statsAt(species.base, level, individualFromSeed(seed, species.kind).trait);
   const rank = foe.rank ?? 'normal';
+  const tier = foe.tier ?? 1;
   const traits = foe.traits ?? [];
-  const r = RANKS[rank];
+  const r = foeScale(rank, tier);
   const maxHp = Math.round(stats.hp * r.hp * (traits.includes('thick') ? 1.35 : 1));
   const atk = Math.round(stats.atk * r.power * (traits.includes('savage') ? 1.2 : 1));
-  return { species, level, maxHp, hp: maxHp, atk, def: Math.round(stats.def * r.power), uid, rank, traits };
+  return { species, level, maxHp, hp: maxHp, atk, def: Math.round(stats.def * r.power), uid, rank, tier, traits };
 }
 
 export type Side = 'pet' | 'foe';
@@ -84,12 +87,13 @@ const MOVE_POWER = 1.7;
 const BIG_POWER = 1.9;
 /** Scales damage so a fight takes a handful of turns, not a dozen. Foes hit a little softer. */
 const PACE = 1.6;
-const FOE_PACE = 1.25;
+const FOE_PACE = 1;
 /** Timing quality at or above this lands a critical hit. */
 export const CRIT_QUALITY = 0.82;
 const FOE_CRIT_CHANCE = 0.06;
 export const PARTY_SIZE = 3;
-export const TONIC_HEAL = 0.5;
+/** A tonic heals a set amount of health; upgrades raise it through `tonicPower`. */
+export const TONIC_HEAL = 35;
 export const MENDING_HEAL = 0.35;
 const BURN_TURNS = 3;
 const BURN_SHARE = 0.07;
@@ -119,6 +123,10 @@ export interface BattleOptions {
   /** Gear multipliers on the party's attack (and Fireball) and health. */
   petDamage?: number;
   petHealth?: number;
+  /** Share of health each party member starts with (0..1), from lasting damage. Full when absent. */
+  vigor?: number[];
+  /** Multiplier on what a tonic heals, for upgrades. */
+  tonicPower?: number;
 }
 
 /** What the foe will do on its next turn, shown above it so the player can plan. */
@@ -159,15 +167,17 @@ export class Battle {
   private readonly rng: Rng;
   private readonly wayfarerLevel: number;
   private readonly petDamage: number;
+  readonly tonicHeal: number;
 
   constructor(
     readonly party: Fighter[],
     readonly foe: Fighter,
-    { rng = Math.random, wayfarerLevel = 1, petDamage = 1, petHealth = 1 }: BattleOptions = {},
+    { rng = Math.random, wayfarerLevel = 1, petDamage = 1, petHealth = 1, vigor, tonicPower = 1 }: BattleOptions = {},
   ) {
     this.rng = rng;
     this.wayfarerLevel = wayfarerLevel;
     this.petDamage = petDamage;
+    this.tonicHeal = Math.round(TONIC_HEAL * tonicPower);
     this.cooldowns = party.map(() => ({ move: 0, art: 0 }));
     this.wardUp = foe.traits.includes('warded');
     for (const f of party) {
@@ -176,6 +186,27 @@ export class Battle {
       f.maxHp = Math.round(f.maxHp * petHealth);
       if (full) f.hp = f.maxHp;
     }
+    vigor?.forEach((v, i) => {
+      const f = party[i];
+      if (f) f.hp = Math.max(0, Math.min(f.maxHp, Math.round(f.maxHp * v)));
+    });
+    // Lead with the first pet still standing.
+    const first = party.findIndex((f) => f.hp > 0);
+    if (first > 0) {
+      this.active = first;
+      this.fought.clear();
+      this.fought.add(first);
+    }
+  }
+
+  /** Share of health each party member has left (0..1), to carry over to the next fight. */
+  vigorLeft(): number[] {
+    return this.party.map((f) => f.hp / f.maxHp);
+  }
+
+  /** A boss below half health is enraged: its big attack comes a turn sooner. */
+  get enraged(): boolean {
+    return this.foe.rank === 'boss' && this.foe.hp * 2 < this.foe.maxHp;
   }
 
   /** Stamps an event with everyone's health as it stands now. */
@@ -221,7 +252,7 @@ export class Battle {
   }
 
   get intent(): Intent {
-    const every = this.foe.traits.includes('swift') ? 2 : 3;
+    const every = Math.max(2, (this.foe.traits.includes('swift') ? 2 : 3) - (this.enraged ? 1 : 0));
     const big = this.foeTurns % every === every - 1;
     return big ? { big, name: this.foe.species.move, element: this.foe.species.element } : { big, name: 'Strike', element: null };
   }
@@ -285,11 +316,12 @@ export class Battle {
     }
   }
 
-  private heal(targets: number[], fraction: number, source: 'tonic' | 'mending'): BattleEvent {
+  /** Heals each target by a share of its health, or by a flat amount when `flat` is given. */
+  private heal(targets: number[], fraction: number, source: 'tonic' | 'mending', flat?: number): BattleEvent {
     let amount = 0;
     for (const i of targets) {
       const f = this.party[i];
-      const add = Math.min(f.maxHp - f.hp, Math.round(f.maxHp * fraction));
+      const add = Math.min(f.maxHp - f.hp, flat ?? Math.round(f.maxHp * fraction));
       f.hp += add;
       amount += add;
     }
@@ -376,7 +408,7 @@ export class Battle {
         this.tick();
         break;
       case 'tonic':
-        events.push(this.heal([this.active], TONIC_HEAL, 'tonic'));
+        events.push(this.heal([this.active], 0, 'tonic', this.tonicHeal));
         this.tick();
         break;
       case 'spell':
@@ -426,13 +458,14 @@ const RANK_REWARD: Record<Rank, { xp: number }> = {
   normal: { xp: 1 },
   rare: { xp: 1.6 },
   elite: { xp: 2.6 },
+  boss: { xp: 6 },
 };
 
 /** Experience for each pet after driving a monster off. */
 export function victoryRewards(foe: Fighter): { xp: number } {
   const rarityBonus = foe.species.rarity === 'rare' ? 1.6 : foe.species.rarity === 'uncommon' ? 1.25 : 1;
-  const rank = RANK_REWARD[foe.rank];
-  return { xp: Math.round(14 * foe.level * rarityBonus * rank.xp) };
+  const rank = RANK_REWARD[foe.rank].xp * (foe.rank === 'normal' || foe.rank === 'rare' ? 1 : 1 + 0.35 * (foe.tier - 1));
+  return { xp: Math.round(14 * foe.level * rarityBonus * rank) };
 }
 
 /** Pets that fought share full experience; the rest of the party learns by watching, at half. */
