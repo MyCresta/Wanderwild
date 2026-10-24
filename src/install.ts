@@ -11,10 +11,15 @@ const isStandalone = () =>
   (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
 /**
- * Offers "Install Wanderwild" where the browser supports an install prompt (Android
+ * Offers "Install Wanderwild" (in the journal's settings) where the browser supports an install prompt (Android
  * Chrome, desktop Chrome and Edge), and a one-time Add to Home Screen tip on iOS.
  */
-export function setupInstallButton(button: HTMLButtonElement, showNotice: (text: string | null) => void): void {
+export function setupInstallButton(
+  button: HTMLButtonElement,
+  showNotice: (text: string | null) => void,
+  /** What to show or hide with the button, such as its settings row. */
+  shown: HTMLElement = button,
+): void {
   if (isStandalone()) return;
 
   let deferred: BeforeInstallPromptEvent | null = null;
@@ -22,18 +27,18 @@ export function setupInstallButton(button: HTMLButtonElement, showNotice: (text:
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
     deferred = event as BeforeInstallPromptEvent;
-    button.hidden = false;
+    shown.hidden = false;
   });
 
   button.addEventListener('click', async () => {
     if (!deferred) return;
-    button.hidden = true;
+    shown.hidden = true;
     await deferred.prompt();
     deferred = null;
   });
 
   window.addEventListener('appinstalled', () => {
-    button.hidden = true;
+    shown.hidden = true;
     deferred = null;
   });
 

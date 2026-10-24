@@ -20,6 +20,7 @@ import { ShrineLayer } from './map/shrineLayer';
 import { Hud } from './hud/hud';
 import { HearthsteadPanel } from './hud/hearthsteadPanel';
 import { renderParty } from './hud/partyPanel';
+import { journal } from './ui/journal';
 import { ForgePanel } from './hud/forgePanel';
 import { formatWait } from './hud/format';
 import { CompanionMarker, CreatureMarkers, ResidentMarkers } from './map/creatures';
@@ -34,7 +35,6 @@ import { toast } from './ui/dom';
 import { openEncounter } from './ui/encounter';
 import { DeedKeeper } from './ui/deeds';
 import { sound } from './audio/sound';
-import { setupSoundButton } from './ui/soundButton';
 import { HuntController } from './ui/hunt';
 import { Trace } from './game/glyphs';
 import { realmShares, samplePoints, waymarkSpawn } from './game/demesne';
@@ -42,7 +42,7 @@ import { DemesneLayer } from './map/demesneLayer';
 import { DemesnePanel } from './hud/demesnePanel';
 import { ringInRealm, walkInRealm } from './creatures/evolution';
 import { playerReach } from './geo/reach';
-import { setupRailMenu, watchLayout } from './ui/layout';
+import { watchLayout } from './ui/layout';
 import { installOrbitCamera } from './map/orbitCamera';
 import { FightBoard, type FoeNear } from './ui/fightBoard';
 import { Farsight } from './ui/farsight';
@@ -65,10 +65,8 @@ const CREATURE_XP: Record<Spawn['rarity'], number> = { common: 60, uncommon: 90,
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const noticeEl = $('notice');
 const recenterEl = $<HTMLButtonElement>('recenter');
-const sealsEl = $('seals');
 
 watchLayout();
-setupRailMenu();
 
 function showNotice(text: string | null): void {
   noticeEl.hidden = !text;
@@ -118,6 +116,7 @@ function setFollowing(value: boolean): void {
   if (value && farsight.active) return farsight.set(false);
   following = value;
   recenterEl.setAttribute('aria-pressed', String(value));
+  recenterEl.hidden = value;
   if (value && lastFix) map.easeTo({ center: [lastFix.lng, lastFix.lat], zoom: Math.max(map.getZoom(), 15) });
 }
 
@@ -148,7 +147,6 @@ const creatureGame: GameContext = {
   collection,
   changed() {
     saveCollection(collection);
-    sealsEl.textContent = String(collection.seals);
     companionMarker.setPet(companion(collection));
     deeds?.check();
     refreshResidents?.();
@@ -166,8 +164,9 @@ creatureGame.wayfarer = {
   },
 };
 creatureGame.changed();
-deeds = new DeedKeeper(game, collection, $('deeds'), $('wayfarer-title'));
-$('satchel-open').addEventListener('click', () => renderParty($('satchel-party'), creatureGame));
+deeds = new DeedKeeper(game, collection, $('wayfarer-title'));
+hud.seals = () => collection.seals;
+journal.onShow('wayfarer', () => renderParty($('satchel-party'), creatureGame));
 new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame, forge);
 
 // Glyphwalking: the shape of the walk, kept in memory only, and the Demesne it claims.
@@ -244,7 +243,7 @@ function meet(spawn: Spawn, encounter: Encounter): void {
     const metres = haversine(lastFix, spawn);
     const reach = playerReach(lastFix, game.bonuses().reachM);
     sound.play('error');
-    toast(`That ${encounter.species.name} is ${Math.round(metres)} m away. Walk ${Math.ceil(metres - reach)} m closer, or reach it by Farsight 👁 for ${Math.round(FARSIGHT_SHARE * 100)}% rewards.`);
+    toast(`${encounter.species.name} is ${Math.ceil(metres - reach)} m out of reach. Walk closer, or use Farsight 👁.`);
     return;
   }
   if (encounter.species.kind === 'pet') {
@@ -285,9 +284,10 @@ const farsight = new Farsight({
   enter() {
     following = false;
     recenterEl.setAttribute('aria-pressed', 'false');
+    recenterEl.hidden = false;
     orbit.setFree(true);
     if (!seenFarsightHint()) {
-      hud.toast(`Farsight: drag anywhere to explore. Fight, sketch and pick up curios from here for ${Math.round(FARSIGHT_SHARE * 100)}% rewards. Walking still pays full.`, 6000);
+      hud.toast(`Farsight: drag to explore and play from here for ${Math.round(FARSIGHT_SHARE * 100)}% rewards. Walking pays full.`, 5000);
     }
     refreshAround(true);
   },
@@ -351,7 +351,7 @@ function showReach(): void {
   fights.update(foes);
   if (!foeHinted && companion(collection) && foes.some((f) => f.inReach)) {
     foeHinted = true;
-    toast('A Blotspawn is close enough to fight! Tap it, or the ⚔ button.');
+    toast('A Blotspawn is in reach! Tap it to fight.');
   }
 }
 game.on((e) => e.kind === 'change' && showReach());
@@ -537,7 +537,6 @@ document.addEventListener('visibilitychange', () => {
 });
 
 sound.install();
-setupSoundButton($<HTMLButtonElement>('sound-toggle'));
 
 registerSW({ immediate: true });
-setupInstallButton($<HTMLButtonElement>('install'), showNotice);
+setupInstallButton($<HTMLButtonElement>('install'), showNotice, $('install-row'));

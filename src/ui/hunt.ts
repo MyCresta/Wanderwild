@@ -2,6 +2,7 @@ import './hunt.css';
 import type { Map } from 'maplibre-gl';
 import { sound } from '../audio/sound';
 import { railButtons } from './layout';
+import { journal } from './journal';
 import type { Fix } from '../geo/distance';
 import type { GameState } from '../game/state';
 import { MATERIALS, REALMS, type MaterialId, type RealmId } from '../game/realms';
@@ -60,6 +61,13 @@ const CHEST_ICON = `<svg class="hunt-chest" viewBox="0 0 120 100" aria-hidden="t
   </g>
 </svg>`;
 
+/** Draws the scroll icon at list size. */
+function scrollIcon(): HTMLElement {
+  const span = h('span', { class: 'journal-link-icon', 'aria-hidden': 'true' });
+  span.innerHTML = SCROLL_ICON;
+  return span;
+}
+
 /** The treasure hunt: its map button, the treasure map sheet, and the chest at the end. */
 export class HuntController {
   private log = loadHuntLog();
@@ -77,8 +85,11 @@ export class HuntController {
     this.button = h('button', { class: 'hunt-button', type: 'button', 'aria-label': 'Treasure hunt', onclick: () => this.open() });
     this.button.innerHTML = SCROLL_ICON;
     this.button.append(this.label);
-    // Sits just under the "more" button in the right-hand rail.
-    railButtons('right').insertBefore(this.button, document.getElementById('rail-more'));
+    // On the map only while a hunt is under way; hunts start from the journal.
+    railButtons('right').append(this.button);
+    document.getElementById('satchel-hunt')?.append(
+      h('button', { class: 'journal-link', type: 'button', onclick: () => (journal.close(), this.open()) }, scrollIcon(), 'Treasure hunts'),
+    );
     this.render();
   }
 
@@ -116,6 +127,7 @@ export class HuntController {
 
   private render(): void {
     const hunt = this.hunt;
+    this.button.hidden = !hunt && !this.chestReady;
     this.button.classList.toggle('hunt-active', !!hunt);
     this.button.classList.toggle('hunt-ready', this.chestReady);
     this.label.textContent = this.chestReady ? 'Open!' : hunt ? (this.last ? WARMTH_TEXT[this.last] : 'Hunting') : 'Hunt';
@@ -133,7 +145,7 @@ export class HuntController {
     this.layer.markFound(landmark);
     this.pending = { treasure, name: landmark.name, hints: hunt.hints, material };
     // Never close a battle or catch to show the chest; wait for a tap instead.
-    if (document.querySelector('.sheet-backdrop')) {
+    if (document.querySelector('.sheet-backdrop, dialog[open]')) {
       this.chestReady = true;
       toast(`You found ${landmark.name}! Tap the treasure map to open the chest.`);
     } else {

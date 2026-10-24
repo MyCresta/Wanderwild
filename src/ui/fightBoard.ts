@@ -1,4 +1,4 @@
-import { FOE_TRAITS, RANKS } from '../creatures/foes';
+import { FOE_TRAITS } from '../creatures/foes';
 import { MONSTERS } from '../creatures/species';
 import type { Encounter } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
@@ -100,18 +100,12 @@ export class FightBoard {
     sheet.body.append(
       this.foes.length
         ? list
-        : h('p', { class: 'hint' }, 'No Blotspawn about right now. They gather in quiet lanes and old graveyards, and new ones spill out every 15 minutes.'),
-      h(
-        'p',
-        { class: 'hint' },
-        `Blotspawn show on the map with a dark ink pool. ${RANKS.rare.name} ones glow gold and ${RANKS.elite.name}s wear a crown: tougher, with quirks, and worth far more.`,
-      ),
+        : h('p', { class: 'hint' }, 'No Blotspawn about right now. New ones spill out every 15 minutes.'),
       h(
         'button',
-        { class: 'btn', type: 'button', onclick: () => (sheet.close(), this.hooks.practice(practiceEncounter(level))) },
+        { class: 'btn', type: 'button', title: 'A training blot. No rewards, nothing lost.', onclick: () => (sheet.close(), this.hooks.practice(practiceEncounter(level))) },
         '⚔ Practice bout',
       ),
-      h('p', { class: 'hint' }, 'Practice anytime against a training blot. No rewards, nothing lost.'),
       wheelHelp(),
     );
   }

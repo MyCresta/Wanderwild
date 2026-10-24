@@ -32,7 +32,7 @@ export class Farsight {
       'button',
       { class: 'farsight-pill', type: 'button', hidden: true, 'aria-label': 'Leave Farsight and return to the Wayfarer' },
       h('strong', {}, 'Farsight'),
-      h('span', {}, ` · drag to explore · ${Math.round(FARSIGHT_SHARE * 100)}% rewards · walk for full`),
+      h('span', {}, ` · ${Math.round(FARSIGHT_SHARE * 100)}% rewards`),
       h('span', { class: 'farsight-pill-x', 'aria-hidden': 'true' }, '×'),
     );
     this.pill.addEventListener('click', () => this.set(false));
