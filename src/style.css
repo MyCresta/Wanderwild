@@ -2916,7 +2916,29 @@ body:has(.catch-scene) .banners {
   box-shadow: 0 2px 0 var(--leather-dark), 0 0 0 2px #4b6a3c;
 }
 
-/* The timing sweep runs inside the very button you pressed. */
+/* The timing sweep runs on a bar over the log, right above the attacks and clear of the thumb. */
+.log-wrap {
+  position: relative;
+}
+
+.sweep-bar {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 4px 6px;
+  border-radius: 12px;
+  background: var(--parchment);
+  touch-action: manipulation;
+}
+
+.sweep-bar.sweeping {
+  display: flex;
+}
+
 .cmd.sweeping {
   opacity: 1;
   border-color: var(--gold);
@@ -2924,24 +2946,22 @@ body:has(.catch-scene) .banners {
 }
 
 .sweep-track {
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  bottom: 6px;
-  height: 12px;
-  border-radius: 6px;
+  position: relative;
+  display: block;
+  height: 18px;
+  border-radius: 9px;
   background: rgba(59, 42, 26, 0.25);
 }
 
 .sweep-zone {
   position: absolute;
-  top: -2px;
-  bottom: -2px;
+  top: -3px;
+  bottom: -3px;
   left: calc(var(--sweet) - 9%);
   width: 18%;
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--gold);
-  box-shadow: 0 0 8px var(--gold);
+  box-shadow: 0 0 10px var(--gold);
 }
 
 /* Spans the track so translateX(100%) carries the needle to the far end. */
@@ -2954,25 +2974,16 @@ body:has(.catch-scene) .banners {
 
 .sweep-needle {
   position: absolute;
-  top: -4px;
-  bottom: -4px;
+  top: -6px;
+  bottom: -6px;
   left: 0;
-  width: 4px;
+  width: 5px;
   margin-left: -2px;
-  border-radius: 2px;
+  border-radius: 3px;
   background: #8e2b22;
 }
 
-.sweeping .cmd-name,
-.sweeping .cmd-sub,
-.sweeping .edge {
-  visibility: hidden;
-}
-
 .sweep-hint {
-  position: absolute;
-  inset: 0 0 auto;
-  padding: 8px 6px;
   font-size: 13px;
   font-weight: bold;
   text-align: center;
