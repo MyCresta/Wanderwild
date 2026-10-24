@@ -1,14 +1,11 @@
-import type { Fix } from './distance';
-
 /**
- * How close the player must be to meet a creature, touch a shrine or pick up a curio by hand.
- * One reach for everything on the map, drawn as the ring around the player. Generous, since GPS wanders.
+ * How close the player must be to meet a creature, touch a shrine, pick up a curio or
+ * find a hunt's landmark. One reach for everything, drawn as the purple ring around the
+ * player. It never grows or shrinks with GPS error, so the ring always means the same thing.
  */
-export const REACH_M = 120;
-/** Up to this much of the GPS error is forgiven on top of the reach. */
-const MAX_ACCURACY_SLACK_M = 40;
+export const REACH_M = 100;
 
-/** Reach for this fix: the base, gear bonuses, and some slack for a fuzzy fix. */
-export function playerReach(fix: Fix, bonusM = 0): number {
-  return REACH_M + bonusM + Math.min(Math.max(fix.accuracy, 0), MAX_ACCURACY_SLACK_M);
+/** Reach with gear bonuses on top of the base. */
+export function playerReach(bonusM = 0): number {
+  return REACH_M + Math.max(0, bonusM);
 }

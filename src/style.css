@@ -1093,6 +1093,30 @@ body:has(> .catch-scene) .parchment-overlay {
   white-space: nowrap;
 }
 
+/* Steps today: a quiet button, tap for what they give. */
+.hud-steps {
+  pointer-events: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.hud-steps .hud-value {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hud-steps svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  opacity: 0.8;
+}
+
 .hud-purse {
   display: flex;
   flex-direction: row;
