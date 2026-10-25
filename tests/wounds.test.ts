@@ -107,7 +107,7 @@ describe('elite tiers and bosses', () => {
     expect(battle.enraged).toBe(false);
     boss.hp = Math.floor(boss.maxHp / 2) - 1;
     expect(battle.enraged).toBe(true);
-    battle.turn({ kind: 'art' });
+    battle.turn({ kind: 'attack', slot: 2 });
     expect(battle.intent.big).toBe(true);
   });
 

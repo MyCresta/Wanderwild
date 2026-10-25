@@ -1,6 +1,8 @@
 import type { OwnedPet } from '../creatures/collection';
 import { evolve, evolutionStatus } from '../creatures/evolution';
 import { getSpecies } from '../creatures/species';
+import { getMove } from '../creatures/moves';
+import { moveRow } from './moves';
 import { individualFromSeed, statsAt } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
 import { createBackdrop } from './catch/backdrop';
@@ -110,8 +112,10 @@ export function openEvolution(ctx: GameContext, pet: OwnedPet, onDone?: () => vo
         h('h2', {}, into.name),
         h('p', { class: 'epithet' }, into.epithet),
         h('p', { class: 'lore' }, into.lore),
-        h('dl', { class: 'stats evo-stats' }, row('Vigour', before.hp, after.hp), row('Might', before.atk, after.atk), row('Guard', before.def, after.def)),
-        h('p', {}, `New move: `, h('strong', {}, into.move)),
+        h('dl', { class: 'stats evo-stats' }, row('Vigour', before.hp, after.hp), row('Might', before.atk, after.atk), row('Guard', before.def, after.def), row('Speed', before.spd, after.spd)),
+        ...into.moves
+          .filter((id) => from.kind !== 'pet' || !from.moves.includes(id))
+          .map((id) => h('p', { class: 'evo-move' }, 'New move: ', moveRow(getMove(id)))),
         h('div', { class: 'actions' }, h('button', { class: 'btn btn-primary', type: 'button', onclick: close }, 'Wonderful')),
       ),
     );

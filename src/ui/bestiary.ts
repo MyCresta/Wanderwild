@@ -1,6 +1,7 @@
 import { addPet, companion, STARTERS, type OwnedPet } from '../creatures/collection';
 import { hashString, mulberry32 } from '../creatures/rng';
-import { ALL_SPECIES, ELEMENTS, getSpecies } from '../creatures/species';
+import { ALL_SPECIES, getSpecies } from '../creatures/species';
+import { moveList } from './moves';
 import { individualFromSeed, MAX_LEVEL, statsAt, xpToNext } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
 import { elementBadge, rarityBadge } from './badges';
@@ -52,7 +53,8 @@ function petDetail(ctx: GameContext, sheet: Page, pet: OwnedPet, back: () => voi
       rarityBadge(species),
       individual.gilded && h('span', { class: 'badge badge-gilded' }, '✦ Gilded'),
       ' ',
-      h('em', {}, individual.trait.name),
+      h('em', { class: 'trait-name', title: individual.trait.blurb }, individual.trait.name),
+      h('small', { class: 'trait-blurb' }, ` · ${individual.trait.blurb}`),
     ),
     h(
       'div',
@@ -69,8 +71,10 @@ function petDetail(ctx: GameContext, sheet: Page, pet: OwnedPet, back: () => voi
       h('dd', {}, String(stats.atk)),
       h('dt', {}, 'Guard'),
       h('dd', {}, String(stats.def)),
-      h('dt', {}, 'Move'),
-      h('dd', {}, `${ELEMENTS[species.element].glyph} ${species.move}`),
+      h('dt', {}, 'Speed'),
+      h('dd', {}, String(stats.spd)),
+      h('dt', {}, 'Moves'),
+      h('dd', {}, species.kind === 'pet' ? moveList(species) : ''),
     ),
     h('p', { class: 'lore' }, species.lore),
     evolutionPanel(ctx, sheet, pet),

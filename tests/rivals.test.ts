@@ -57,7 +57,7 @@ describe('fighting a line of foes', () => {
     const battle = new Battle([tank()], line, { rng: mulberry32(2) });
     const seen: number[] = [];
     for (let i = 0; i < 40 && !battle.winner; i++) {
-      for (const e of battle.turn({ kind: 'strike', quality: 0.5 })) if (e.kind === 'foe-in') seen.push(e.index);
+      for (const e of battle.turn({ kind: 'attack', slot: 0, quality: 0.5 })) if (e.kind === 'foe-in') seen.push(e.index);
     }
     expect(seen).toEqual([1, 2]);
     expect(battle.winner).toBe('pet');
@@ -71,7 +71,7 @@ describe('fighting a line of foes', () => {
     const battle = new Battle([tank('emberkit')], [first, second], { rng: mulberry32(4) });
     battle.burn = 2;
     first.hp = 1;
-    const events = battle.turn({ kind: 'strike', quality: 0.5 });
+    const events = battle.turn({ kind: 'attack', slot: 0, quality: 0.5 });
     expect(events.at(-1)).toMatchObject({ kind: 'foe-in', index: 1, hp: { foe: second.maxHp } });
     expect(battle.foe).toBe(second);
     expect(battle.burn).toBe(0);

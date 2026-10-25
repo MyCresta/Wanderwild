@@ -21,17 +21,25 @@ export interface Trait {
   hp: number;
   atk: number;
   def: number;
+  spd: number;
   /** Multiplier on experience earned. */
   xp: number;
+  /** What it changes, in a few words. */
+  blurb: string;
 }
 
+/**
+ * Temperaments: every one gives a little and takes a little, so no Wildling is simply the
+ * best of its kind; two of the same kind just fight in a different style.
+ * The order is kept, since saved Wildlings get theirs from their seed.
+ */
 export const TRAITS: readonly Trait[] = [
-  { name: 'Brave', hp: 1, atk: 1.1, def: 0.95, xp: 1 },
-  { name: 'Sturdy', hp: 1, atk: 0.95, def: 1.12, xp: 1 },
-  { name: 'Hearty', hp: 1.12, atk: 1, def: 0.97, xp: 1 },
-  { name: 'Fierce', hp: 0.93, atk: 1.15, def: 1, xp: 1 },
-  { name: 'Curious', hp: 1, atk: 1, def: 1, xp: 1.2 },
-  { name: 'Steadfast', hp: 1.04, atk: 1.03, def: 1.04, xp: 1 },
+  { name: 'Brave', hp: 1, atk: 1.1, def: 0.92, spd: 1, xp: 1, blurb: 'More attack, less defence' },
+  { name: 'Sturdy', hp: 1, atk: 1, def: 1.12, spd: 0.9, xp: 1, blurb: 'More defence, less speed' },
+  { name: 'Hearty', hp: 1.12, atk: 0.93, def: 1, spd: 1, xp: 1, blurb: 'More health, less attack' },
+  { name: 'Fierce', hp: 0.9, atk: 1.12, def: 1, spd: 1, xp: 1, blurb: 'More attack, less health' },
+  { name: 'Curious', hp: 1, atk: 1, def: 1, spd: 1, xp: 1.2, blurb: 'Learns faster: 20% more XP' },
+  { name: 'Nimble', hp: 0.92, atk: 1, def: 1, spd: 1.15, xp: 1, blurb: 'More speed, less health' },
 ];
 
 /** What an individual's seed decides: colouring, temperament, and a rare golden coat. */
@@ -60,6 +68,7 @@ export function statsAt(base: BaseStats, level: number, trait: Trait): BaseStats
     hp: Math.round((base.hp * growth + level * 2) * trait.hp),
     atk: Math.round(base.atk * growth * trait.atk),
     def: Math.round(base.def * growth * trait.def),
+    spd: Math.round(base.spd * growth * trait.spd),
   };
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Battle, makeFighter, MOVE_COOLDOWN, shareXp, victoryRewards, type BattleEvent } from '../src/creatures/battle';
+import { Battle, makeFighter, shareXp, victoryRewards, type BattleEvent } from '../src/creatures/battle';
 import { beatenBy, matchup, STRONG, WEAK, WHEEL } from '../src/creatures/elements';
 import { rollFoe } from '../src/creatures/foes';
 import { creatureForSpawn } from '../src/creatures/stats';
@@ -15,27 +15,30 @@ const pet = (id: string, level = 5, seed = 1) => makeFighter(getSpecies(id), lev
 /** A pet that cannot faint, for watching many turns go by. */
 const tank = (id = 'cragmite') => Object.assign(pet(id, 1), { hp: 1e6, maxHp: 1e6 });
 const hits = (events: BattleEvent[]) => events.filter((e) => e.kind === 'hit');
+/** The party's blow in a turn's events, whoever went first. */
+const petHit = (events: BattleEvent[]) => events.find((e) => e.kind === 'hit' && e.attacker === 'pet');
+const foeHit = (events: BattleEvent[]) => events.find((e) => e.kind === 'hit' && e.attacker === 'foe');
 
 describe('party battles', () => {
   it('lands critical element moves only from well-timed taps', () => {
     const battle = new Battle([tank('bramblet')], pet('thornmaw', 30), { rng: mulberry32(1) });
-    const [perfect] = hits(battle.turn({ kind: 'move', quality: 1 }));
-    battle.turn({ kind: 'strike' });
-    battle.turn({ kind: 'strike' });
-    const [late] = hits(battle.turn({ kind: 'move', quality: 0.3 }));
-    expect(perfect).toMatchObject({ attacker: 'pet', action: 'move', crit: true });
-    expect(late).toMatchObject({ attacker: 'pet', action: 'move', crit: false });
+    const perfect = petHit(battle.turn({ kind: 'attack', slot: 1, quality: 1 }));
+    battle.turn({ kind: 'attack', slot: 0 });
+    battle.turn({ kind: 'attack', slot: 0 });
+    const late = petHit(battle.turn({ kind: 'attack', slot: 1, quality: 0.3 }));
+    expect(perfect).toMatchObject({ name: 'Thistle Volley', element: 'grove', crit: true });
+    expect(late).toMatchObject({ name: 'Thistle Volley', crit: false });
   });
 
   it('swaps pets, and forces a swap when the active one faints', () => {
     const weak = pet('driftfin', 1);
     weak.hp = 1;
     const battle = new Battle([weak, pet('cragmite', 8)], pet('wickwraith', 12), { rng: mulberry32(3) });
-    const events = battle.turn({ kind: 'strike', quality: 0.5 });
+    const events = battle.turn({ kind: 'attack', slot: 0, quality: 0.5 });
     expect(events.at(-1)).toEqual({ kind: 'faint', index: 0 });
     expect(battle.mustSwap).toBe(true);
     expect(battle.winner).toBeNull();
-    expect(battle.turn({ kind: 'strike' })).toEqual([]);
+    expect(battle.turn({ kind: 'attack', slot: 0 })).toEqual([]);
     expect(battle.turn({ kind: 'swap', to: 1 })).toEqual([{ kind: 'swap', to: 1 }]);
     expect(battle.pet.species.id).toBe('cragmite');
     expect(battle.canSwapTo(0)).toBe(false);
@@ -45,7 +48,7 @@ describe('party battles', () => {
     const a = pet('driftfin', 1);
     a.hp = 1;
     const battle = new Battle([a], pet('wickwraith', 12), { rng: mulberry32(3) });
-    battle.turn({ kind: 'strike' });
+    battle.turn({ kind: 'attack', slot: 0 });
     expect(battle.winner).toBe('foe');
   });
 
@@ -63,7 +66,7 @@ describe('party battles', () => {
     expect(b.hp).toBeGreaterThan(5);
     // One spell per turn, and casting did not hand the foe a turn.
     expect(warden.canCast('secondWind')).toBe(false);
-    warden.turn({ kind: 'strike' });
+    warden.turn({ kind: 'attack', slot: 0 });
     expect(warden.castSpell('secondWind')).toHaveLength(1);
     expect(warden.pet.hp).toBe(warden.pet.maxHp);
     // Spells the hero's class does not teach are not offered.
@@ -87,7 +90,7 @@ describe('party battles', () => {
 
   it('shares experience: full for pets that fought, half for the bench', () => {
     const battle = new Battle([tank('bramblet'), pet('emberkit'), pet('driftfin')], pet('smudgeling'));
-    battle.turn({ kind: 'strike' });
+    battle.turn({ kind: 'attack', slot: 0 });
     battle.turn({ kind: 'swap', to: 2 });
     expect(shareXp(battle, 40)).toEqual([40, 20, 40]);
   });
@@ -113,62 +116,75 @@ describe('the Elemental Wheel', () => {
     const roll = () => 0.5;
     const strong = new Battle([pet('emberkit', 10)], pet('thornmaw', 30), { rng: roll });
     const weak = new Battle([pet('bramblet', 10)], pet('thornmaw', 30), { rng: roll });
-    const s = hits(strong.turn({ kind: 'move', quality: 0.5 }))[0];
-    const w = hits(weak.turn({ kind: 'move', quality: 0.5 }))[0];
+    const s = petHit(strong.turn({ kind: 'attack', slot: 1, quality: 0.5 }))!;
+    const w = petHit(weak.turn({ kind: 'attack', slot: 1, quality: 0.5 }))!;
     expect(s).toMatchObject({ effectiveness: STRONG });
     expect(s.kind === 'hit' && w.kind === 'hit' && s.damage > w.damage).toBe(true);
   });
 });
 
 describe('attacks and foe intents', () => {
-  it('puts the element move on cooldown and falls back to Strike', () => {
+  it('rests a move after use, and Strike-like moves never rest', () => {
     const battle = new Battle([pet('driftfin', 10)], pet('murkwing', 30), { rng: mulberry32(2) });
-    battle.turn({ kind: 'move', quality: 0.5 });
-    expect(battle.ready('move')).toBe(false);
-    expect(hits(battle.turn({ kind: 'move' }))[0]).toMatchObject({ action: 'strike' });
-    for (let i = 1; i < MOVE_COOLDOWN; i++) battle.turn({ kind: 'strike' });
-    expect(battle.ready('move')).toBe(true);
+    battle.turn({ kind: 'attack', slot: 1, quality: 0.5 });
+    expect(battle.ready(1)).toBe(false);
+    expect(battle.turn({ kind: 'attack', slot: 1 })).toEqual([]);
+    battle.turn({ kind: 'attack', slot: 0 });
+    expect(battle.ready(1)).toBe(false);
+    battle.turn({ kind: 'attack', slot: 0 });
+    expect(battle.ready(1)).toBe(true);
+    expect(battle.ready(0)).toBe(true);
   });
 
   it('announces the big attack every third turn, every other when Swift', () => {
     const plain = new Battle([tank()], pet('smudgeling', 30), { rng: mulberry32(4) });
     const seen = [plain.intent.big];
     for (let i = 0; i < 5; i++) {
-      plain.turn({ kind: 'strike' });
+      plain.turn({ kind: 'attack', slot: 0 });
       seen.push(plain.intent.big);
     }
     expect(seen).toEqual([false, false, true, false, false, true]);
     const swift = new Battle([tank()], makeFighter(MONSTERS[0], 30, 1, undefined, { traits: ['swift'] }));
     expect(swift.intent.big).toBe(false);
-    swift.turn({ kind: 'strike' });
+    swift.turn({ kind: 'attack', slot: 0 });
     expect(swift.intent.big).toBe(true);
   });
 
   it('dodges with Updraft and soaks with Bulwark', () => {
     const gale = new Battle([pet('wisplume', 5)], pet('thornmaw', 30), { rng: mulberry32(5) });
-    expect(gale.turn({ kind: 'art' }).some((e) => e.kind === 'miss')).toBe(true);
+    const first = gale.turn({ kind: 'attack', slot: 2, quality: 0.5 });
+    const next = gale.turn({ kind: 'attack', slot: 0, quality: 0.5 });
+    expect([...first, ...next].some((e) => e.kind === 'miss')).toBe(true);
     const roll = () => 0.5;
     const bare = new Battle([pet('cragmite', 5)], pet('thornmaw', 20), { rng: roll });
     const walled = new Battle([pet('cragmite', 5)], pet('thornmaw', 20), { rng: roll });
-    const open = hits(bare.turn({ kind: 'strike' })).find((e) => e.kind === 'hit' && e.attacker === 'foe')!;
-    const shut = hits(walled.turn({ kind: 'art' })).find((e) => e.kind === 'hit' && e.attacker === 'foe')!;
+    bare.turn({ kind: 'attack', slot: 0 });
+    walled.turn({ kind: 'attack', slot: 2 });
+    const open = foeHit(bare.turn({ kind: 'attack', slot: 0 }))!;
+    const shut = foeHit(walled.turn({ kind: 'attack', slot: 0 }))!;
     expect(shut.kind === 'hit' && open.kind === 'hit' && shut.damage < open.damage).toBe(true);
   });
 
   it('burns with Kindle and crits after Glimmer', () => {
     const ember = new Battle([pet('emberkit', 5)], pet('cragmite', 30), { rng: mulberry32(6) });
-    ember.turn({ kind: 'art' });
-    expect(ember.turn({ kind: 'strike' }).some((e) => e.kind === 'burn')).toBe(true);
-    const lumen = new Battle([pet('lumoth', 5)], pet('cragmite', 30), { rng: mulberry32(6) });
-    lumen.turn({ kind: 'art' });
-    expect(hits(lumen.turn({ kind: 'strike' }))[0]).toMatchObject({ crit: true });
+    expect(ember.turn({ kind: 'attack', slot: 2 }).some((e) => e.kind === 'burn')).toBe(true);
+    const lumen = new Battle([pet('glimhare', 5)], pet('cragmite', 30), { rng: mulberry32(6) });
+    lumen.turn({ kind: 'attack', slot: 2 });
+    expect(petHit(lumen.turn({ kind: 'attack', slot: 0, quality: 0 }))).toMatchObject({ crit: true });
+  });
+
+  it('heals with draining moves', () => {
+    const kit = pet('emberkit', 10);
+    kit.hp = 5;
+    const battle = new Battle([kit], pet('cragmite', 1), { rng: () => 0.5 });
+    expect(battle.turn({ kind: 'attack', slot: 0 }).some((e) => e.kind === 'heal' && e.source === 'drain')).toBe(true);
   });
 
   it('halves damage while Warded, until struck with its weakness', () => {
     const foe = makeFighter(MONSTERS[2], 30, 1, undefined, { rank: 'rare', traits: ['warded'] }); // Thornmaw, weak to Ember.
     const battle = new Battle([pet('emberkit', 10)], foe, { rng: mulberry32(7) });
-    expect(hits(battle.turn({ kind: 'strike' }))[0]).toMatchObject({ warded: true });
-    const events = battle.turn({ kind: 'move', quality: 0.5 });
+    expect(petHit(battle.turn({ kind: 'attack', slot: 0 }))).toMatchObject({ warded: true });
+    const events = battle.turn({ kind: 'attack', slot: 1, quality: 0.5 });
     expect(events.some((e) => e.kind === 'status' && e.status === 'ward-break')).toBe(true);
     expect(battle.wardUp).toBe(false);
   });
@@ -264,7 +280,7 @@ describe('choosing who opens', () => {
     expect(battle.active).toBe(1);
     expect(battle.fought.has(0)).toBe(false);
     expect(battle.freeSwap).toBe(true);
-    battle.turn({ kind: 'strike' });
+    battle.turn({ kind: 'attack', slot: 0 });
     expect(battle.freeSwap).toBe(false);
     const hpBefore = battle.party[0].hp;
     const later = battle.turn({ kind: 'swap', to: 0 });
@@ -287,5 +303,38 @@ describe('wayfarer support in battle', () => {
     expect(game.useTonic()).toBe(false);
     game.save.supplies.tonic = 1;
     expect(game.useTonic()).toBe(true);
+  });
+});
+
+describe('speed', () => {
+  it('lets the faster side attack first, with ties to the party', () => {
+    const quick = new Battle([pet('kitewisp', 10)], pet('cragmite', 10), { rng: () => 0.5 });
+    expect(quick.petFirst).toBe(true);
+    expect(hits(quick.turn({ kind: 'attack', slot: 0 }))[0]).toMatchObject({ attacker: 'pet' });
+    const slow = new Battle([pet('cragmite', 10)], pet('kitewisp', 10), { rng: () => 0.5 });
+    expect(slow.petFirst).toBe(false);
+    expect(hits(slow.turn({ kind: 'attack', slot: 0 }))[0]).toMatchObject({ attacker: 'foe' });
+    const a = pet('bramblet', 10);
+    const b = pet('bramblet', 10);
+    expect(new Battle([a], b).petFirst).toBe(true);
+  });
+
+  it('still lets swaps and tonics go before a faster foe', () => {
+    const battle = new Battle([pet('cragmite', 10), pet('shellop', 10)], pet('kitewisp', 10), { rng: () => 0.5 });
+    battle.turn({ kind: 'attack', slot: 0 });
+    expect(battle.turn({ kind: 'swap', to: 1 })[0]).toMatchObject({ kind: 'swap' });
+  });
+
+  it('loses the turn when felled before acting', () => {
+    const weak = pet('cragmite', 1);
+    weak.hp = 1;
+    const battle = new Battle([weak, pet('cragmite', 10)], pet('kitewisp', 20), { rng: () => 0.5 });
+    const events = battle.turn({ kind: 'attack', slot: 1, quality: 1 });
+    expect(events.map((e) => e.kind)).toEqual(['hit', 'faint']);
+    expect(battle.mustSwap).toBe(true);
+  });
+
+  it('grows with level, so a stronger Wildling outpaces its younger self', () => {
+    expect(pet('cragmite', 20).spd).toBeGreaterThan(pet('cragmite', 5).spd);
   });
 });

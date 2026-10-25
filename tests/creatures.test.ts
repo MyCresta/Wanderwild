@@ -7,20 +7,21 @@ import { ALL_SPECIES, getSpecies, MONSTERS, PETS } from '../src/creatures/specie
 import { addXp, creatureForSpawn, effectiveness, individualFromSeed, MAX_LEVEL, statsAt, xpToNext } from '../src/creatures/stats';
 import { PET_ART } from '../src/creatures/art/pets';
 import { WILDLING2_ART } from '../src/creatures/art/wildlings2';
+import { WILDLING3_ART } from '../src/creatures/art/wildlings3';
 import { MONSTER_ART } from '../src/creatures/art/monsters';
 
 describe('roster', () => {
   it('has unique ids and names, and art for every species', () => {
     expect(new Set(ALL_SPECIES.map((s) => s.id)).size).toBe(ALL_SPECIES.length);
     expect(new Set(ALL_SPECIES.map((s) => s.name)).size).toBe(ALL_SPECIES.length);
-    for (const pet of PETS) expect(PET_ART[pet.id] ?? WILDLING2_ART[pet.id]).toBeTypeOf('function');
+    for (const pet of PETS) expect(PET_ART[pet.id] ?? WILDLING2_ART[pet.id] ?? WILDLING3_ART[pet.id]).toBeTypeOf('function');
     for (const monster of MONSTERS) expect(MONSTER_ART[monster.id]).toBeTypeOf('function');
   });
 
-  it('has two Wildlings of every element, and a Taken foe for each', async () => {
+  it('has at least two Wildlings of every element, and a Taken foe for each', async () => {
     const { ELEMENTS, TAKEN } = await import('../src/creatures/species');
     const { beatenBy } = await import('../src/creatures/elements');
-    for (const element of Object.keys(ELEMENTS)) expect(PETS.filter((p) => p.element === element)).toHaveLength(2);
+    for (const element of Object.keys(ELEMENTS)) expect(PETS.filter((p) => p.element === element).length).toBeGreaterThanOrEqual(2);
     expect(TAKEN).toHaveLength(PETS.length);
     for (const t of TAKEN) {
       expect(getSpecies(t.id).kind).toBe('monster');
@@ -100,7 +101,7 @@ describe('battle', () => {
     expect(effectiveness(cragmite.element, murkwing)).toBeGreaterThan(1);
 
     const battle = new Battle([makeFighter(cragmite, 5, 1)], makeFighter(murkwing, 3, 2), { rng: mulberry32(42) });
-    for (let i = 0; i < 100 && !battle.winner; i++) battle.turn({ kind: battle.moveReady ? 'move' : 'strike' });
+    for (let i = 0; i < 100 && !battle.winner; i++) battle.turn({ kind: 'attack', slot: battle.ready(1) ? 1 : 0 });
     expect(battle.winner).toBe('pet');
     expect(victoryRewards(battle.foe).xp).toBeGreaterThan(0);
   });
@@ -119,12 +120,13 @@ describe('evolution', () => {
   it('has art and a home realm for every evolving form', async () => {
     const { EVOLVED_ART } = await import('../src/creatures/art/evolved');
     const { EVOLVED2_ART } = await import('../src/creatures/art/evolved2');
+    const { WILDLING3_ART } = await import('../src/creatures/art/wildlings3');
     const { EVOLVED } = await import('../src/creatures/species');
     for (const pet of PETS) {
       expect(pet.evolution).toBeDefined();
       expect(EVOLVED.some((e) => e.id === pet.evolution!.into)).toBe(true);
     }
-    for (const e of EVOLVED) expect(EVOLVED_ART[e.id] ?? EVOLVED2_ART[e.id]).toBeTypeOf('function');
+    for (const e of EVOLVED) expect(EVOLVED_ART[e.id] ?? EVOLVED2_ART[e.id] ?? WILDLING3_ART[e.id]).toBeTypeOf('function');
   });
 
   it('needs the level, the walk and a Ring in the home realm, then keeps level and seed', async () => {
@@ -152,6 +154,50 @@ describe('evolution', () => {
     for (let i = 0; i < 500; i++) {
       const e = creatureForSpawn({ seed: i * 31337, rarity: 'rare' }, 20);
       expect(e.species.kind === 'pet' ? e.species.stage : 1).toBe(1);
+    }
+  });
+});
+
+describe('moves and temperaments', () => {
+  it('gives every Wildling three known moves: one usable every turn, one of its own element', async () => {
+    const { EVOLVED } = await import('../src/creatures/species');
+    const { getMove } = await import('../src/creatures/moves');
+    for (const s of [...PETS, ...EVOLVED]) {
+      const moves = s.moves.map(getMove);
+      expect(new Set(s.moves).size).toBe(3);
+      expect(moves.some((m) => m.wait === 0 && m.power > 0)).toBe(true);
+      expect(moves.some((m) => m.element === s.element && m.power > 0)).toBe(true);
+    }
+  });
+
+  it('shares moves between kinds, and not every Wildling knows Strike', async () => {
+    const { EVOLVED } = await import('../src/creatures/species');
+    const all = [...PETS, ...EVOLVED];
+    const uses = new Map<string, number>();
+    for (const s of all) for (const id of s.moves) uses.set(id, (uses.get(id) ?? 0) + 1);
+    expect([...uses.values()].filter((n) => n > 1).length).toBeGreaterThan(8);
+    const strikers = all.filter((s) => s.moves.includes('strike')).length;
+    expect(strikers).toBeGreaterThan(0);
+    expect(strikers).toBeLessThan(all.length / 2);
+  });
+
+  it('shows power as one to five pips', async () => {
+    const { getMove, powerPips } = await import('../src/creatures/moves');
+    expect(powerPips(getMove('strike'))).toBe(2);
+    expect(powerPips(getMove('thistle-volley'))).toBe(4);
+    expect(powerPips(getMove('rampart-slam'))).toBe(5);
+    expect(powerPips(getMove('wellspring'))).toBe(0);
+  });
+
+  it('makes every temperament a trade-off, so none is simply best', async () => {
+    const { TRAITS } = await import('../src/creatures/stats');
+    for (const t of TRAITS) {
+      const stats = [t.hp, t.atk, t.def, t.spd];
+      if (t.xp > 1) expect(stats.every((k) => k === 1)).toBe(true);
+      else {
+        expect(stats.some((k) => k > 1)).toBe(true);
+        expect(stats.some((k) => k < 1)).toBe(true);
+      }
     }
   });
 });
