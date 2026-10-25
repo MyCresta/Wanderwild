@@ -314,6 +314,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   const waySection = section('Hero', h('div', { class: 'cmd-grid' }, ...spellBtns.map((s) => s.el), tonicBtn));
   const wayTitle = waySection.querySelector('.cmd-title')!;
   const partySection = section('Party · tap to swap', bench);
+  const partyTitle = partySection.querySelector('.cmd-title')!;
   waySection.hidden = !way;
   partySection.hidden = battle.party.length < 2;
   const panel = h('div', { class: 'cmd-panel' }, attackSection, waySection, partySection);
@@ -410,6 +411,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       el.title = spell.blurb;
       el.disabled = busy || forced || mana < cost || !battle.canCast(id);
     }
+    partyTitle.textContent = battle.freeSwap ? 'Party · pick who opens, free' : 'Party · tap to swap';
     fleeBtn.disabled = busy;
     showHp();
     setTurn(battle.winner ? null : 'pet');

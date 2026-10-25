@@ -38,8 +38,8 @@ export interface Collection {
   version: 1;
   pets: OwnedPet[];
   companionUid: string | null;
-  /** Up to two more pets that join the companion in battle, by uid. */
-  party: string[];
+  /** The battle party by uid, up to PARTY_SIZE; the first leads each fight. Any Wildlings, companion or not. */
+  lineup: string[];
   /** Species met at least once, for the bestiary. */
   seen: string[];
   /** Spawn ids already caught or beaten, with when each may be forgotten. */
@@ -60,7 +60,7 @@ export function emptyCollection(): Collection {
     version: 1,
     pets: [],
     companionUid: null,
-    party: [],
+    lineup: [],
     seen: [],
     cleared: {},
     xpProgressM: 0,
@@ -74,8 +74,18 @@ export function loadCollection(storage: Pick<Storage, 'getItem'> | undefined = g
     const parsed = JSON.parse(raw) as Partial<Collection>;
     if (parsed.version !== 1) return emptyCollection();
     // Binding seals were retired when Wildlings started joining by walking together.
-    const { seals: _seals, sealProgressM: _progress, ...rest } = parsed as Partial<Collection> & { seals?: number; sealProgressM?: number };
-    return { ...emptyCollection(), ...rest };
+    const { seals: _seals, sealProgressM: _progress, party, ...rest } = parsed as Partial<Collection> & {
+      seals?: number;
+      sealProgressM?: number;
+      party?: string[];
+    };
+    const c = { ...emptyCollection(), ...rest };
+    // The party used to be the companion plus up to two picks; keep that order as the lineup.
+    if (!rest.lineup) {
+      const lead = companion(c);
+      c.lineup = lead ? [lead.uid, ...(party ?? []).filter((u) => u !== lead.uid)].slice(0, PARTY_SIZE) : [];
+    }
+    return c;
   } catch {
     return emptyCollection();
   }
@@ -98,29 +108,46 @@ export function companion(c: Collection): OwnedPet | null {
   return c.pets.find((p) => p.uid === c.companionUid) ?? c.pets[0] ?? null;
 }
 
-/** The battle party: the companion first, then up to two chosen pets. */
+/** How many Wildlings fight in a party. */
+export const PARTY_SIZE = 3;
+
+/** The battle party in lineup order, leader first. Falls back to the companion when none is chosen. */
 export function partyPets(c: Collection): OwnedPet[] {
+  const pets = c.lineup.map((uid) => c.pets.find((p) => p.uid === uid)).filter((p): p is OwnedPet => !!p);
+  if (pets.length) return pets.slice(0, PARTY_SIZE);
   const lead = companion(c);
-  if (!lead) return [];
-  const rest = c.party
-    .filter((uid) => uid !== lead.uid)
-    .map((uid) => c.pets.find((p) => p.uid === uid))
-    .filter((p): p is OwnedPet => !!p);
-  return [lead, ...rest].slice(0, 3);
+  return lead ? [lead] : [];
 }
 
-/** Adds a pet to the party, or takes it out. Returns whether it is now in the party. */
+/** Adds a pet to the end of the party, or takes it out. Returns whether it is now in the party. */
 export function togglePartyMember(c: Collection, uid: string): boolean {
-  const lead = companion(c);
-  if (uid === lead?.uid) return true;
-  const i = c.party.indexOf(uid);
+  if (!c.pets.some((p) => p.uid === uid)) return false;
+  const lineup = partyPets(c).map((p) => p.uid);
+  const i = lineup.indexOf(uid);
   if (i >= 0) {
-    c.party.splice(i, 1);
-    return false;
+    // The party never empties: the last one stays.
+    if (lineup.length > 1) lineup.splice(i, 1);
+    c.lineup = lineup;
+    return lineup.includes(uid);
   }
-  c.party = c.party.filter((u) => u !== lead?.uid && c.pets.some((p) => p.uid === u)).slice(-1);
-  c.party.push(uid);
+  if (lineup.length >= PARTY_SIZE) return false;
+  c.lineup = [...lineup, uid];
   return true;
+}
+
+/** Puts a pet at the head of the party, bringing it in if there is room or in place of the last. */
+export function setLeader(c: Collection, uid: string): void {
+  if (!c.pets.some((p) => p.uid === uid)) return;
+  const rest = partyPets(c)
+    .map((p) => p.uid)
+    .filter((u) => u !== uid);
+  c.lineup = [uid, ...rest].slice(0, PARTY_SIZE);
+}
+
+/** Average level of the party, which wild Blotspawn are measured against. */
+export function partyLevel(c: Collection): number {
+  const pets = partyPets(c);
+  return pets.length ? Math.round(pets.reduce((sum, p) => sum + p.level, 0) / pets.length) : 1;
 }
 
 export function markSeen(c: Collection, speciesId: string): void {
@@ -139,6 +166,10 @@ export function addPet(c: Collection, encounter: Encounter): OwnedPet {
   c.pets.push(pet);
   markSeen(c, pet.speciesId);
   if (!c.companionUid) c.companionUid = pet.uid;
+  // A new friend joins the party while there is room.
+  const lineup = partyPets(c).map((p) => p.uid);
+  if (lineup.length < PARTY_SIZE && !lineup.includes(pet.uid)) lineup.push(pet.uid);
+  c.lineup = lineup;
   return pet;
 }
 

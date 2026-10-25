@@ -4,7 +4,7 @@ import { beatenBy, matchup, STRONG, WEAK, WHEEL } from '../src/creatures/element
 import { rollFoe } from '../src/creatures/foes';
 import { creatureForSpawn } from '../src/creatures/stats';
 import { MONSTERS } from '../src/creatures/species';
-import { addPet, emptyCollection, partyPets, togglePartyMember } from '../src/creatures/collection';
+import { addPet, emptyCollection, loadCollection, partyLevel, partyPets, setLeader, togglePartyMember } from '../src/creatures/collection';
 import { mulberry32 } from '../src/creatures/rng';
 import { getSpecies } from '../src/creatures/species';
 import { newSave } from '../src/game/save';
@@ -86,7 +86,8 @@ describe('party battles', () => {
   });
 
   it('shares experience: full for pets that fought, half for the bench', () => {
-    const battle = new Battle([pet('bramblet'), pet('emberkit'), pet('driftfin')], pet('smudgeling'));
+    const battle = new Battle([tank('bramblet'), pet('emberkit'), pet('driftfin')], pet('smudgeling'));
+    battle.turn({ kind: 'strike' });
     battle.turn({ kind: 'swap', to: 2 });
     expect(shareXp(battle, 40)).toEqual([40, 20, 40]);
   });
@@ -204,20 +205,71 @@ describe('rare and elite Blotspawn', () => {
 });
 
 describe('the party', () => {
-  it('is the companion plus up to two chosen pets', () => {
+  const enc = (id: string, seed: number, level = 1) => ({ species: getSpecies(id), level, seed });
+
+  it('is any three Wildlings in the order chosen, companion or not', () => {
     const c = emptyCollection();
-    const enc = (id: string, seed: number) => ({ species: getSpecies(id), level: 1, seed });
-    const lead = addPet(c, enc('bramblet', 1));
+    const a = addPet(c, enc('bramblet', 1));
     const b = addPet(c, enc('emberkit', 2));
     const d = addPet(c, enc('driftfin', 3));
     const e = addPet(c, enc('cragmite', 4));
-    expect(partyPets(c).map((p) => p.uid)).toEqual([lead.uid]);
-    togglePartyMember(c, b.uid);
-    togglePartyMember(c, d.uid);
-    togglePartyMember(c, e.uid); // Full: replaces the oldest pick.
-    expect(partyPets(c).map((p) => p.uid)).toEqual([lead.uid, d.uid, e.uid]);
-    expect(togglePartyMember(c, d.uid)).toBe(false);
-    expect(partyPets(c)).toHaveLength(2);
+    // New friends join while there is room.
+    expect(partyPets(c).map((p) => p.uid)).toEqual([a.uid, b.uid, d.uid]);
+    expect(togglePartyMember(c, e.uid)).toBe(false); // Full.
+    expect(togglePartyMember(c, a.uid)).toBe(false); // The companion can step out.
+    expect(togglePartyMember(c, e.uid)).toBe(true);
+    expect(partyPets(c).map((p) => p.uid)).toEqual([b.uid, d.uid, e.uid]);
+    expect(c.companionUid).toBe(a.uid);
+    setLeader(c, e.uid);
+    expect(partyPets(c).map((p) => p.uid)).toEqual([e.uid, b.uid, d.uid]);
+    // Leading with someone outside a full party bumps the last one.
+    setLeader(c, a.uid);
+    expect(partyPets(c).map((p) => p.uid)).toEqual([a.uid, e.uid, b.uid]);
+  });
+
+  it('never empties', () => {
+    const c = emptyCollection();
+    const a = addPet(c, enc('bramblet', 1));
+    expect(togglePartyMember(c, a.uid)).toBe(true);
+    expect(partyPets(c)).toHaveLength(1);
+  });
+
+  it('keeps the old companion-first party when loading an older save', () => {
+    const c = emptyCollection();
+    const a = addPet(c, enc('bramblet', 1));
+    const b = addPet(c, enc('emberkit', 2));
+    const d = addPet(c, enc('driftfin', 3));
+    const { lineup: _lineup, ...old } = { ...c, party: [d.uid], companionUid: b.uid };
+    const loaded = loadCollection({ getItem: () => JSON.stringify(old) });
+    expect(partyPets(loaded).map((p) => p.uid)).toEqual([b.uid, d.uid]);
+    expect(a.uid).toBeTruthy();
+  });
+
+  it('averages its level for the foes it meets', () => {
+    const c = emptyCollection();
+    addPet(c, enc('bramblet', 1, 4));
+    addPet(c, enc('emberkit', 2, 10));
+    expect(partyLevel(c)).toBe(7);
+  });
+});
+
+describe('choosing who opens', () => {
+  it('lets the first swap go free, then swaps cost a turn', () => {
+    const party = [makeFighter(getSpecies('bramblet'), 10, 1), makeFighter(getSpecies('emberkit'), 10, 2)];
+    const foe = makeFighter(MONSTERS[0], 10, 3);
+    const battle = new Battle(party, foe, { rng: () => 0.5 });
+    expect(battle.freeSwap).toBe(true);
+    const opening = battle.turn({ kind: 'swap', to: 1 });
+    expect(opening.map((e) => e.kind)).toEqual(['swap']);
+    expect(battle.active).toBe(1);
+    expect(battle.fought.has(0)).toBe(false);
+    expect(battle.freeSwap).toBe(true);
+    battle.turn({ kind: 'strike' });
+    expect(battle.freeSwap).toBe(false);
+    const hpBefore = battle.party[0].hp;
+    const later = battle.turn({ kind: 'swap', to: 0 });
+    expect(later.length).toBeGreaterThan(1);
+    expect(battle.party[0].hp).toBeLessThan(hpBefore);
   });
 });
 

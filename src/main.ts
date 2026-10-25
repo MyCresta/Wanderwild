@@ -28,7 +28,8 @@ import { HeroPanel, openHeroChoice } from './hud/heroPanel';
 import { heroSvg } from './hud/heroArt';
 import { formatWait } from './hud/format';
 import { CompanionMarker, CreatureMarkers, FollowerMarker } from './map/creatures';
-import { addPet, companion, loadCollection, saveCollection, walkRewards } from './creatures/collection';
+import { addPet, companion, loadCollection, partyLevel, saveCollection, walkRewards } from './creatures/collection';
+import { foeThreat } from './creatures/foes';
 import { spawnsNear, type Spawn } from './game/spawns';
 import { getSpecies } from './creatures/species';
 import { creatureForSpawn, type Encounter } from './creatures/stats';
@@ -326,7 +327,8 @@ function refreshSpawns(force = false): void {
   const now = Date.now();
   if (!force && spawnCheck && haversine(spawnCheck, fix) < SPAWN_REFRESH_M && now - spawnCheck.at < SPAWN_REFRESH_MS) return;
   spawnCheck = { lat: fix.lat, lng: fix.lng, at: now };
-  const level = companion(collection)?.level ?? 1;
+  // Blotspawn measure themselves against the whole party, not just whoever walks along.
+  const level = partyLevel(collection);
   const waymarked = game.save.waymarks.filter((w) => haversine(fix, w) < 1500).map((w) => waymarkSpawn(w, now));
   const live = [...spawnsNear(fix.lat, fix.lng, now, 1), ...waymarked].filter(
     (spawn) => spawn.expiresAt > now && !(spawn.id in collection.cleared),
@@ -347,7 +349,7 @@ function refreshSpawns(force = false): void {
       .filter(({ spawn, encounter }) => wildlingWanted(spawn.id, encounter, collection)),
     ...lairs,
   ];
-  creatures.show(shown);
+  creatures.show(shown, (e) => (e.species.kind === 'monster' ? foeThreat(e.level, level, e.rank, e.tier) : null));
   showReach();
 }
 
