@@ -37,6 +37,7 @@ import { wildlingWanted } from './creatures/scarcity';
 import type { GameContext } from './ui/context';
 import { openBattle } from './ui/battle';
 import { lairsNear } from './game/lairs';
+import { rivalsNear } from './game/rivals';
 import { renderBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
 import { openFollower, openJoined, openMeeting } from './ui/meet';
@@ -347,11 +348,14 @@ function refreshSpawns(force = false): void {
   // Boss lairs hold the same spot all week and rise to meet your strongest pet.
   const strongest = Math.max(1, ...collection.pets.map((p) => p.level));
   const lairs = lairsNear(fix.lat, fix.lng, now, strongest).filter(({ spawn }) => !(spawn.id in collection.cleared));
+  // Inkbinders camp for a day with three Taken, levelled against the party they will fight.
+  const rivals = rivalsNear(fix.lat, fix.lng, now, level).filter(({ spawn }) => !(spawn.id in collection.cleared));
   shown = [
     ...live
       .map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) }))
       .filter(({ spawn, encounter }) => wildlingWanted(spawn.id, encounter, collection)),
     ...lairs,
+    ...rivals,
   ];
   creatures.show(shown, (e) => (e.species.kind === 'monster' ? foeThreat(e.level, level, e.rank, e.tier) : null));
   showReach();

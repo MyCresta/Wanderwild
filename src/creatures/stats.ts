@@ -12,6 +12,7 @@ import {
 import { matchup } from './elements';
 import { ELITE_TIERS, INK_CELL_M, INK_LEVELS, inkDepth, rollFoe, type FoeTrait, type InkDepth, type Rank } from './foes';
 import { cellAt } from '../game/cells';
+import type { Rival } from '../game/rivals';
 
 export const MAX_LEVEL = 30;
 
@@ -142,6 +143,8 @@ export interface Encounter {
   /** Elite tier 1-3, boss tier 1-5. */
   tier?: number;
   traits?: FoeTrait[];
+  /** An Inkbinder's camp: this is the lead of their line of three Taken. */
+  rival?: Rival;
 }
 
 /**

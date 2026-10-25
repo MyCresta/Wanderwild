@@ -33,6 +33,9 @@ import { elementTag, wheelHelp } from './wheel';
 import { healList } from './tonics';
 import { sound } from '../audio/sound';
 import { HERO_SPELLS, type HeroSpellId } from '../game/hero';
+import { GRADES, rivalTitle, unbound, type Rival } from '../game/rivals';
+import { bandFull, startFollowing } from '../creatures/befriend';
+import { lineWanted } from '../creatures/scarcity';
 
 /** How long the timing needle takes to sweep across an attack button. */
 const SWEEP_MS = 850;
@@ -191,7 +194,64 @@ function openBossGate(ctx: GameContext, encounter: Encounter, onFight: () => voi
   );
 }
 
-/** A quick turn-based fight between the party and a Blotspawn. */
+/**
+ * Before an Inkbinder: who they are, the three Taken they will send in, and how ready the party is.
+ * Each Taken is a different element, so one counter will not carry the fight: the party needs range.
+ */
+function openRivalGate(ctx: GameContext, rival: Rival, onFight: () => void): void {
+  const pets = partyPets(ctx.collection);
+  const level = partyLevel(pets.filter((p) => fitToFight(p)));
+  const top = Math.max(...rival.line.map((e) => e.level));
+  const arch = rival.grade === 'arch';
+  const sheet = openSheet(rivalTitle(rival), { className: `sheet-boss sheet-rival rival-${rival.grade}` });
+  const counters = rival.line.filter((e) => {
+    const s = e.species;
+    return s.kind === 'monster' && pets.some((p) => getSpecies(p.speciesId).element === s.weakTo);
+  }).length;
+  const verdict =
+    top - level > 3
+      ? `Too strong for now: their Taken reach level ${top}, your party about ${level}.`
+      : pets.length < 3
+        ? 'Three Taken against fewer Wildlings. Bring a full party of three, and tonics.'
+        : counters < 2
+          ? `Your party counters only ${counters} of the three. Bring Wildlings strong against the others.`
+          : arch
+            ? 'A hard fight. Swap to the right Wildling for each Taken and keep tonics close.'
+            : 'A fair fight. Swap to the right Wildling for each Taken.';
+  sheet.body.append(
+    h(
+      'p',
+      { class: 'hint rival-lore' },
+      arch
+        ? 'An Archbinder: their Taken are Rare and stronger than your party. Free them and one may walk with you.'
+        : 'A renegade scribe who binds Wildlings with Blot ink. Beat all three Taken to free them, and one may walk with you.',
+    ),
+    h(
+      'ol',
+      { class: 'rival-line' },
+      ...rival.line.map((e) =>
+        h(
+          'li',
+          {},
+          createCreatureSvg({ speciesId: e.species.id, seed: e.seed, size: 64, facing: -1 }),
+          h('span', { class: 'rival-lv' }, `Lv ${e.level}`),
+          elementTag(e.species.element),
+          h('span', { class: 'rival-quirks', title: (e.traits ?? []).map((t) => `${FOE_TRAITS[t].name}: ${FOE_TRAITS[t].blurb}`).join(' ') }, (e.traits ?? []).map((t) => FOE_TRAITS[t].glyph).join(' ')),
+        ),
+      ),
+    ),
+    healList(ctx, pets),
+    h('p', { class: `gate-verdict${top - level > 2 || (arch && counters < 2) ? ' gate-risky' : ''}` }, verdict),
+    h(
+      'div',
+      { class: 'actions' },
+      h('button', { class: 'btn', type: 'button', onclick: () => sheet.close() }, 'Not yet'),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: () => (sheet.close(), onFight()) }, 'Challenge'),
+    ),
+  );
+}
+
+/** A quick turn-based fight between the party and a Blotspawn, or an Inkbinder's line of three Taken. */
 export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won: boolean) => void, opts: BattleOpts = {}): void {
   const owned = partyPets(ctx.collection);
   if (!owned.length) return;
@@ -200,13 +260,17 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     toast(`Your party is worn out. Let them rest${soonest > 0 ? ` about ${soonest} min` : ''}, or give them a tonic from your Bag.`);
     return;
   }
-  if (encounter.rank === 'boss' && !opts.gateSeen) {
-    openBossGate(ctx, encounter, () => openBattle(ctx, encounter, onDone, { ...opts, gateSeen: true }));
+  const rival = encounter.rival;
+  if ((encounter.rank === 'boss' || rival) && !opts.gateSeen) {
+    const go = () => openBattle(ctx, encounter, onDone, { ...opts, gateSeen: true });
+    if (rival) openRivalGate(ctx, rival, go);
+    else openBossGate(ctx, encounter, go);
     return;
   }
   const practice = !!opts.practice;
+  const line = rival?.line ?? [encounter];
   if (!practice) {
-    markSeen(ctx.collection, encounter.species.id);
+    for (const e of line) markSeen(ctx.collection, e.species.id);
     ctx.changed();
   }
 
@@ -214,7 +278,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   const heroName = way?.heroName?.() ?? 'Your hero';
   const battle = new Battle(
     owned.map((p) => makeFighter(getSpecies(p.speciesId), p.level, p.seed, p.uid)),
-    makeFighter(encounter.species, encounter.level, encounter.seed, undefined, encounter),
+    line.map((e) => makeFighter(e.species, e.level, e.seed, undefined, e)),
     {
       petDamage: way?.gear().petDamage,
       petHealth: way?.gear().petHealth,
@@ -224,11 +288,12 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       hero: way?.hero(),
     },
   );
-  const foe = battle.foe;
+  /** The foe on screen, which trails the battle until a fallen foe's exit has played out. */
+  let foe = battle.foe;
+  let foeEnc = line[0];
   const rankName = foe.rank === 'rare' || foe.rank === 'elite' ? `${RANKS[foe.rank].name} ` : '';
-  const sheet = openSheet(practice ? 'Practice bout' : `${rankName}${foeName(encounter)} blocks the way`, {
-    className: `sheet-battle battle-rank-${foe.rank}`,
-  });
+  const title = practice ? 'Practice bout' : rival ? rivalTitle(rival) : `${rankName}${foeName(encounter)} blocks the way`;
+  const sheet = openSheet(title, { className: `sheet-battle battle-rank-${foe.rank}${rival ? ' battle-rival' : ''}` });
   let reported = false;
   const finish = (won: boolean) => {
     if (reported) return;
@@ -249,9 +314,8 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   // What the screen shows, which trails the battle's own state until each blow is played out.
   const shown: HpSnap & { active: number } = { foe: foe.hp, party: battle.party.map((f) => f.hp), active: battle.active };
 
-  const foeSvg = createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 150, facing: -1 });
   const intent = h('div', { class: 'intent', 'aria-live': 'polite' });
-  const foeSpot = h('div', { class: `fighter fighter-foe fighter-${foe.rank}` }, foeSvg, intent);
+  const foeSpot = h('div', { class: `fighter fighter-foe fighter-${foe.rank}` }, intent);
   const petSpot = h('div', { class: 'fighter fighter-pet' });
   const petStatus = h('div', { class: 'status-row' });
   const showPet = () => {
@@ -275,15 +339,25 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     shown.party = [...e.hp.party];
     showHp();
   };
-  const foeTags = h(
-    'div',
-    { class: 'status-row' },
-    foe.rank !== 'normal' && h('span', { class: `rank-chip rank-${foe.rank}` }, rankLabel(foe.rank, foe.tier)),
-    elementTag(foe.species.element),
-    ...foe.traits.map((t) => h('span', { class: 'trait-chip', title: FOE_TRAITS[t].blurb }, `${FOE_TRAITS[t].glyph} ${FOE_TRAITS[t].name}`)),
-  );
+  const foeTags = h('div', { class: 'status-row' });
   const enragedChip = h('span', { class: 'trait-chip chip-enraged', title: 'Its big attack comes every other turn' }, '🔥 Enraged');
-  const wardChip = foe.traits.includes('warded') ? foeTags.querySelectorAll('.trait-chip')[foe.traits.indexOf('warded')] : null;
+  let wardChip: Element | null = null;
+  // A rival's line as pips: one per Taken, dimmed once it falls.
+  const pips = h('span', { class: 'foe-pips', 'aria-hidden': 'true' });
+  /** Puts the current foe on screen: its art, badge, element and quirks. */
+  const showFoe = () => {
+    foeSpot.className = `fighter fighter-foe fighter-${foe.rank}`;
+    foeSpot.replaceChildren(createCreatureSvg({ speciesId: foeEnc.species.id, seed: foeEnc.seed, size: 150, facing: -1 }), intent);
+    foeTags.replaceChildren(
+      ...(line.length > 1 ? [pips] : []),
+      ...(foe.rank !== 'normal' ? [h('span', { class: `rank-chip rank-${foe.rank}` }, rankLabel(foe.rank, foe.tier))] : []),
+      elementTag(foe.species.element),
+      ...foe.traits.map((t) => h('span', { class: 'trait-chip', title: FOE_TRAITS[t].blurb }, `${FOE_TRAITS[t].glyph} ${FOE_TRAITS[t].name}`)),
+    );
+    pips.replaceChildren(...line.map((_, i) => h('span', { class: i < battle.foes.indexOf(foe) ? 'pip-down' : '' })));
+    wardChip = foe.traits.includes('warded') ? foeTags.querySelectorAll('.trait-chip')[foe.traits.indexOf('warded')] : null;
+  };
+  showFoe();
   const turnBanner = h('div', { class: 'turn-banner', 'aria-live': 'polite' });
   const arena = h(
     'div',
@@ -294,7 +368,11 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   );
   const weakness = foe.species.kind === 'monster' ? foe.species.weakTo : null;
   const opening = [
-    practice ? 'A training blot made of practice ink. No rewards, nothing lost.' : `${foe.species.epithet}.`,
+    practice
+      ? 'A training blot made of practice ink. No rewards, nothing lost.'
+      : rival
+        ? `${rival.name} sends in ${foe.species.name}, with two more Taken behind it.`
+        : `${foe.species.epithet}.`,
     weakness ? ` Weak to ${ELEMENTS[weakness].glyph} ${ELEMENTS[weakness].name}.` : '',
     foe.traits.length ? ` ${foe.traits.map((t) => `${FOE_TRAITS[t].name}: ${FOE_TRAITS[t].blurb.toLowerCase()}`).join(' ')}` : '',
   ].join('');
@@ -468,6 +546,11 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
           : e.amount !== undefined
             ? `${heroName} casts ${HERO_SPELLS[e.spell].name} (+${e.amount}).`
             : `${heroName} casts ${HERO_SPELLS[e.spell].name}.`;
+      case 'foe-in': {
+        const next = battle.foes[e.index];
+        const weak = next.species.kind === 'monster' ? ` Weak to ${ELEMENTS[next.species.weakTo].glyph} ${ELEMENTS[next.species.weakTo].name}.` : '';
+        return `${rival?.name ?? 'The foe'} sends in ${next.species.name}!${weak}`;
+      }
       case 'faint':
         return battle.winner ? `${battle.party[e.index].species.name} is worn out.` : `${battle.party[e.index].species.name} is worn out. Send in another!`;
     }
@@ -558,6 +641,20 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     } else if (e.kind === 'faint') {
       petSpot.classList.add('faint');
       await wait(450);
+    } else if (e.kind === 'foe-in') {
+      // The fallen Taken melts back into a Wildling's shape and slips away; the next steps up.
+      log.textContent = `${foe.species.name} is freed from the ink!`;
+      foeSpot.classList.add('dissolve');
+      sound.play('victory');
+      await wait(900);
+      foe = battle.foes[e.index];
+      foeEnc = line[e.index];
+      showFoe();
+      log.textContent = describe(e);
+      sound.play('tap');
+      applySnap(e);
+      refreshStatus();
+      await wait(500);
     }
   };
 
@@ -572,17 +669,21 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       if (practice) {
         log.textContent = 'The practice blot splatters. Ready for the real thing? Look for the ⚔ Fight button on the map.';
       } else {
-        const reward = victoryRewards(battle.foe);
+        const reward = rival ? { xp: Math.round(victoryRewards(battle.foes).xp * GRADES[rival.grade].xp) } : victoryRewards(battle.foe);
         const shares = shareXp(battle, reward.xp);
         const grew: string[] = [];
         owned.forEach((p, i) => {
           if (grantPetXp(p, shares[i]) > 0) grew.push(`${getSpecies(p.speciesId).name} grew to level ${p.level}!`);
         });
-        const loot = way?.findGear?.({ rank: battle.foe.rank, tier: battle.foe.tier }) ?? null;
+        // A camp drops gear like an Elite, an Archbinder's like a tougher one.
+        const loot = way?.findGear?.(rival ? { rank: 'elite', tier: rival.grade === 'arch' ? 2 : 1 } : { rank: battle.foe.rank, tier: battle.foe.tier }) ?? null;
+        const freed = rival ? freeOne(ctx, rival) : null;
         if (loot) setTimeout(() => sound.play('equip'), 600);
         ctx.changed();
         log.replaceChildren(
-          `${foeName(encounter)} dissolves into a puddle of harmless ink. `,
+          rival
+            ? `${rival.name}'s ink runs dry and the Taken wake up as Wildlings again. ${freed ? `${freed} falls in beside you. ` : ''}`
+            : `${foeName(encounter)} dissolves into a puddle of harmless ink. `,
           h('strong', {}, `+${reward.xp} XP`),
           owned.length > 1 ? ' to each Wildling that fought (half to the rest)' : '',
           '.',
@@ -596,7 +697,9 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       sheet.setTitle('Driven back');
       log.textContent = practice
         ? 'Worn out, but it was only practice. Try leading with a Wildling that is strong against it.'
-        : 'Your party is worn out and retreats. Their wounds stay until they rest (about an hour to full) or drink a tonic. Bring Wildlings strong against it and try again.';
+        : rival
+          ? `Your party is worn out and retreats. ${rival.name} keeps camp until the day is out: rest, bring counters for each Taken and try again.`
+          : 'Your party is worn out and retreats. Their wounds stay until they rest (about an hour to full) or drink a tonic. Bring Wildlings strong against it and try again.';
     }
     // Wounds stay, so this is the moment to patch the party up, picking who gets a tonic.
     const hurt = !practice && owned.some((p) => vigorNow(p) < 1);
@@ -646,4 +749,19 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   for (const { id, el } of spellBtns) el.addEventListener('click', () => cast(id));
   tonicBtn.addEventListener('click', () => act({ kind: 'tonic' }));
   refresh();
+}
+
+/**
+ * After beating an Inkbinder, the last Taken freed may want to walk with you, if it is a Wildling
+ * worth having and nobody is following you already. Returns its name when it falls in.
+ */
+function freeOne(ctx: GameContext, rival: Rival): string | null {
+  const last = rival.line[rival.line.length - 1];
+  const species = unbound(last.species.id);
+  if (!species || ctx.collection.follower || bandFull(ctx.collection, ctx.wayfarer?.level() ?? 1)) return null;
+  const wildling: Encounter = { species, level: Math.max(1, last.level - 2), seed: last.seed };
+  if (!lineWanted(wildling, ctx.collection)) return null;
+  if (!startFollowing(ctx.collection, `${rival.id}:freed`, wildling, ctx.wayfarer?.gear().catchBonus ?? 0)) return null;
+  ctx.changed();
+  return species.name;
 }
