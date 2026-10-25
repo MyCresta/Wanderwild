@@ -26,10 +26,12 @@ export interface Follower {
   speciesId: string;
   seed: number;
   level: number;
-  /** Metres to walk together before it joins. */
+  /** Trust needed before it joins, in metres walked together; waiting earns it too, slowly. */
   needM: number;
   walkedM: number;
   startedAt: number;
+  /** When waiting last added trust. */
+  tickedAt?: number;
 }
 
 export interface Collection {

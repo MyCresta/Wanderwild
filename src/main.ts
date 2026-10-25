@@ -223,8 +223,6 @@ function settleFollower(outcome: FollowOutcome): void {
     game.grantXp(CREATURE_XP[species.rarity]);
     game.changed();
     openJoined(creatureGame, outcome.pet);
-  } else if (outcome?.kind === 'left') {
-    toast(`${outcome.name} lost interest and wandered back into the margins.`);
   }
   creatureGame.changed();
 }
@@ -246,10 +244,6 @@ function meet(spawn: Spawn, encounter: Encounter): void {
     return;
   }
   if (encounter.species.kind === 'pet') {
-    if (remote) {
-      toast(`Wildlings only trust you in person. Walk up to ${encounter.species.name} to meet it.`);
-      return;
-    }
     openMeeting(creatureGame, spawn.id, encounter, () => clearSpawn(spawn, false));
   } else if (!companion(collection)) {
     toast('You need a companion to face Blotspawn.');
@@ -258,7 +252,7 @@ function meet(spawn: Spawn, encounter: Encounter): void {
       if (!won) return;
       clearSpawn(spawn, true, remote);
       // A Wildling that sees you drive off a Blotspawn trusts you all the faster.
-      if (collection.follower && !remote) settleFollower(followerTrust(collection, BLOT_TRUST_M));
+      if (collection.follower) settleFollower(followerTrust(collection, remote ? BLOT_TRUST_M / 2 : BLOT_TRUST_M));
     });
   }
 }
@@ -467,6 +461,8 @@ map.on('idle', () => {
 });
 // Cooled-down shrines and an ending blessing need a redraw even when nothing moves.
 setInterval(() => {
+  // A follower warms to you just by staying near, even with the app closed.
+  if (collection.follower) settleFollower(followerTrust(collection, 0));
   refreshWorld();
   hud.render();
 }, 15_000);
@@ -542,6 +538,7 @@ if (SIMULATE) {
 // Write progress straight away when the app is put in the background.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') void game.flush();
+  else if (collection.follower) settleFollower(followerTrust(collection, 0));
 });
 
 sound.install();

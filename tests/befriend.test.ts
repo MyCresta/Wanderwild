@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bandFull, bandSize, BLOT_TRUST_M, dismissFollower, FOLLOW_MS, followerTrust, releasePet, startFollowing, walkNeeded, WALK_TO_BEFRIEND } from '../src/creatures/befriend';
+import { bandFull, bandSize, BLOT_TRUST_M, dismissFollower, followerTrust, followerWaitMs, HOURS_TO_BEFRIEND, releasePet, startFollowing, walkNeeded, WALK_TO_BEFRIEND } from '../src/creatures/befriend';
 import { addPet, emptyCollection } from '../src/creatures/collection';
 import { getSpecies } from '../src/creatures/species';
 
@@ -26,13 +26,32 @@ describe('befriending a Wildling', () => {
     expect(startFollowing(c, 'c', wild('smudgeling'))).toBeNull();
   });
 
-  it('trusts faster when you drive off Blotspawn, and wanders off if kept waiting', () => {
+  it('trusts faster when you drive off Blotspawn', () => {
     const c = emptyCollection();
     startFollowing(c, 'a', wild(), 0, 0);
-    followerTrust(c, BLOT_TRUST_M, 10);
+    followerTrust(c, BLOT_TRUST_M, 0);
     expect(c.follower!.walkedM).toBe(BLOT_TRUST_M);
-    expect(followerTrust(c, 10, FOLLOW_MS + 1)).toEqual({ kind: 'left', name: 'Driftfin' });
-    expect(c.pets).toHaveLength(0);
+  });
+
+  it('joins from home after a few hours, and walking cuts the wait', () => {
+    const hour = 60 * 60 * 1000;
+    const hours = HOURS_TO_BEFRIEND[getSpecies('driftfin').rarity];
+    const c = emptyCollection();
+    startFollowing(c, 'a', wild(), 0, 0);
+    expect(followerWaitMs(c.follower!)).toBeCloseTo(hours * hour);
+    expect(followerTrust(c, 0, (hours - 0.1) * hour)).toBeNull();
+    expect(followerTrust(c, 0, hours * hour)?.kind).toBe('joined');
+
+    const walker = emptyCollection();
+    const f = startFollowing(walker, 'a', wild(), 0, 0)!;
+    followerTrust(walker, f.needM / 2, 0);
+    expect(followerWaitMs(f)).toBeCloseTo((hours * hour) / 2);
+  });
+
+  it('a charm shortens the wait as well as the walk', () => {
+    const c = emptyCollection();
+    const f = startFollowing(c, 'a', wild(), 0.5, 0)!;
+    expect(followerWaitMs(f)).toBeCloseTo((HOURS_TO_BEFRIEND[getSpecies('driftfin').rarity] * 60 * 60 * 1000) / 2);
   });
 
   it('a charm shortens the walk, but never below half', () => {
