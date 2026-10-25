@@ -4,10 +4,11 @@ import type { Encounter } from './stats';
 
 /** Metres a Wildling must walk with you before it joins, by rarity. */
 export const WALK_TO_BEFRIEND: Record<Rarity, number> = { common: 400, uncommon: 700, rare: 1000 };
-/** Driving off a Blotspawn while one follows earns this much trust, in metres. */
+/** Hours a follower needs at your side to trust you with no walking at all, by rarity. Walking is far quicker. */
+export const HOURS_TO_BEFRIEND: Record<Rarity, number> = { common: 3, uncommon: 5, rare: 8 };
+/** Driving off a Blotspawn while one follows earns this much trust, in metres (half by Farsight). */
 export const BLOT_TRUST_M = 150;
-/** A follower that has not been won over in this long wanders back to the wild. */
-export const FOLLOW_MS = 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 export const BASE_BAND = 6;
 export const MAX_BAND = 12;
 
@@ -30,22 +31,30 @@ export function startFollowing(c: Collection, spawnId: string, encounter: Encoun
     needM: walkNeeded(encounter.species.rarity, charm),
     walkedM: 0,
     startedAt: now,
+    tickedAt: now,
   };
   markSeen(c, encounter.species.id);
   return c.follower;
 }
 
-export type FollowOutcome = { kind: 'joined'; pet: OwnedPet } | { kind: 'left'; name: string } | null;
+export type FollowOutcome = { kind: 'joined'; pet: OwnedPet } | null;
 
-/** Adds trust, as metres walked together, and settles the follower if it is won over or has given up. */
+/** Trust a follower gains per millisecond just by staying with you, in metres. A charm shortens the wait as it shortens the walk. */
+const idleTrustPerMs = (f: Follower) => WALK_TO_BEFRIEND[getSpecies(f.speciesId).rarity] / (HOURS_TO_BEFRIEND[getSpecies(f.speciesId).rarity] * HOUR_MS);
+
+/** Time left before a follower joins if you do not walk at all. */
+export const followerWaitMs = (f: Follower) => Math.max(0, f.needM - f.walkedM) / idleTrustPerMs(f);
+
+/**
+ * Adds trust, counted in metres walked together, and settles the follower once it is won over.
+ * Time passing counts too, even with the app closed, so a Wildling can be befriended from home.
+ */
 export function followerTrust(c: Collection, metres: number, now = Date.now()): FollowOutcome {
   const f = c.follower;
   if (!f) return null;
-  if (now - f.startedAt > FOLLOW_MS) {
-    c.follower = null;
-    return { kind: 'left', name: getSpecies(f.speciesId).name };
-  }
-  f.walkedM = Math.min(f.needM, f.walkedM + metres);
+  const idle = Math.max(0, now - (f.tickedAt ?? f.startedAt)) * idleTrustPerMs(f);
+  f.tickedAt = now;
+  f.walkedM = Math.min(f.needM, f.walkedM + metres + idle);
   if (f.walkedM < f.needM) return null;
   c.follower = null;
   const pet = addPet(c, { species: getSpecies(f.speciesId), level: f.level, seed: f.seed });

@@ -1,4 +1,4 @@
-import { bandFull, bandSize, dismissFollower, startFollowing, walkNeeded } from '../creatures/befriend';
+import { bandFull, bandSize, dismissFollower, HOURS_TO_BEFRIEND, startFollowing, walkNeeded } from '../creatures/befriend';
 import { markSeen, type OwnedPet } from '../creatures/collection';
 import { getSpecies } from '../creatures/species';
 import { individualFromSeed, type Encounter } from '../creatures/stats';
@@ -9,8 +9,8 @@ import { h, openSheet, toast } from './dom';
 import { sound } from '../audio/sound';
 
 /**
- * Meeting a wild Wildling. There is nothing to throw and nothing to trace: ask it to walk with
- * you, and if you walk far enough together it decides to stay.
+ * Meeting a wild Wildling, in person or by Farsight. There is nothing to throw and nothing to trace:
+ * ask it along, and it decides to stay after a few hours at your side, or much sooner if you walk together.
  */
 export function openMeeting(ctx: GameContext, spawnId: string, encounter: Encounter, onFollow: () => void): void {
   const { species, level, seed } = encounter;
@@ -22,6 +22,7 @@ export function openMeeting(ctx: GameContext, spawnId: string, encounter: Encoun
   const following = ctx.collection.follower;
   const charm = ctx.wayfarer?.gear().catchBonus ?? 0;
   const need = walkNeeded(species.rarity, charm);
+  const hours = Math.round(HOURS_TO_BEFRIEND[species.rarity] * (need / walkNeeded(species.rarity)));
 
   const follow = () => {
     if (following) dismissFollower(ctx.collection);
@@ -29,7 +30,7 @@ export function openMeeting(ctx: GameContext, spawnId: string, encounter: Encoun
     sound.play('discover');
     ctx.changed();
     sheet.close();
-    toast(`${species.name} falls in beside you. Walk ${need} m together.`);
+    toast(`${species.name} falls in beside you. It stays in about ${hours} h, or after ${need} m walked together.`);
     onFollow();
   };
 
@@ -40,15 +41,15 @@ export function openMeeting(ctx: GameContext, spawnId: string, encounter: Encoun
     action = h(
       'div',
       { class: 'actions' },
-      h('p', { class: 'hint' }, `${getSpecies(following.speciesId).name} is already walking with you.`),
-      h('button', { class: 'btn', type: 'button', onclick: follow }, `Walk with ${species.name} instead`),
+      h('p', { class: 'hint' }, `${getSpecies(following.speciesId).name} is already with you.`),
+      h('button', { class: 'btn', type: 'button', onclick: follow }, `Take ${species.name} instead`),
     );
-  else action = h('div', { class: 'actions' }, h('button', { class: 'btn btn-primary', type: 'button', onclick: follow }, 'Walk with me'));
+  else action = h('div', { class: 'actions' }, h('button', { class: 'btn btn-primary', type: 'button', onclick: follow }, 'Come with me'));
 
   sheet.body.append(
     h('div', { class: 'stage stage-small' }, createCreatureSvg({ speciesId: species.id, seed, size: 180 })),
     h('p', { class: 'encounter-info' }, h('strong', {}, `Lv ${level}`), ' ', elementBadge(species), ' ', rarityBadge(species)),
-    h('p', { class: 'lore' }, `${species.epithet[0].toUpperCase()}${species.epithet.slice(1)}. It watches you from the margin of the map. Walk ${need} m together and it may choose to stay.`),
+    h('p', { class: 'lore' }, `${species.epithet[0].toUpperCase()}${species.epithet.slice(1)}. It watches you from the margin of the map. Keep it with you for about ${hours} h and it may choose to stay. Walking ${need} m together wins it over far sooner.`),
     action,
   );
 }
@@ -60,7 +61,7 @@ export function openJoined(ctx: GameContext, pet: OwnedPet): void {
   sound.play('achievement');
   sheet.body.append(
     h('div', { class: 'stage stage-small' }, createCreatureSvg({ speciesId: pet.speciesId, seed: pet.seed, size: 180 })),
-    h('p', { class: 'lore' }, `After the long road together, ${species.name} has decided to stay. It joins your band at level ${pet.level}.`),
+    h('p', { class: 'lore' }, `After your time together, ${species.name} has decided to stay. It joins your band at level ${pet.level}.`),
     h(
       'div',
       { class: 'actions' },
