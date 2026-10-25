@@ -82,7 +82,7 @@ export const HERO_SPELLS: Record<HeroSpellId, SpellDef> = {
   hex: { name: 'Hex', glyph: '☾', cost: 8, kind: 'curse', blurb: 'The foe hits 30% softer for 3 turns.' },
   starfall: { name: 'Starfall', glyph: '☄', cost: 14, kind: 'damage', blurb: 'A heavy blow that ignores wards.' },
   frenzy: { name: 'Frenzy', glyph: '✦', cost: 5, kind: 'buff', blurb: 'The next attack is critical.' },
-  wildcall: { name: 'Wild Call', glyph: '❦', cost: 8, kind: 'buff', blurb: 'The Wildling in front can use its move and art again.' },
+  wildcall: { name: 'Wild Call', glyph: '❦', cost: 8, kind: 'buff', blurb: 'The Wildling in front can use all its moves again.' },
   packHowl: { name: 'Pack Howl', glyph: '☽', cost: 10, kind: 'buff', blurb: 'The party hits 30% harder for 3 turns.' },
 };
 
@@ -150,7 +150,7 @@ export const TALENTS: Record<HeroClass, [Talent, Talent][]> = {
       { name: 'Keen Eye', blurb: 'Crits are easier to time', mods: { critEase: 0.1 } },
     ],
     [
-      { name: 'Quick Arts', blurb: 'Arts ready a turn sooner', mods: { artHaste: 1 } },
+      { name: 'Quick Arts', blurb: 'Slow moves ready a turn sooner', mods: { artHaste: 1 } },
       { name: 'Thick Hide', blurb: '+10% creature health', mods: { health: 0.1 } },
     ],
     [

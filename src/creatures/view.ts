@@ -2,6 +2,7 @@ import { EVOLVED_ART } from './art/evolved';
 import { EVOLVED2_ART } from './art/evolved2';
 import { taken } from './art/taken';
 import { WILDLING2_ART } from './art/wildlings2';
+import { WILDLING3_ART } from './art/wildlings3';
 import { MONSTER_ART } from './art/monsters';
 import { PET_ART } from './art/pets';
 import type { Art } from './art/types';
@@ -78,7 +79,7 @@ function loop(now: number): void {
   frame = live.size ? requestAnimationFrame(loop) : 0;
 }
 
-const drawerFor = (id: string) => PET_ART[id] ?? WILDLING2_ART[id] ?? EVOLVED_ART[id] ?? EVOLVED2_ART[id];
+const drawerFor = (id: string) => PET_ART[id] ?? WILDLING2_ART[id] ?? EVOLVED_ART[id] ?? EVOLVED2_ART[id] ?? WILDLING3_ART[id];
 
 /** Draws a creature as a self-animating SVG. It stops animating once removed from the page. */
 export function createCreatureSvg(options: CreatureOptions): SVGSVGElement {

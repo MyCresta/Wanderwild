@@ -1,12 +1,10 @@
 import {
-  ARTS,
   Battle,
   CRIT_QUALITY,
   makeFighter,
   shareXp,
   victoryRewards,
   type Action,
-  type Attack,
   type BattleEvent,
   type Fighter,
   type HpSnap,
@@ -27,6 +25,8 @@ import {
 import { ELEMENTS, getSpecies } from '../creatures/species';
 import type { Encounter } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
+import { EFFECT_TEXT, moveBlurb, pipText } from '../creatures/moves';
+import { moveGlyph } from './moves';
 import type { GameContext } from './context';
 import { h, openSheet, toast, wait } from './dom';
 import { elementTag, wheelHelp } from './wheel';
@@ -343,6 +343,14 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     shown.party = [...e.hp.party];
     showHp();
   };
+  /** Speed as one chip on each side; the faster one is marked, since it attacks first. */
+  const speedChip = (f: Fighter, first: boolean) =>
+    h(
+      'span',
+      { class: `trait-chip chip-speed${first ? ' chip-first' : ''}`, title: 'Speed: the faster one attacks first each turn. Swaps and tonics always go first.' },
+      `⚡ ${f.spd}${first ? ' · first' : ''}`,
+    );
+  const foeSpeed = h('span', { class: 'speed-slot' });
   const foeTags = h('div', { class: 'status-row' });
   const enragedChip = h('span', { class: 'trait-chip chip-enraged', title: 'Its big attack comes every other turn' }, '🔥 Enraged');
   let wardChip: Element | null = null;
@@ -356,6 +364,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       ...(line.length > 1 ? [pips] : []),
       ...(foe.rank !== 'normal' ? [h('span', { class: `rank-chip rank-${foe.rank}` }, rankLabel(foe.rank, foe.tier))] : []),
       elementTag(foe.species.element),
+      foeSpeed,
       ...foe.traits.map((t) => h('span', { class: 'trait-chip', title: FOE_TRAITS[t].blurb }, `${FOE_TRAITS[t].glyph} ${FOE_TRAITS[t].name}`)),
     );
     pips.replaceChildren(...line.map((_, i) => h('span', { class: i < battle.foes.indexOf(foe) ? 'pip-down' : '' })));
@@ -383,8 +392,11 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   const log = h('p', { class: 'battle-log' }, opening);
 
   const cmd = (extra = '') => h('button', { class: `cmd ${extra}`, type: 'button' });
-  const attacks: Record<Attack, HTMLButtonElement> = { strike: cmd('cmd-strike'), move: cmd('cmd-move'), art: cmd('cmd-art') };
-  for (const attack of Object.keys(attacks) as Attack[]) attacks[attack].addEventListener('click', () => act({ kind: attack }));
+  const attacks = [0, 1, 2].map((slot) => {
+    const btn = cmd('cmd-attack');
+    btn.addEventListener('click', () => act({ kind: 'attack', slot }));
+    return btn;
+  });
   const tonicBtn = cmd('cmd-way');
   const spellBtns = (battle.hero?.spells ?? []).map((id) => ({ id, el: cmd('cmd-way cmd-spell') }));
   const fleeBtn = h('button', { class: 'btn btn-small btn-flee', type: 'button', onclick: () => sheet.close() }, practice ? 'Stop' : 'Flee');
@@ -392,7 +404,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
 
   const section = (title: string, ...children: HTMLElement[]) =>
     h('section', { class: 'cmd-section' }, h('h3', { class: 'cmd-title' }, title), ...children);
-  const attackSection = section('Attacks', h('div', { class: 'cmd-grid' }, attacks.strike, attacks.move, attacks.art));
+  const attackSection = section('Attacks', h('div', { class: 'cmd-grid' }, ...attacks));
   const waySection = section('Hero', h('div', { class: 'cmd-grid' }, ...spellBtns.map((s) => s.el), tonicBtn));
   const wayTitle = waySection.querySelector('.cmd-title')!;
   const partySection = section('Party · tap to swap', bench);
@@ -406,7 +418,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   sheet.body.append(arena, h('div', { class: 'log-wrap' }, log, sweepBar), panel, footer);
 
   let busy = false;
-  const all = () => [...Object.values(attacks), tonicBtn, ...spellBtns.map((s) => s.el), ...bench.querySelectorAll('button')];
+  const all = () => [...attacks, tonicBtn, ...spellBtns.map((s) => s.el), ...bench.querySelectorAll('button')];
 
   const setTurn = (side: 'pet' | 'foe' | null) => {
     arena.classList.toggle('turn-pet', side === 'pet');
@@ -421,32 +433,34 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     petStatus.replaceChildren(
       ...[
         elementTag(battle.party[shown.active].species.element),
+        speedChip(battle.party[shown.active], battle.party[shown.active].spd >= foe.spd),
         battle.guard && h('span', { class: 'trait-chip chip-good' }, `⛨ Guard ${battle.guard.turns}`),
         battle.dodge && h('span', { class: 'trait-chip chip-good' }, '❂ Dodge'),
         battle.focus && h('span', { class: 'trait-chip chip-good' }, '✦ Weak spot marked'),
       ].filter((n): n is HTMLSpanElement => !!n),
     );
+    foeSpeed.replaceChildren(speedChip(foe, foe.spd > battle.party[shown.active].spd));
     if (wardChip) wardChip.classList.toggle('chip-broken', !battle.wardUp);
     if (battle.enraged && !enragedChip.isConnected) foeTags.append(enragedChip);
     foeSpot.classList.toggle('burning', battle.burn > 0);
   };
 
   const refresh = () => {
-    const pet = battle.pet;
-    const element = pet.species.element;
     const cd = battle.cooldowns[battle.active];
     const forced = battle.mustSwap;
-    const label = (attack: Attack, name: string, blurb: string, wait: number) => {
-      const btn = attacks[attack];
-      const edge = battle.edge(attack);
-      card(btn, name, wait > 0 ? `Ready in ${wait}` : blurb, attack !== 'strike' && wait === 0 ? edgeTag(edge) : null);
+    battle.moves.forEach((move, slot) => {
+      const btn = attacks[slot];
+      const wait = cd[slot];
+      const edge = battle.edge(move);
+      // Power as pips, so moves compare at a glance; a trick says what it does instead.
+      const sub = wait > 0 ? `Ready in ${wait}` : move.power > 0 ? `${pipText(move)}${move.effect ? ` ${EFFECT_TEXT[move.effect].short}` : ''}` : EFFECT_TEXT[move.effect!].short;
+      card(btn, `${moveGlyph(move)} ${move.name}`, sub, wait === 0 ? edgeTag(edge) : null);
+      btn.title = moveBlurb(move);
       btn.disabled = busy || forced || wait > 0;
       btn.classList.toggle('cmd-strong', wait === 0 && edge > 1);
-      btn.style.setProperty('--el', attack === 'strike' ? 'var(--leather)' : ELEMENTS[element].color);
-    };
-    label('strike', '⚔ Strike', 'Tap twice: time it for a crit', 0);
-    label('move', `${ELEMENTS[element].glyph} ${pet.species.move}`, 'Big hit · tap twice to time it', cd.move);
-    label('art', `${ELEMENTS[element].glyph} ${ARTS[element].name}`, ARTS[element].blurb, cd.art);
+      btn.style.setProperty('--el', move.element ? ELEMENTS[move.element].color : 'var(--leather)');
+    });
+    const pet = battle.pet;
 
     const next = battle.intent;
     const threat = next.big ? battle.threat(battle.active) : 1;
@@ -461,7 +475,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     bench.replaceChildren(
       ...battle.party.map((f, i) => {
         const p = owned[i];
-        const edge = battle.edge('move', f);
+        const edge = battle.bestEdge(f);
         const threatened = battle.threat(i) > 1;
         const btn = h(
           'button',
@@ -543,7 +557,9 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       case 'heal':
         return e.source === 'tonic'
           ? `A tonic restores ${e.amount} health.`
-          : `${battle.party[shown.active].species.name} draws on a Wellspring (+${e.amount}).`;
+          : e.source === 'drain'
+            ? `${battle.party[shown.active].species.name} drains ${e.amount} health.`
+            : `${battle.party[shown.active].species.name} draws on a Wellspring (+${e.amount}).`;
       case 'spell':
         return e.damage
           ? `${heroName} casts ${HERO_SPELLS[e.spell].name} for ${e.damage}!`
@@ -569,7 +585,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       const fromPet = e.attacker === 'pet';
       const attacker = fromPet ? petSpot : foeSpot;
       const target = fromPet ? foeSpot : petSpot;
-      const elemental = e.action !== 'strike';
+      const elemental = e.element !== null;
       attacker.classList.add(elemental ? 'cast' : 'lunge');
       sound.play(elemental ? 'spell' : 'strike');
       // The blow lands as the lunge reaches its target: that is when health drops.
@@ -721,15 +737,18 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     busy = true;
     all().forEach((b) => ((b as HTMLButtonElement).disabled = true));
     fleeBtn.disabled = true;
-    if ((action.kind === 'strike' || action.kind === 'move') && battle.ready(action.kind)) {
-      action = { ...action, quality: await timingSweep(attacks[action.kind], sweepBar, battle.critAt) };
+    // Every move that hits is timed: a second tap on the gold lands a crit.
+    if (action.kind === 'attack' && battle.ready(action.slot) && battle.moves[action.slot].power > 0) {
+      action = { ...action, quality: await timingSweep(attacks[action.slot], sweepBar, battle.critAt) };
     }
     panel.classList.add('cmd-waiting');
-    let foeTurn = false;
+    // The faster side goes first, so the banner follows whoever is acting.
+    let side: 'pet' | 'foe' = 'pet';
     for (const e of battle.turn(action)) {
-      if (!foeTurn && foeSide(e)) {
-        foeTurn = true;
-        setTurn('foe');
+      const next: 'pet' | 'foe' = foeSide(e) ? 'foe' : e.kind === 'faint' || e.kind === 'foe-in' ? side : 'pet';
+      if (next !== side) {
+        side = next;
+        setTurn(side);
         await wait(TURN_PAUSE_MS);
       }
       await play(e);

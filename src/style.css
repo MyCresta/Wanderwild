@@ -3825,3 +3825,63 @@ span.forge-up {
   margin: 0;
   text-align: center;
 }
+
+/* Speed: one chip per side in battle; the faster side is marked, since it attacks first. */
+.chip-speed {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.chip-first {
+  border-color: #8a6a1c;
+  background: rgba(184, 144, 42, 0.2);
+  color: #5a4210;
+}
+
+/* A move as one line: name on the left, power pips (or what it does) on the right. */
+.move-list {
+  display: grid;
+  gap: 2px;
+}
+
+.move-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: normal;
+}
+
+.move-name {
+  color: var(--el, inherit);
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.move-pips {
+  letter-spacing: 1px;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.cmd-attack .cmd-sub {
+  letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trait-blurb {
+  opacity: 0.75;
+}
+
+.evo-move {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.speed-slot {
+  display: contents;
+}

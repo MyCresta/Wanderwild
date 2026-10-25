@@ -1,8 +1,9 @@
 import { beatenBy, matchup } from './elements';
 import { HERO_SPELLS, type HeroPower, type HeroSpellId } from '../game/hero';
 import { FOE_TRAITS, foeScale, type FoeTrait, type Rank } from './foes';
+import { getMove, type Move } from './moves';
 import type { Rng } from './rng';
-import type { Element, Species } from './species';
+import { signature, type Element, type Species } from './species';
 import { damage, individualFromSeed, statsAt } from './stats';
 
 export interface Fighter {
@@ -12,6 +13,8 @@ export interface Fighter {
   hp: number;
   atk: number;
   def: number;
+  /** Speed: the faster side attacks first each turn. */
+  spd: number;
   /** The owned pet's uid, for party members. */
   uid?: string;
   rank: Rank;
@@ -34,15 +37,24 @@ export function makeFighter(
   const r = foeScale(rank, tier, level);
   const maxHp = Math.round(stats.hp * r.hp * (traits.includes('thick') ? 1.35 : 1));
   const atk = Math.round(stats.atk * r.power * (traits.includes('savage') ? 1.2 : 1));
-  return { species, level, maxHp, hp: maxHp, atk, def: Math.round(stats.def * r.power), uid, rank, tier, traits };
+  const spd = Math.round(stats.spd * (traits.includes('swift') ? SWIFT_SPEED : 1));
+  return { species, level, maxHp, hp: maxHp, atk, def: Math.round(stats.def * r.power), spd, uid, rank, tier, traits };
 }
 
+/** The name of a foe's telegraphed big attack. */
+const bigMoveName = (s: Species) => (s.kind === 'monster' ? s.move : signature(s).name);
+
+/** A Swift foe is quicker on its feet as well as with its big attack. */
+const SWIFT_SPEED = 1.25;
+
+/** The moves a fighter knows. Foes only Strike and telegraph a big attack, so they have none. */
+export const movesOf = (f: Fighter): Move[] => (f.species.kind === 'pet' ? f.species.moves.map(getMove) : []);
+
 export type Side = 'pet' | 'foe';
-/** The three attacks every pet knows: a plain Strike, its element move, and its element's art. */
-export type Attack = 'strike' | 'move' | 'art';
 
 export type Action =
-  | { kind: Attack; /** 0..1 from the timing ring; 1 is a perfect tap. */ quality?: number }
+  /** One of the active Wildling's three moves, by slot. */
+  | { kind: 'attack'; slot: number; /** 0..1 from the timing sweep; 1 is a perfect tap. */ quality?: number }
   | { kind: 'swap'; to: number }
   | { kind: 'tonic' };
 
@@ -58,8 +70,11 @@ export type BattleEvent = (
   | {
       kind: 'hit';
       attacker: Side;
-      action: Attack | 'big';
       name: string;
+      /** The move's element, or null for a plain blow. */
+      element: Element | null;
+      /** The foe's telegraphed big attack. */
+      big?: boolean;
       damage: number;
       effectiveness: number;
       crit: boolean;
@@ -74,7 +89,7 @@ export type BattleEvent = (
   | { kind: 'reflect'; damage: number }
   | { kind: 'leech'; amount: number }
   | { kind: 'swap'; to: number }
-  | { kind: 'heal'; targets: number[]; amount: number; source: 'tonic' | 'art' }
+  | { kind: 'heal'; targets: number[]; amount: number; source: 'tonic' | 'art' | 'drain' }
   /** The hero's spell: damage to the foe, health back to `targets`, or neither for a blessing or curse. */
   | { kind: 'spell'; spell: HeroSpellId; damage?: number; amount?: number; targets?: number[] }
   | { kind: 'faint'; index: number }
@@ -82,10 +97,6 @@ export type BattleEvent = (
   | { kind: 'foe-in'; index: number }
 ) & { hp?: HpSnap };
 
-/** Turns between uses: the element move is ready every other turn, the art every third. */
-export const MOVE_COOLDOWN = 2;
-export const ART_COOLDOWN = 3;
-const MOVE_POWER = 1.7;
 const BIG_POWER = 1.9;
 /** Scales damage so a fight takes a handful of turns, not a dozen. Foes hit a little softer. */
 const PACE = 1.6;
@@ -106,16 +117,8 @@ const STARFALL_POWER = 2.2;
 const BURN_TURNS = 3;
 const BURN_SHARE = 0.07;
 const LEECH_SHARE = 0.4;
-
-/** Each element's art: a trick rather than a blow, so there is always a choice to make. */
-export const ARTS: Record<Element, { name: string; blurb: string }> = {
-  ember: { name: 'Kindle', blurb: 'A light hit that sets the foe burning for 3 turns.' },
-  tide: { name: 'Wellspring', blurb: 'Heals a third of its health.' },
-  grove: { name: 'Thornguard', blurb: 'Halves the next hit and throws half of it back.' },
-  stone: { name: 'Bulwark', blurb: 'Takes 60% less damage for 2 turns.' },
-  gale: { name: 'Updraft', blurb: 'A light hit, then dodges the next attack.' },
-  lumen: { name: 'Glimmer', blurb: 'Marks the weak spot: the next attack is critical.' },
-};
+const DRAIN_SHARE = 0.5;
+const HEAL_SHARE = 1 / 3;
 
 export interface BattleOptions {
   rng?: Rng;
@@ -153,8 +156,8 @@ interface Guard {
  * then unleashes a big element attack, always announced a turn ahead.
  */
 export class Battle {
-  /** Turns until each party member's element move and art are ready again. */
-  readonly cooldowns: { move: number; art: number }[];
+  /** Turns until each of each party member's moves is ready again, by slot. */
+  readonly cooldowns: number[][];
   active = 0;
   winner: Side | null = null;
   /** Party members that took part, for sharing experience. */
@@ -192,7 +195,7 @@ export class Battle {
     this.foes = Array.isArray(foes) ? foes : [foes];
     this.foe = this.foes[0];
     this.tonicHeal = Math.round(TONIC_HEAL * tonicPower);
-    this.cooldowns = party.map(() => ({ move: 0, art: 0 }));
+    this.cooldowns = party.map(() => [0, 0, 0]);
     this.wardUp = this.foe.traits.includes('warded');
     const damage = petDamage * (hero?.damage ?? 1);
     const health = petHealth * (hero?.health ?? 1);
@@ -231,8 +234,14 @@ export class Battle {
     return CRIT_QUALITY - (this.hero?.critEase ?? 0);
   }
 
-  private get artCooldown(): number {
-    return Math.max(1, ART_COOLDOWN - (this.hero?.artHaste ?? 0));
+  /** Turns a move rests after use; Quick Arts talents shorten the slow ones. */
+  private waitFor(move: Move): number {
+    return move.wait >= 3 ? Math.max(2, move.wait - (this.hero?.artHaste ?? 0)) : move.wait;
+  }
+
+  /** Whether the party's Wildling in front attacks before the foe this turn. Ties go to the party. */
+  get petFirst(): boolean {
+    return this.pet.spd >= this.foe.spd;
   }
 
   /**
@@ -251,7 +260,7 @@ export class Battle {
     const pet = this.pet;
     if (spell === 'secondWind') return pet.hp < pet.maxHp;
     if (spell === 'mending') return this.party.some((f) => f.hp > 0 && f.hp < f.maxHp);
-    if (spell === 'wildcall') return this.cooldowns[this.active].move > 0 || this.cooldowns[this.active].art > 0;
+    if (spell === 'wildcall') return this.cooldowns[this.active].some((w) => w > 0);
     return true;
   }
 
@@ -303,7 +312,7 @@ export class Battle {
         events.push({ kind: 'spell', spell }, { kind: 'status', target: 'pet', status: 'focus', name });
         break;
       case 'wildcall':
-        this.cooldowns[this.active] = { move: 0, art: 0 };
+        this.cooldowns[this.active] = [0, 0, 0];
         events.push({ kind: 'spell', spell });
         break;
       case 'packHowl':
@@ -335,12 +344,13 @@ export class Battle {
     return this.party[this.active];
   }
 
-  ready(attack: Attack): boolean {
-    return attack === 'strike' || this.cooldowns[this.active][attack] === 0;
+  /** The active Wildling's moves, by slot. */
+  get moves(): Move[] {
+    return movesOf(this.pet);
   }
 
-  get moveReady(): boolean {
-    return this.ready('move');
+  ready(slot: number): boolean {
+    return slot >= 0 && slot < this.moves.length && this.cooldowns[this.active][slot] === 0;
   }
 
   /** True when the active pet has fainted and another must be sent in. */
@@ -357,11 +367,14 @@ export class Battle {
     return index !== this.active && (this.party[index]?.hp ?? 0) > 0;
   }
 
-  /** How the active pet's attack would land on the foe: 1.5 strong, 0.6 weak, 1 even. */
-  edge(attack: Attack, pet = this.pet): number {
-    if (attack === 'strike') return 1;
-    if (attack === 'art' && !hurts(pet.species.element)) return 1;
-    return matchup(pet.species.element, this.foe.species.element);
+  /** How a move would land on the foe: 1.5 strong, 0.6 weak, 1 even or no damage. */
+  edge(move: Move): number {
+    return move.element && move.power > 0 ? matchup(move.element, this.foe.species.element) : 1;
+  }
+
+  /** The best edge any of a fighter's damaging moves has on the foe, for the party bench. */
+  bestEdge(f: Fighter): number {
+    return Math.max(1, ...movesOf(f).map((m) => this.edge(m)));
   }
 
   /** How the foe's big attack would land on a party member. */
@@ -372,18 +385,17 @@ export class Battle {
   get intent(): Intent {
     const every = Math.max(2, (this.foe.traits.includes('swift') ? 2 : 3) - (this.enraged ? 1 : 0));
     const big = this.foeTurns % every === every - 1;
-    return big ? { big, name: this.foe.species.move, element: this.foe.species.element } : { big, name: 'Strike', element: null };
+    return big ? { big, name: bigMoveName(this.foe.species), element: this.foe.species.element } : { big, name: 'Strike', element: null };
   }
 
-  private petHit(action: Attack, power: number, quality: number): BattleEvent[] {
+  private petHit(move: Move, quality: number): BattleEvent[] {
     const pet = this.pet;
-    const elemental = action !== 'strike';
-    let eff = elemental ? matchup(pet.species.element, this.foe.species.element) : 1;
-    const timed = action !== 'art';
-    const crit = this.focus || (timed && quality >= this.critAt);
+    const fullEff = move.element ? matchup(move.element, this.foe.species.element) : 1;
+    let eff = fullEff;
+    const crit = this.focus || quality >= this.critAt;
     this.focus = false;
     // A well-timed tap also nudges damage up; a missed one still lands.
-    const timing = timed ? 0.85 + 0.15 * Math.min(1, quality / this.critAt) : 1;
+    const timing = 0.85 + 0.15 * Math.min(1, quality / this.critAt);
     const events: BattleEvent[] = [];
     let warded = false;
     if (this.wardUp) {
@@ -396,43 +408,53 @@ export class Battle {
       }
     }
     const howl = this.howl > 0 ? HOWL_POWER : 1;
-    const dmg = Math.max(1, Math.round(damage(pet.atk, this.foe.def, power, eff, this.rng(), crit) * timing * howl * PACE));
+    const dmg = Math.max(1, Math.round(damage(pet.atk, this.foe.def, move.power, eff, this.rng(), crit) * timing * howl * PACE));
     this.foe.hp = Math.max(0, this.foe.hp - dmg);
-    const name = action === 'move' ? pet.species.move : action === 'art' ? ARTS[pet.species.element].name : 'Strike';
-    events.unshift(this.snap({ kind: 'hit', attacker: 'pet', action, name, damage: dmg, effectiveness: elemental ? matchup(pet.species.element, this.foe.species.element) : 1, crit, warded }));
+    events.unshift(this.snap({ kind: 'hit', attacker: 'pet', name: move.name, element: move.element, damage: dmg, effectiveness: fullEff, crit, warded }));
+    if (move.effect === 'drain') {
+      const amount = Math.min(pet.maxHp - pet.hp, Math.round(dmg * DRAIN_SHARE));
+      if (amount > 0) {
+        pet.hp += amount;
+        events.push(this.snap({ kind: 'heal', targets: [this.active], amount, source: 'drain' }));
+      }
+    }
     return events;
   }
 
-  private useArt(): BattleEvent[] {
+  /** The active Wildling uses a move: its blow, if it has one, then its trick. */
+  private useMove(move: Move, quality: number): BattleEvent[] {
+    const events = move.power > 0 ? this.petHit(move, quality) : [];
     const pet = this.pet;
-    const element = pet.species.element;
-    const name = ARTS[element].name;
-    switch (element) {
-      case 'ember': {
-        const events = this.petHit('art', 0.6, 0);
+    const name = move.name;
+    switch (move.effect) {
+      case 'burn':
         this.burn = BURN_TURNS;
-        return [...events, { kind: 'status', target: 'foe', status: 'burn', name }];
-      }
-      case 'gale': {
-        const events = this.petHit('art', 0.6, 0);
+        events.push({ kind: 'status', target: 'foe', status: 'burn', name });
+        break;
+      case 'dodge':
         this.dodge = true;
-        return [...events, { kind: 'status', target: 'pet', status: 'dodge', name }];
-      }
-      case 'tide': {
-        const add = Math.min(pet.maxHp - pet.hp, Math.round(pet.maxHp / 3));
+        events.push({ kind: 'status', target: 'pet', status: 'dodge', name });
+        break;
+      case 'heal': {
+        const add = Math.min(pet.maxHp - pet.hp, Math.round(pet.maxHp * HEAL_SHARE));
         pet.hp += add;
-        return [this.snap({ kind: 'heal', targets: [this.active], amount: add, source: 'art' })];
+        events.push(this.snap({ kind: 'heal', targets: [this.active], amount: add, source: 'art' }));
+        break;
       }
-      case 'grove':
+      case 'thorns':
         this.guard = { turns: 1, through: 0.5, reflect: 0.5 };
-        return [{ kind: 'status', target: 'pet', status: 'guard', name }];
-      case 'stone':
+        events.push({ kind: 'status', target: 'pet', status: 'guard', name });
+        break;
+      case 'bulwark':
         this.guard = { turns: 2, through: 0.4, reflect: 0 };
-        return [{ kind: 'status', target: 'pet', status: 'guard', name }];
-      case 'lumen':
+        events.push({ kind: 'status', target: 'pet', status: 'guard', name });
+        break;
+      case 'focus':
         this.focus = true;
-        return [{ kind: 'status', target: 'pet', status: 'focus', name }];
+        events.push({ kind: 'status', target: 'pet', status: 'focus', name });
+        break;
     }
+    return events;
   }
 
   /** Heals each target by a share of its health, or by a flat amount when `flat` is given. */
@@ -480,6 +502,7 @@ export class Battle {
   }
 
   private foeAttack(): BattleEvent[] {
+    if (this.foe.hp <= 0) return [];
     const intent = this.intent;
     this.foeTurns++;
     const pet = this.pet;
@@ -496,7 +519,7 @@ export class Battle {
     const dmg = guard ? Math.max(1, Math.round(raw * guard.through)) : raw;
     pet.hp = Math.max(0, pet.hp - dmg);
     const events: BattleEvent[] = [
-      this.snap({ kind: 'hit', attacker: 'foe', action: intent.big ? 'big' : 'strike', name: intent.name, damage: dmg, effectiveness: eff, crit, guarded: !!guard }),
+      this.snap({ kind: 'hit', attacker: 'foe', name: intent.name, element: intent.element, big: intent.big, damage: dmg, effectiveness: eff, crit, guarded: !!guard }),
     ];
     if (guard) {
       if (guard.reflect > 0) {
@@ -516,7 +539,10 @@ export class Battle {
     return events;
   }
 
-  /** Resolves one player action and the foe's answer. */
+  /**
+   * Resolves one player action and the foe's answer. Speed decides who attacks first; swaps
+   * and tonics always come before the foe. Burns tick at the end of the turn.
+   */
   turn(action: Action): BattleEvent[] {
     if (this.winner) return [];
     const events: BattleEvent[] = [];
@@ -528,23 +554,30 @@ export class Battle {
       if (this.freeSwap) this.fought.delete(this.active);
       return [this.swapTo(action.to)];
     }
+    if (action.kind === 'attack' && !this.ready(action.slot)) return [];
+    if (action.kind === 'swap' && !this.canSwapTo(action.to)) return [];
     this.opened = true;
 
-    const cd = this.cooldowns[this.active];
-    switch (action.kind) {
-      case 'strike':
-      case 'move':
-      case 'art': {
-        const kind = this.ready(action.kind) ? action.kind : 'strike';
-        if (kind === 'art') events.push(...this.useArt());
-        else events.push(...this.petHit(kind, kind === 'move' ? MOVE_POWER : 1, action.quality ?? 0.5));
+    const foeFirst = action.kind === 'attack' && !this.petFirst;
+    if (foeFirst) {
+      events.push(...this.foeAttack());
+      if (this.foeDown(events)) return this.endTurn(events);
+      if (this.fainted(events)) {
+        // Felled before it could act: the turn still passes.
         this.tick();
-        if (kind === 'move') cd.move = MOVE_COOLDOWN;
-        if (kind === 'art') cd.art = this.artCooldown;
+        return this.endTurn(events);
+      }
+    }
+
+    switch (action.kind) {
+      case 'attack': {
+        const move = this.moves[action.slot];
+        events.push(...this.useMove(move, action.quality ?? 0.5));
+        this.tick();
+        this.cooldowns[this.active][action.slot] = this.waitFor(move);
         break;
       }
       case 'swap':
-        if (!this.canSwapTo(action.to)) return [];
         events.push(this.swapTo(action.to));
         this.tick();
         break;
@@ -556,19 +589,31 @@ export class Battle {
     this.cast = false;
     if (this.foeDown(events)) return events;
 
-    if (this.burn > 0) {
+    if (!foeFirst) {
+      events.push(...this.foeAttack());
+      if (this.foeDown(events) || this.fainted(events)) return this.endTurn(events);
+    }
+    return this.endTurn(events);
+  }
+
+  /** True when the Wildling in front has just fallen; ends the fight if nobody is left. */
+  private fainted(events: BattleEvent[]): boolean {
+    if (this.pet.hp > 0) return false;
+    events.push({ kind: 'faint', index: this.active });
+    if (!this.party.some((f) => f.hp > 0)) this.winner = 'foe';
+    return true;
+  }
+
+  /** The end of a turn: a burning foe smoulders, and a turn the pet lost still passes. */
+  private endTurn(events: BattleEvent[]): BattleEvent[] {
+    this.cast = false;
+    if (this.winner) return events;
+    if (this.burn > 0 && this.foe.hp > 0) {
       this.burn--;
       const dmg = Math.max(1, Math.round(this.foe.maxHp * BURN_SHARE));
       this.foe.hp = Math.max(0, this.foe.hp - dmg);
       events.push(this.snap({ kind: 'burn', damage: dmg }));
-      if (this.foeDown(events)) return events;
-    }
-
-    events.push(...this.foeAttack());
-    if (this.foeDown(events)) return events;
-    if (this.pet.hp <= 0) {
-      events.push({ kind: 'faint', index: this.active });
-      if (!this.party.some((f) => f.hp > 0)) this.winner = 'foe';
+      this.foeDown(events);
     }
     return events;
   }
@@ -577,14 +622,10 @@ export class Battle {
   private tick(): void {
     this.howl = Math.max(0, this.howl - 1);
     for (const cd of this.cooldowns) {
-      cd.move = Math.max(0, cd.move - 1);
-      cd.art = Math.max(0, cd.art - 1);
+      for (let i = 0; i < cd.length; i++) cd[i] = Math.max(0, cd[i] - 1);
     }
   }
 }
-
-/** Arts that deal damage, and so care about the wheel. */
-const hurts = (e: Element) => e === 'ember' || e === 'gale';
 
 const RANK_REWARD: Record<Rank, { xp: number }> = {
   normal: { xp: 1 },
