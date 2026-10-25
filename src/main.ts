@@ -160,6 +160,7 @@ creatureGame.wayfarer = {
   mana: () => game.mana,
   spellCost: (spell) => game.spellCost(spell),
   spendMana: (spell) => game.spendMana(spell),
+  findGear: (foe) => game.findGear({ kind: 'foe', ...foe })?.text ?? null,
   gear: () => {
     const b = game.bonuses();
     return { petDamage: b.petDamage + (isNight() ? b.nightDamage : 0), petHealth: b.petHealth, catchBonus: b.catchBonus };
@@ -394,7 +395,7 @@ function takeCurio(curio: Curio): void {
     ...Object.entries(reward.materials).map(([id, n]) => `+${n} ${MATERIALS[id as MaterialId].name}`),
   ].filter(Boolean);
   sound.play('coin');
-  toast(`${CURIO_KINDS[curio.kind].name}${here ? '' : ' (by Farsight)'}: ${parts.join(', ')}.`);
+  toast(`${CURIO_KINDS[curio.kind].name}${here ? '' : ' (by Farsight)'}: ${parts.join(', ')}.${reward.gear ? ` ${reward.gear.text}` : ''}`);
 }
 
 /** Today's curios around wherever play is happening. */

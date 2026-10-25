@@ -14,7 +14,7 @@ import {
   type HeroClass,
   type Stat,
 } from '../game/hero';
-import { FORGE_LEVEL, power, RARITIES, SLOT_DEFS, SLOTS } from '../game/gear';
+import { power, RARITIES, SLOT_DEFS, SLOTS } from '../game/gear';
 import type { GameState } from '../game/state';
 import { nextUnlock } from '../game/wayfarer';
 import { journal } from '../ui/journal';
@@ -141,8 +141,8 @@ export class HeroPanel {
 
     const s = g.save;
     const gear = SLOTS.map((slot) => {
-      const item = s.gear.find((x) => x.id === s.equipped[slot]);
-      return `<li title="${item ? SLOT_DEFS[slot].effect(power(item)) : `${SLOT_DEFS[slot].name}: empty`}">${gearSvg(item ?? { slot }, 36)}<small style="${item ? `color:${RARITIES[item.rarity].color}` : ''}">${item ? `${SLOT_DEFS[slot].name}${item.plus ? ` +${item.plus}` : ''}` : '—'}</small></li>`;
+      const item = s.gear[slot];
+      return `<li><button type="button" data-act="forge" title="${item ? SLOT_DEFS[slot].effect(power(item)) : `${SLOT_DEFS[slot].name}: not found yet`}">${gearSvg(item ?? { slot }, 36)}<small style="${item ? `color:${RARITIES[item.rarity].color}` : ''}">${item ? `${SLOT_DEFS[slot].name}${item.plus ? ` +${item.plus}` : ''}` : '—'}</small></button></li>`;
     }).join('');
 
     this.host.innerHTML = `
@@ -153,9 +153,8 @@ export class HeroPanel {
       <h3>Talents ${anyPicked ? '<button type="button" class="link-button" data-act="reset">Reset</button>' : ''}</h3>
       <ul class="talent-rows">${talents}</ul>
       ${level < SECOND_CLASS_LEVEL ? `<p class="satchel-hint">A second class opens at level ${SECOND_CLASS_LEVEL}.</p>` : ''}
-      <h3>Gear</h3>
-      <ul class="hero-gear">${gear}</ul>
-      ${level >= FORGE_LEVEL ? '<div class="satchel-actions"><button type="button" data-act="forge">Forge and equip</button></div>' : `<p class="satchel-hint">The Forge opens at level ${FORGE_LEVEL}.</p>`}`;
+      <h3>Gear <button type="button" class="link-button" data-act="forge">Forge</button></h3>
+      <ul class="hero-gear">${gear}</ul>`;
     const second = this.host.querySelector('#second-picker');
     if (second)
       second.replaceWith(

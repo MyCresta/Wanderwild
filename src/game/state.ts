@@ -28,18 +28,22 @@ import {
   type BuildingId,
 } from './hearthstead';
 import {
-  craftCost,
-  craftItem,
   FORGE_LEVEL,
   gearBonuses,
+  isBetter,
   maxPlus,
-  newGearSeed,
+  meltValue,
+  RARITIES,
+  rollGear,
   RUNE_IDS,
   RUNE_LEVEL,
   runeSockets,
+  SLOT_DEFS,
   upgradeCost as gearUpgradeCost,
   type GearBonuses,
   type GearItem,
+  type GearRarity,
+  type GearSource,
   type RuneId,
   type Slot,
 } from './gear';
@@ -65,6 +69,20 @@ export const VISITED_CELL_M = 50;
 export const EGG_UNLOCK_LEVEL = 8;
 /** Chance a shrine gives a rune once runes are unlocked. */
 export const RUNE_SHRINE_CHANCE = 0.06;
+
+/** What came of a gear drop. */
+export interface GearFind {
+  slot: Slot;
+  rarity: GearRarity;
+  /** True when it was rarer and is now worn; false when it melted down. */
+  kept: boolean;
+  text: string;
+}
+
+const melt = (slot: Slot, rarity: GearRarity): Partial<Record<MaterialId, number>> => {
+  const m = meltValue(slot, rarity);
+  return { [m.material]: m.amount };
+};
 
 export type GameEvent =
   | { kind: 'change' }
@@ -247,10 +265,7 @@ export class GameState {
   // ---- Gear and the Forge ----
 
   equippedItems(): GearItem[] {
-    const s = this.save;
-    return Object.values(s.equipped)
-      .map((id) => s.gear.find((g) => g.id === id))
-      .filter((g): g is GearItem => !!g);
+    return Object.values(this.save.gear);
   }
 
   bonuses(): GearBonuses {
@@ -266,29 +281,43 @@ export class GameState {
     this.save.materials[cost.material] = (this.save.materials[cost.material] ?? 0) - cost.amount;
   }
 
-  canCraft(slot: Slot): boolean {
-    return this.level.level >= FORGE_LEVEL && this.canPay(craftCost(slot));
+  /**
+   * Rolls for gear from a fight or a find. A rarer piece is put on straight away and
+   * keeps the slot's upgrades and runes; anything else melts into its slot's material.
+   * Returns a line saying what happened, or null when nothing dropped.
+   */
+  findGear(source: GearSource, rand: () => number = Math.random): GearFind | null {
+    const roll = rollGear(source, this.level.level, this.save.gear, rand);
+    return roll ? this.takeGear(roll.slot, roll.rarity) : null;
   }
 
-  /** Forges a new item and equips it if the slot is empty. */
-  craft(slot: Slot, seed = newGearSeed(slot)): GearItem | null {
-    if (!this.canCraft(slot)) return null;
-    this.pay(craftCost(slot));
-    const item = craftItem(slot, this.level.level, seed);
-    this.save.gear.push(item);
-    if (!this.save.equipped[slot]) this.save.equipped[slot] = item.id;
-    this.grantXp(40);
+  takeGear(slot: Slot, rarity: GearRarity): GearFind {
+    const s = this.save;
+    const current = s.gear[slot];
+    const name = `${RARITIES[rarity].name} ${SLOT_DEFS[slot].name}`;
+    let find: GearFind;
+    if (isBetter(rarity, current)) {
+      if (current) this.addMaterials(melt(current.slot, current.rarity));
+      s.gear[slot] = { slot, rarity, plus: current?.plus ?? 0, runes: current?.runes ?? [] };
+      find = { slot, rarity, kept: true, text: current?.plus ? `Found a ${name}! It keeps your +${current.plus}.` : `Found a ${name}!` };
+    } else {
+      const m = melt(slot, rarity);
+      this.addMaterials(m);
+      const [id, n] = Object.entries(m)[0] as [MaterialId, number];
+      find = { slot, rarity, kept: false, text: `Found a ${name}, melted into ${n} ${MATERIALS[id].name}.` };
+    }
     this.changed();
-    return item;
+    return find;
   }
 
-  canUpgradeGear(item: GearItem): boolean {
-    return this.level.level >= FORGE_LEVEL && item.plus < maxPlus(this.level.level) && this.canPay(gearUpgradeCost(item));
+  canUpgradeGear(slot: Slot): boolean {
+    const item = this.save.gear[slot];
+    return !!item && this.level.level >= FORGE_LEVEL && item.plus < maxPlus(this.level.level) && this.canPay(gearUpgradeCost(item));
   }
 
-  upgradeGear(id: string): boolean {
-    const item = this.save.gear.find((g) => g.id === id);
-    if (!item || !this.canUpgradeGear(item)) return false;
+  upgradeGear(slot: Slot): boolean {
+    const item = this.save.gear[slot];
+    if (!item || !this.canUpgradeGear(slot)) return false;
     this.pay(gearUpgradeCost(item));
     item.plus += 1;
     this.grantXp(20 + 10 * item.plus);
@@ -296,29 +325,9 @@ export class GameState {
     return true;
   }
 
-  equip(id: string): void {
-    const item = this.save.gear.find((g) => g.id === id);
-    if (!item) return;
-    this.save.equipped[item.slot] = item.id;
-    this.changed();
-  }
-
-  /** Melts an unequipped item back into half its slot's crafting material. */
-  salvage(id: string): boolean {
+  socketRune(slot: Slot, rune: RuneId): boolean {
     const s = this.save;
-    const i = s.gear.findIndex((g) => g.id === id);
-    if (i < 0 || s.equipped[s.gear[i].slot] === id) return false;
-    const [item] = s.gear.splice(i, 1);
-    const cost = craftCost(item.slot);
-    this.addMaterials({ [cost.material]: Math.max(1, Math.floor(cost.amount / 2) + item.plus) });
-    s.runes.push(...item.runes);
-    this.changed();
-    return true;
-  }
-
-  socketRune(id: string, rune: RuneId): boolean {
-    const s = this.save;
-    const item = s.gear.find((g) => g.id === id);
+    const item = s.gear[slot];
     const r = s.runes.indexOf(rune);
     if (!item || r < 0 || this.level.level < RUNE_LEVEL || item.runes.length >= runeSockets(item)) return false;
     s.runes.splice(r, 1);
@@ -472,6 +481,8 @@ export class GameState {
       s.eggs.push(found);
       egg += ` You found a ${found.km} km egg!`;
     }
+    const gear = this.findGear({ kind: 'shrine' });
+    if (gear) egg += ` ${gear.text}`;
     const mats = (Object.entries(reward.materials) as [MaterialId, number][])
       .map(([id, n]) => `${n} ${MATERIALS[id].name}`)
       .join(', ');
@@ -481,7 +492,7 @@ export class GameState {
   }
 
   /** Picks up a curio once and pays it out; returns what it held. */
-  findCurio(curio: Curio, realm: RealmId, onFoot: boolean): CurioReward | null {
+  findCurio(curio: Curio, realm: RealmId, onFoot: boolean): (CurioReward & { gear: GearFind | null }) | null {
     if (curio.id in this.save.curiosFound) return null;
     const reward = curioReward(curio, realm, onFoot);
     this.save.curiosFound[curio.id] = curio.expiresAt;
@@ -489,8 +500,9 @@ export class GameState {
     this.save.currencies.wanderlight += reward.wanderlight;
     this.addMaterials(reward.materials);
     this.grantXp(reward.xp);
+    const gear = this.findGear({ kind: 'curio', onFoot });
     this.changed();
-    return reward;
+    return { ...reward, gear };
   }
 
   changed(): void {

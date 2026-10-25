@@ -1,7 +1,7 @@
 import type { Egg, Hatchling } from './eggs';
 import { BUILDING_IDS, newHearthstead, type HearthsteadState, type SupplyId } from './hearthstead';
 import type { Expedition } from './expeditions';
-import { RUNE_IDS, SLOTS, type GearItem, type GearRarity, type RuneId, type Slot } from './gear';
+import { MELT, RARITY_ORDER, RUNE_IDS, runeSockets, SLOT_DEFS, SLOTS, type GearItem, type GearRarity, type RuneId, type Slot } from './gear';
 import { REALMS, type MaterialId, type RealmId } from './realms';
 import type { Waymark } from './waymarks';
 import type { GlyphKind } from './glyphs';
@@ -13,7 +13,7 @@ import { isHeroClass, LOOKS, METRES_PER_MANA, newHero, TALENTS, talentKey, type 
  * a phone change before there is any server.
  */
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export interface SaveData {
   version: typeof SAVE_VERSION;
@@ -43,8 +43,8 @@ export interface SaveData {
   hatchlings: Hatchling[];
   /** Owned by the creatures code; its shape is defined there. */
   pets: unknown[];
-  gear: GearItem[];
-  equipped: Partial<Record<Slot, string>>;
+  /** The piece worn in each slot, with the slot's Forge upgrades and runes. */
+  gear: Partial<Record<Slot, GearItem>>;
   /** Unsocketed runes. */
   runes: RuneId[];
   expeditions: Expedition[];
@@ -80,8 +80,7 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     eggs: [],
     hatchlings: [],
     pets: [],
-    gear: [],
-    equipped: {},
+    gear: {},
     runes: [],
     expeditions: [],
     realmsVisited: [],
@@ -107,7 +106,8 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
   if (raw.version > SAVE_VERSION) throw new Error('This save is from a newer version of Wanderwild');
 
   // Version 1 had no Hearthstead, supplies or eggs, and version 2 no gear, runes or
-  // expeditions, and version 3 no Waymarks; the defaults below fill them in.
+  // expeditions, and version 3 no Waymarks; the defaults below fill them in. Version 4
+  // kept a list of crafted gear; parseGear folds it into one piece per slot.
   // Future migrations that rename or reshape fields go here, one version at a time.
   const fresh = newSave(now);
   const strings = (v: unknown) => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : []);
@@ -119,6 +119,7 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
   const hearth = isObject(raw.hearthstead) ? raw.hearthstead : {};
   const buildings = isObject(hearth.buildings) ? hearth.buildings : {};
   const records = (v: unknown) => (Array.isArray(v) ? v.filter(isObject) : []);
+  const gear = parseGear(raw, strings);
   return {
     ...fresh,
     createdAt: num(raw.createdAt, now),
@@ -127,7 +128,7 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
     rewardedMetres: num(raw.rewardedMetres, num(raw.distanceMetres)),
     wayfarer: { xp: num(wayfarer.xp) },
     currencies: { coin: num(currencies.coin), wanderlight: num(currencies.wanderlight) },
-    materials: numbers(raw.materials),
+    materials: addUp(numbers(raw.materials), gear.materials),
     shrineCooldowns: numbers(raw.shrineCooldowns) as Record<string, number>,
     shrinesVisited: num(raw.shrinesVisited),
     blessingUntil: num(raw.blessingUntil),
@@ -154,19 +155,8 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
     })),
     hatchlings: records(raw.hatchlings) as unknown as Hatchling[],
     pets: Array.isArray(raw.pets) ? raw.pets : [],
-    gear: records(raw.gear)
-      .filter((g) => SLOTS.includes(g.slot as Slot) && ['worn', 'fine', 'rare', 'mythic', 'relic'].includes(g.rarity as string))
-      .map((g) => ({
-        id: String(g.id),
-        slot: g.slot as Slot,
-        rarity: g.rarity as GearRarity,
-        plus: Math.max(0, Math.min(10, num(g.plus))),
-        runes: strings(g.runes).filter(isRune),
-      })),
-    equipped: isObject(raw.equipped)
-      ? Object.fromEntries(Object.entries(raw.equipped).filter(([k, v]) => SLOTS.includes(k as Slot) && typeof v === 'string'))
-      : {},
-    runes: strings(raw.runes).filter(isRune),
+    gear: gear.gear,
+    runes: gear.runes,
     expeditions: records(raw.expeditions).map((e) => ({
       petUid: String(e.petUid),
       petLevel: num(e.petLevel, 1),
@@ -187,6 +177,59 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
       return { day: typeof st.day === 'string' ? st.day : '', count: Math.max(0, num(st.count)) };
     })(),
   };
+}
+
+const addUp = (a: Partial<Record<MaterialId, number>>, b: Partial<Record<MaterialId, number>>) => {
+  const sum = { ...a };
+  for (const [id, n] of Object.entries(b) as [MaterialId, number][]) sum[id] = (sum[id] ?? 0) + n;
+  return sum;
+};
+
+const isRarity = (v: unknown): v is GearRarity => RARITY_ORDER.includes(v as GearRarity);
+
+/**
+ * Reads gear back as one piece per slot. A version 4 list of crafted gear keeps the worn
+ * piece in each slot with the highest upgrade any piece of that slot had, so nothing
+ * spent at the Forge is lost; spare pieces melt into materials and their runes return.
+ */
+function parseGear(raw: Record<string, unknown>, strings: (v: unknown) => string[]) {
+  const runes = strings(raw.runes).filter(isRune);
+  const materials: Partial<Record<MaterialId, number>> = {};
+  const gear: Partial<Record<Slot, GearItem>> = {};
+  const clean = (g: Record<string, unknown>, slot: Slot): GearItem => ({
+    slot,
+    rarity: g.rarity as GearRarity,
+    plus: Math.max(0, Math.min(10, Math.floor(num(g.plus)))),
+    runes: strings(g.runes).filter(isRune),
+  });
+  if (Array.isArray(raw.gear)) {
+    const equipped = isObject(raw.equipped) ? raw.equipped : {};
+    const items = raw.gear.filter(isObject).filter((g) => SLOTS.includes(g.slot as Slot) && isRarity(g.rarity));
+    for (const slot of SLOTS) {
+      const mine = items.filter((g) => g.slot === slot);
+      if (!mine.length) continue;
+      const worn =
+        mine.find((g) => g.id === equipped[slot]) ??
+        mine.reduce((a, b) => (RARITY_ORDER.indexOf(b.rarity as GearRarity) > RARITY_ORDER.indexOf(a.rarity as GearRarity) ? b : a));
+      const kept = clean(worn, slot);
+      kept.plus = Math.max(...mine.map((g) => clean(g, slot).plus));
+      const material = SLOT_DEFS[slot].material;
+      for (const g of mine) {
+        if (g === worn) continue;
+        runes.push(...clean(g, slot).runes);
+        materials[material] = (materials[material] ?? 0) + MELT[g.rarity as GearRarity];
+      }
+      gear[slot] = kept;
+    }
+  } else if (isObject(raw.gear)) {
+    for (const slot of SLOTS) {
+      const g = raw.gear[slot];
+      if (isObject(g) && isRarity(g.rarity)) gear[slot] = clean(g, slot);
+    }
+  }
+  // Runes beyond the open sockets go back to the bag.
+  for (const item of Object.values(gear)) runes.push(...item.runes.splice(runeSockets(item)));
+  return { gear, runes, materials };
 }
 
 /** Reads the hero back, or makes a new one; spell charge from before heroes becomes mana. */

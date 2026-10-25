@@ -36,12 +36,12 @@ export interface Unlock {
 export const UNLOCKS: Unlock[] = [
   { level: 1, what: 'Map, wayshrines, Wildlings, Blotspawn, and Glyphwalking' },
   { level: 3, what: 'The Hearthstead: Herb Garden and Mine' },
-  { level: 5, what: 'The Forge and gear upgrades to +5' },
+  { level: 5, what: 'Forge upgrades to +5' },
   { level: 8, what: 'Wildling expeditions and wild eggs' },
   { level: 10, what: 'Wardens and realm claiming' },
-  { level: 15, what: 'Runes and gear upgrades to +10' },
-  { level: 20, what: 'A second hero class, and Rifts' },
-  { level: 30, what: 'Mythic gear and the final story chapter' },
+  { level: 15, what: 'Runes and Forge upgrades to +10' },
+  { level: 20, what: 'A second hero class, Mythic gear, and Rifts' },
+  { level: 30, what: 'Relic gear and the final story chapter' },
 ];
 
 export const isUnlocked = (level: number, feature: number) => level >= feature;
