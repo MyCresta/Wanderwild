@@ -1,4 +1,5 @@
-import { bandFull, bandSize, dismissFollower, HOURS_TO_BEFRIEND, startFollowing, walkNeeded } from '../creatures/befriend';
+import { bandFull, bandSize, dismissFollower, followerWaitMs, followerWalkLeftM, HOURS_TO_BEFRIEND, startFollowing, walkNeeded } from '../creatures/befriend';
+import { formatDistance, formatDuration } from '../hud/format';
 import { markSeen, type OwnedPet } from '../creatures/collection';
 import { getSpecies } from '../creatures/species';
 import { individualFromSeed, type Encounter } from '../creatures/stats';
@@ -51,6 +52,52 @@ export function openMeeting(ctx: GameContext, spawnId: string, encounter: Encoun
     h('p', { class: 'encounter-info' }, h('strong', {}, `Lv ${level}`), ' ', elementBadge(species), ' ', rarityBadge(species)),
     h('p', { class: 'lore' }, `${species.epithet[0].toUpperCase()}${species.epithet.slice(1)}. It watches you from the margin of the map. Keep it with you for about ${hours} h and it may choose to stay. Walking ${need} m together wins it over far sooner.`),
     action,
+  );
+}
+
+/** The Wildling following you now: how far along its trust is, and how to win it over sooner. */
+export function openFollower(ctx: GameContext): void {
+  const f = ctx.collection.follower;
+  if (!f) return;
+  const species = getSpecies(f.speciesId);
+  const individual = individualFromSeed(f.seed, species.kind);
+  const trust = Math.floor((100 * f.walkedM) / f.needM);
+  const sheet = openSheet(`${individual.gilded ? '✦ Gilded ' : ''}${species.name}`, { className: 'sheet-meet' });
+  sheet.body.append(
+    h('div', { class: 'stage stage-small' }, createCreatureSvg({ speciesId: f.speciesId, seed: f.seed, size: 180 })),
+    h('p', { class: 'encounter-info' }, h('strong', {}, `Lv ${f.level}`), ' ', elementBadge(species), ' ', rarityBadge(species)),
+    h(
+      'div',
+      { class: 'trust' },
+      h('span', { class: 'trust-label' }, h('span', {}, 'Trust'), h('b', {}, `${trust}%`)),
+      h('span', { class: 'building-bar' }, h('span', { style: { width: `${trust}%` } })),
+    ),
+    h(
+      'ul',
+      { class: 'trust-ways' },
+      h('li', {}, 'Stays in ', h('b', {}, formatDuration(followerWaitMs(f))), ' at your side, even with the app closed.'),
+      h('li', {}, 'Or sooner: walk ', h('b', {}, formatDistance(followerWalkLeftM(f))), ' together.'),
+      h('li', {}, 'Driving off Blotspawn builds trust too.'),
+    ),
+    h(
+      'div',
+      { class: 'actions' },
+      h(
+        'button',
+        {
+          class: 'btn',
+          type: 'button',
+          onclick: () => {
+            dismissFollower(ctx.collection);
+            ctx.changed();
+            sheet.close();
+            toast(`${species.name} wanders back into the margins.`);
+          },
+        },
+        'Let it go',
+      ),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: () => sheet.close() }, 'Keep going'),
+    ),
   );
 }
 
