@@ -1,4 +1,4 @@
-import { mulberry32, type Rng } from './rng';
+import { hashString, mulberry32, type Rng } from './rng';
 
 /**
  * Blotspawn come in three ranks. Rare and Elite ones are bigger blots with quirks,
@@ -94,4 +94,40 @@ export function rollFoe(spawnRarity: SpawnRarity, seed: number): { rank: Rank; t
   const rng = mulberry32(seed ^ 0x5bd1e995);
   const { rank, tier } = foeRank(spawnRarity, rng);
   return { rank, tier, traits: pickTraits(rng, foeScale(rank, tier).traits) };
+}
+
+/**
+ * How deep the ink runs in a patch of the map. Every few streets the Blotspawn change:
+ * thin ink holds easy prey well under your party, deep ink holds foes above it.
+ */
+export type InkDepth = 'thin' | 'even' | 'deep';
+/** Size of one patch of ink, in metres. */
+export const INK_CELL_M = 400;
+/** Levels above (or below) the party's average that a Blotspawn of each depth stands at. */
+export const INK_LEVELS: Record<InkDepth, readonly [number, number]> = {
+  thin: [-5, -1],
+  even: [-2, 2],
+  deep: [2, 5],
+};
+
+/** The depth of a patch, from its cell id. The Barrows run deeper. */
+export function inkDepth(cellId: string, barrows = false): InkDepth {
+  const roll = mulberry32(hashString(`ink:${cellId}`))();
+  const [thin, even] = barrows ? [0.15, 0.55] : [0.3, 0.78];
+  return roll < thin ? 'thin' : roll < even ? 'even' : 'deep';
+}
+
+/** How hard a foe looks next to the party, for the map chip and gates. */
+export type Threat = 'easy' | 'even' | 'hard' | 'deadly';
+export const THREATS: Record<Threat, { name: string }> = {
+  easy: { name: 'Easy' },
+  even: { name: 'Even' },
+  hard: { name: 'Hard' },
+  deadly: { name: 'Deadly' },
+};
+
+export function foeThreat(foeLevel: number, partyLevel: number, rank: Rank = 'normal', tier = 1): Threat {
+  const toughness = rank === 'boss' ? 3 : rank === 'elite' ? 1 + 0.5 * (tier - 1) : rank === 'rare' ? 0.5 : 0;
+  const gap = foeLevel - partyLevel + toughness;
+  return gap <= -3 ? 'easy' : gap <= 1.5 ? 'even' : gap <= 4.5 ? 'hard' : 'deadly';
 }

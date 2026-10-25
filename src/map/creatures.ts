@@ -2,11 +2,13 @@ import { Marker, type Map } from 'maplibre-gl';
 import type { Follower, OwnedPet } from '../creatures/collection';
 import type { Spawn } from '../game/spawns';
 import type { Encounter } from '../creatures/stats';
+import { THREATS, type Threat } from '../creatures/foes';
 import { createCreatureSvg } from '../creatures/view';
 
 interface Placed {
   marker: Marker;
   spawn: Spawn;
+  encounter: Encounter;
 }
 
 /** Wild creatures standing on the map. Tapping one reports it with its encounter. */
@@ -18,8 +20,11 @@ export class CreatureMarkers {
     private readonly onTap: (spawn: Spawn, encounter: Encounter) => void,
   ) {}
 
-  /** Shows exactly these spawns, keeping markers that are already up. */
-  show(entries: { spawn: Spawn; encounter: Encounter }[]): void {
+  /**
+   * Shows exactly these spawns, keeping markers that are already up. Foes with a threat get a
+   * small level chip coloured by how hard they are for the party.
+   */
+  show(entries: { spawn: Spawn; encounter: Encounter }[], threat: (e: Encounter) => Threat | null = () => null): void {
     const keep = new Set(entries.map((e) => e.spawn.id));
     for (const [id, placed] of this.placed)
       if (!keep.has(id)) {
@@ -27,7 +32,13 @@ export class CreatureMarkers {
         this.placed.delete(id);
       }
     for (const { spawn, encounter } of entries) {
-      if (this.placed.has(spawn.id)) continue;
+      const existing = this.placed.get(spawn.id);
+      if (existing) {
+        // The party may have changed, and with it the foe's level and how hard it looks.
+        existing.encounter = encounter;
+        setLevelChip(existing.marker.getElement(), encounter, threat(encounter));
+        continue;
+      }
       const el = document.createElement('button');
       el.type = 'button';
       const rank = encounter.rank && encounter.rank !== 'normal' ? ` map-creature-rank-${encounter.rank}` : '';
@@ -38,10 +49,11 @@ export class CreatureMarkers {
       el.appendChild(createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 64 }));
       el.addEventListener('click', (event) => {
         event.stopPropagation();
-        this.onTap(spawn, encounter);
+        this.onTap(spawn, this.placed.get(spawn.id)?.encounter ?? encounter);
       });
+      setLevelChip(el, encounter, threat(encounter));
       const marker = new Marker({ element: el, anchor: 'bottom' }).setLngLat([spawn.lng, spawn.lat]).addTo(this.map);
-      this.placed.set(spawn.id, { marker, spawn });
+      this.placed.set(spawn.id, { marker, spawn, encounter });
     }
   }
 
@@ -54,6 +66,25 @@ export class CreatureMarkers {
     this.placed.get(id)?.marker.remove();
     this.placed.delete(id);
   }
+}
+
+/** The level chip on a foe marker: always the same size, its colour says easy, even, hard or deadly. */
+function setLevelChip(el: HTMLElement, encounter: Encounter, threat: Threat | null): void {
+  let chip = el.querySelector<HTMLElement>('.foe-level');
+  if (!threat) {
+    chip?.remove();
+    return;
+  }
+  if (!chip) {
+    chip = document.createElement('span');
+    chip.setAttribute('aria-hidden', 'true');
+    el.append(chip);
+  }
+  chip.className = `foe-level threat-${threat}`;
+  chip.textContent = String(encounter.level);
+  chip.title = `Level ${encounter.level} · ${THREATS[threat].name}`;
+  const label = el.getAttribute('aria-label')?.replace(/, (easy|even|hard|deadly) for your party$/, '') ?? '';
+  el.setAttribute('aria-label', `${label.replace(/level \d+/, `level ${encounter.level}`)}, ${THREATS[threat].name.toLowerCase()} for your party`);
 }
 
 /** The current companion trotting beside the player token. */

@@ -169,6 +169,8 @@ export class Battle {
   cast = false;
   readonly hero: HeroPower | undefined;
   private foeTurns = 0;
+  /** Whether the player has taken a first action yet. */
+  private opened = false;
   private readonly rng: Rng;
   readonly tonicHeal: number;
 
@@ -332,6 +334,11 @@ export class Battle {
   }
 
   /** True when the active pet has fainted and another must be sent in. */
+  /** Before the first action, sending in someone else costs no turn: see the foe, then pick who opens. */
+  get freeSwap(): boolean {
+    return !this.opened && !this.winner;
+  }
+
   get mustSwap(): boolean {
     return !this.winner && this.pet.hp <= 0;
   }
@@ -487,11 +494,14 @@ export class Battle {
     if (this.winner) return [];
     const events: BattleEvent[] = [];
 
-    // A fainted pet can only be replaced, and replacing it is free.
-    if (this.mustSwap) {
+    // A fainted pet can only be replaced, and replacing it is free. So is choosing who opens.
+    if (this.mustSwap || (this.freeSwap && action.kind === 'swap')) {
       if (action.kind !== 'swap' || !this.canSwapTo(action.to)) return [];
+      // Who opens has not fought yet; the one sent back only watches.
+      if (this.freeSwap) this.fought.delete(this.active);
       return [this.swapTo(action.to)];
     }
+    this.opened = true;
 
     const cd = this.cooldowns[this.active];
     switch (action.kind) {

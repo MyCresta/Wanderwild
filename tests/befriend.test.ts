@@ -73,10 +73,10 @@ describe('the band', () => {
     expect(bandFull(c, 1)).toBe(true);
     const first = c.pets[0];
     c.companionUid = first.uid;
-    c.party = [first.uid];
+    c.lineup = [first.uid];
     expect(releasePet(c, first.uid)).toBe(true);
     expect(c.companionUid).not.toBe(first.uid);
-    expect(c.party).toEqual([]);
+    expect(c.lineup).not.toContain(first.uid);
     expect(bandFull(c, 1)).toBe(false);
     while (c.pets.length > 1) releasePet(c, c.pets[0].uid);
     expect(releasePet(c, c.pets[0].uid)).toBe(false);

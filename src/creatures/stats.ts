@@ -10,7 +10,8 @@ import {
   type Species,
 } from './species';
 import { matchup } from './elements';
-import { ELITE_TIERS, rollFoe, type FoeTrait, type Rank } from './foes';
+import { ELITE_TIERS, INK_CELL_M, INK_LEVELS, inkDepth, rollFoe, type FoeTrait, type InkDepth, type Rank } from './foes';
+import { cellAt } from '../game/cells';
 
 export const MAX_LEVEL = 30;
 
@@ -97,6 +98,9 @@ export interface SpawnSeed {
   seed: number;
   rarity: SpawnRarity;
   realm?: RealmId;
+  /** Where it stands, which sets how deep the ink runs there. */
+  lat?: number;
+  lng?: number;
 }
 
 const REALM_ELEMENTS: Record<RealmId, Element[]> = {
@@ -106,6 +110,12 @@ const REALM_ELEMENTS: Record<RealmId, Element[]> = {
   hearthfields: ['gale', 'ember'],
   barrows: ['lumen', 'stone'],
 };
+
+/** How deep the ink runs where a spawn stands; spawns with no place sit at even depth. */
+export function spawnInkDepth(spawn: SpawnSeed): InkDepth {
+  if (spawn.lat === undefined || spawn.lng === undefined) return 'even';
+  return inkDepth(cellAt(spawn.lat, spawn.lng, INK_CELL_M).id, spawn.realm === 'barrows');
+}
 
 const MONSTER_CHANCE = 0.3;
 const BARROWS_MONSTER_CHANCE = 0.6;
@@ -134,8 +144,11 @@ export interface Encounter {
   traits?: FoeTrait[];
 }
 
-/** Decides which creature stands at a spawn point. The same spawn always gives the same creature. */
-export function creatureForSpawn(spawn: SpawnSeed, companionLevel: number): Encounter {
+/**
+ * Decides which creature stands at a spawn point. The same spawn always gives the same creature.
+ * Blotspawn are measured against the party's level, shifted by the ink depth of their patch of map.
+ */
+export function creatureForSpawn(spawn: SpawnSeed, partyLevel: number): Encounter {
   const rng = mulberry32(spawn.seed);
   const tier = toSpeciesRarity(spawn.rarity);
   const favoured = spawn.realm ? REALM_ELEMENTS[spawn.realm] : [];
@@ -148,9 +161,10 @@ export function creatureForSpawn(spawn: SpawnSeed, companionLevel: number): Enco
   const foeWeight = (s: MonsterSpecies) => weight(s) * (s.id.startsWith('taken-') ? 0.25 : 1);
   const species: Species = isMonster ? weightedPick<MonsterSpecies>(rng, FOES, foeWeight) : weightedPick(rng, PETS, weight);
   const bonus = spawn.rarity === 'legendary' ? 4 : spawn.rarity === 'epic' ? 2 : 0;
+  const [low, high] = INK_LEVELS[spawnInkDepth(spawn)];
   const level = isMonster
-    ? companionLevel + Math.round(rng() * 4 - 2) + bonus
-    : 1 + Math.floor(rng() * (companionLevel + 2)) + bonus;
+    ? partyLevel + low + Math.round(rng() * (high - low)) + bonus
+    : 1 + Math.floor(rng() * (partyLevel + 2)) + bonus;
   const encounter: Encounter = { species, level: Math.min(MAX_LEVEL, Math.max(1, level)), seed: Math.floor(rng() * 2 ** 32) };
   if (!isMonster) return encounter;
   const foe = rollFoe(spawn.rarity, spawn.seed);

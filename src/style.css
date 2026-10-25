@@ -325,6 +325,40 @@ body {
   text-shadow: 0 0 4px var(--leather-dark);
 }
 
+/* A foe's level on the map, coloured by how hard it is for the party. Fixed size, bottom left. */
+.foe-level {
+  position: absolute;
+  left: -2px;
+  bottom: 2px;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--leather-dark);
+  border-radius: 9px;
+  background: var(--parchment);
+  color: var(--ink);
+  font: 700 11px/15px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+
+.foe-level.threat-easy {
+  background: #cfe3c4;
+  border-color: #2f6b55;
+}
+
+.foe-level.threat-hard {
+  background: #f1c98a;
+  border-color: #8a4b16;
+}
+
+.foe-level.threat-deadly {
+  background: #8e2b22;
+  border-color: #3a0e0a;
+  color: #fbe8c8;
+}
+
 .map-companion {
   pointer-events: none;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
@@ -3637,6 +3671,47 @@ span.forge-up {
 .bag-detail > .satchel-hint {
   min-height: 2.6em;
   margin: 0;
+}
+
+/* The three party slots on the Hero page: the first leads. Empty slots keep the row's height. */
+.party-slots {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.party-slots .party-slot-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--parchment-dark);
+  border-radius: 10px;
+  color: var(--leather);
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.party-slots button {
+  border-color: #2f6b55;
+  background: rgba(47, 107, 85, 0.12);
+}
+
+.party-slots button.party-slot-lead {
+  border-color: #b8902a;
+  background: rgba(243, 210, 122, 0.3);
+}
+
+.party-list button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.party-slots button:disabled,
+.party-list button[aria-pressed='true']:disabled {
+  opacity: 1;
+}
+
+.party-band-title {
+  margin: 12px 0 6px;
+  font-size: 14px;
 }
 
 /* Follower panel: trust so far, and the two ways to finish winning it over. */

@@ -73,7 +73,7 @@ export function dismissFollower(c: Collection): void {
 export function releasePet(c: Collection, uid: string): boolean {
   if (c.pets.length <= 1 || !c.pets.some((p) => p.uid === uid)) return false;
   c.pets = c.pets.filter((p) => p.uid !== uid);
-  c.party = c.party.filter((u) => u !== uid);
+  c.lineup = c.lineup.filter((u) => u !== uid);
   if (c.companionUid === uid) c.companionUid = c.pets[0].uid;
   return true;
 }
