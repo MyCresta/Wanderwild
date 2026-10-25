@@ -42,6 +42,9 @@ export type FollowOutcome = { kind: 'joined'; pet: OwnedPet } | null;
 /** Trust a follower gains per millisecond just by staying with you, in metres. A charm shortens the wait as it shortens the walk. */
 const idleTrustPerMs = (f: Follower) => WALK_TO_BEFRIEND[getSpecies(f.speciesId).rarity] / (HOURS_TO_BEFRIEND[getSpecies(f.speciesId).rarity] * HOUR_MS);
 
+/** Metres still to walk together before a follower joins. */
+export const followerWalkLeftM = (f: Follower) => Math.max(0, f.needM - f.walkedM);
+
 /** Time left before a follower joins if you do not walk at all. */
 export const followerWaitMs = (f: Follower) => Math.max(0, f.needM - f.walkedM) / idleTrustPerMs(f);
 

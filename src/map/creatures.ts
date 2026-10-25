@@ -85,22 +85,31 @@ export class CompanionMarker {
   }
 }
 
-/** A wild Wildling trailing the Wayfarer, with how far it still wants to walk. */
+/** A wild Wildling trailing the Wayfarer, with how much it trusts you so far. Tap it for the details. */
 export class FollowerMarker {
   private readonly marker: Marker;
   private shown: string | null = null;
   private placed = false;
-  private readonly el: HTMLElement;
+  private readonly el: HTMLButtonElement;
   private readonly art: HTMLElement;
   private readonly label: HTMLElement;
 
-  constructor(private readonly map: Map) {
+  constructor(
+    private readonly map: Map,
+    onTap: () => void,
+  ) {
     this.art = document.createElement('div');
     this.label = document.createElement('span');
     this.label.className = 'map-follower-left';
-    this.el = document.createElement('div');
+    this.el = document.createElement('button');
+    this.el.type = 'button';
     this.el.className = 'map-follower';
+    this.el.setAttribute('aria-label', 'Wildling following you');
     this.el.append(this.art, this.label);
+    this.el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onTap();
+    });
     this.marker = new Marker({ element: this.el, anchor: 'bottom', offset: [36, 10] });
   }
 
@@ -112,7 +121,7 @@ export class FollowerMarker {
       if (follower) this.art.appendChild(createCreatureSvg({ speciesId: follower.speciesId, seed: follower.seed, size: 42, facing: -1 }));
     }
     this.el.hidden = !follower;
-    if (follower) this.label.textContent = `${Math.max(0, Math.ceil(follower.needM - follower.walkedM))} m`;
+    if (follower) this.label.textContent = `♥ ${Math.floor((100 * follower.walkedM) / follower.needM)}%`;
   }
 
   update(lng: number, lat: number): void {
