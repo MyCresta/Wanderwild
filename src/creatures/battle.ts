@@ -78,6 +78,8 @@ export type BattleEvent = (
   /** The hero's spell: damage to the foe, health back to `targets`, or neither for a blessing or curse. */
   | { kind: 'spell'; spell: HeroSpellId; damage?: number; amount?: number; targets?: number[] }
   | { kind: 'faint'; index: number }
+  /** A rival's next Wildling steps in after the last one fell. */
+  | { kind: 'foe-in'; index: number }
 ) & { hp?: HpSnap };
 
 /** Turns between uses: the element move is ready every other turn, the art every third. */
@@ -144,7 +146,8 @@ interface Guard {
 }
 
 /**
- * A quick turn-based fight between a party of up to three pets and one Blotspawn.
+ * A quick turn-based fight between a party of up to three pets and one Blotspawn, or a
+ * rival's line of foes who step in one after another.
  * Each turn the hero may cast one spell, then the active pet strikes, uses its element
  * move or art, swaps out or drinks a tonic; then the foe answers. The foe strikes twice and
  * then unleashes a big element attack, always announced a turn ahead.
@@ -173,17 +176,24 @@ export class Battle {
   private opened = false;
   private readonly rng: Rng;
   readonly tonicHeal: number;
+  /** Every foe in the fight, in the order they step in. */
+  readonly foes: Fighter[];
+  /** The foe facing the party now. */
+  foe: Fighter;
+  foeIndex = 0;
 
   constructor(
     readonly party: Fighter[],
-    readonly foe: Fighter,
+    foes: Fighter | Fighter[],
     { rng = Math.random, petDamage = 1, petHealth = 1, hero, vigor, tonicPower = 1 }: BattleOptions = {},
   ) {
     this.rng = rng;
     this.hero = hero;
+    this.foes = Array.isArray(foes) ? foes : [foes];
+    this.foe = this.foes[0];
     this.tonicHeal = Math.round(TONIC_HEAL * tonicPower);
     this.cooldowns = party.map(() => ({ move: 0, art: 0 }));
-    this.wardUp = foe.traits.includes('warded');
+    this.wardUp = this.foe.traits.includes('warded');
     const damage = petDamage * (hero?.damage ?? 1);
     const health = petHealth * (hero?.health ?? 1);
     for (const f of party) {
@@ -281,7 +291,7 @@ export class Battle {
           this.wardUp = false;
           events.push({ kind: 'status', target: 'foe', status: 'ward-break', name: FOE_TRAITS.warded.name });
         }
-        this.foeDown();
+        this.foeDown(events);
         break;
       }
       case 'hex':
@@ -446,10 +456,27 @@ export class Battle {
     return { kind: 'swap', to: index };
   }
 
-  private foeDown(): boolean {
+  /** True when the foe has fallen, which ends the turn; a rival's next foe steps in if there is one. */
+  private foeDown(events: BattleEvent[]): boolean {
     if (this.foe.hp > 0) return false;
-    this.winner = 'pet';
+    if (this.foeIndex + 1 >= this.foes.length) {
+      this.winner = 'pet';
+      return true;
+    }
+    this.foeIndex++;
+    this.foe = this.foes[this.foeIndex];
+    // Burns, hexes and the big-attack rhythm belong to the foe that fell.
+    this.burn = 0;
+    this.hex = 0;
+    this.foeTurns = 0;
+    this.wardUp = this.foe.traits.includes('warded');
+    events.push(this.snap({ kind: 'foe-in', index: this.foeIndex }));
     return true;
+  }
+
+  /** Foes still to step in after the current one. */
+  get foesLeft(): number {
+    return this.foes.length - this.foeIndex - 1;
   }
 
   private foeAttack(): BattleEvent[] {
@@ -527,18 +554,18 @@ export class Battle {
         break;
     }
     this.cast = false;
-    if (this.foeDown()) return events;
+    if (this.foeDown(events)) return events;
 
     if (this.burn > 0) {
       this.burn--;
       const dmg = Math.max(1, Math.round(this.foe.maxHp * BURN_SHARE));
       this.foe.hp = Math.max(0, this.foe.hp - dmg);
       events.push(this.snap({ kind: 'burn', damage: dmg }));
-      if (this.foeDown()) return events;
+      if (this.foeDown(events)) return events;
     }
 
     events.push(...this.foeAttack());
-    if (this.foeDown()) return events;
+    if (this.foeDown(events)) return events;
     if (this.pet.hp <= 0) {
       events.push({ kind: 'faint', index: this.active });
       if (!this.party.some((f) => f.hp > 0)) this.winner = 'foe';
@@ -566,8 +593,9 @@ const RANK_REWARD: Record<Rank, { xp: number }> = {
   boss: { xp: 6 },
 };
 
-/** Experience for each pet after driving a monster off. */
-export function victoryRewards(foe: Fighter): { xp: number } {
+/** Experience for each pet after driving a monster off, or a rival's whole line. */
+export function victoryRewards(foe: Fighter | Fighter[]): { xp: number } {
+  if (Array.isArray(foe)) return { xp: foe.reduce((sum, f) => sum + victoryRewards(f).xp, 0) };
   const rarityBonus = foe.species.rarity === 'rare' ? 1.6 : foe.species.rarity === 'uncommon' ? 1.25 : 1;
   const rank = RANK_REWARD[foe.rank].xp * (foe.rank === 'normal' || foe.rank === 'rare' ? 1 : 1 + 0.35 * (foe.tier - 1));
   return { xp: Math.round(14 * foe.level * rarityBonus * rank) };

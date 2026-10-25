@@ -41,11 +41,21 @@ export class CreatureMarkers {
       }
       const el = document.createElement('button');
       el.type = 'button';
-      const rank = encounter.rank && encounter.rank !== 'normal' ? ` map-creature-rank-${encounter.rank}` : '';
+      const rival = encounter.rival;
+      const rank = rival ? ` map-creature-rival map-creature-rival-${rival.grade}` : encounter.rank && encounter.rank !== 'normal' ? ` map-creature-rank-${encounter.rank}` : '';
       el.className = `map-creature map-creature-${encounter.species.kind} map-creature-${encounter.species.rarity}${rank}`;
       el.dataset.lngLat = `${spawn.lng},${spawn.lat}`;
       const rankName = encounter.rank === 'boss' ? 'Boss ' : encounter.rank === 'elite' ? 'Elite ' : encounter.rank === 'rare' ? 'Rare ' : '';
-      el.setAttribute('aria-label', `${encounter.species.kind === 'pet' ? 'Wild' : `Hostile ${rankName}`}${encounter.species.name}, level ${encounter.level}`);
+      el.setAttribute(
+        'aria-label',
+        rival
+          ? `${rival.grade === 'arch' ? 'Archbinder' : 'Inkbinder'} ${rival.name} with three Taken, level ${encounter.level}`
+          : `${encounter.species.kind === 'pet' ? 'Wild' : `Hostile ${rankName}`}${encounter.species.name}, level ${encounter.level}`,
+      );
+      // An Inkbinder's camp shows the whole line: the lead in front, the other two Taken behind it.
+      if (rival)
+        for (const e of rival.line.slice(1))
+          el.appendChild(createCreatureSvg({ speciesId: e.species.id, seed: e.seed, size: 40 })).classList.add('rival-back');
       el.appendChild(createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 64 }));
       el.addEventListener('click', (event) => {
         event.stopPropagation();

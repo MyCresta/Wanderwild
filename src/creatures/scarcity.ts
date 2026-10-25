@@ -16,6 +16,11 @@ export const STRONGER_BY = 3;
 export function wildlingWanted(spawnId: string, encounter: Encounter, collection: Collection): boolean {
   if (encounter.species.kind !== 'pet') return true;
   if ((hashString(`wildling:${spawnId}`) % 1000) / 1000 >= WILDLING_SHARE) return false;
+  return lineWanted(encounter, collection);
+}
+
+/** A Wildling of a kind you do not keep yet, or clearly stronger than your best of its line. */
+export function lineWanted(encounter: Encounter, collection: Collection): boolean {
   // An evolved companion still counts as its first form.
   const line = (id: string) => PETS.find((p) => p.evolution?.into === id)?.id ?? id;
   const kept = collection.pets.filter((p) => line(p.speciesId) === encounter.species.id);

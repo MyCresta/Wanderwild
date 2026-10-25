@@ -3732,4 +3732,93 @@ span.forge-up {
   padding-left: 18px;
   font-size: 13px;
   line-height: 1.5;
+
+/* ---------- Inkbinders: rival camps with a line of three Taken ---------- */
+
+/* On the map: the lead Taken in front, the other two smaller behind, under a quill. */
+.map-creature-rival > .creature.rival-back {
+  width: calc(40px * var(--marker-scale, 1));
+  height: calc(40px * var(--marker-scale, 1));
+  margin-right: calc(-18px * var(--marker-scale, 1));
+  opacity: 0.85;
+}
+
+.map-creature-rival > .creature:last-child {
+  filter: drop-shadow(0 0 6px rgba(40, 18, 60, 0.95));
+}
+
+.map-creature-rival::after {
+  content: '✒';
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  translate: -50% 0;
+  color: #e9dcc0;
+  font-size: 18px;
+  text-shadow: 0 0 3px #1c0f26, 0 0 6px #3b1f52;
+}
+
+.map-creature-rival-arch::after {
+  color: var(--gold);
+  text-shadow: 0 0 3px #6e1f17, 0 0 6px #6e1f17;
+}
+
+/* In battle: one pip per Taken in the line, dimmed once freed. */
+.foe-pips {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 2px;
+}
+
+.foe-pips > span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #3b1f52;
+  box-shadow: 0 0 0 1px #e9dcc0;
+}
+
+.foe-pips > span.pip-down {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px #3b1f52;
+}
+
+/* The gate before a rival: their three Taken in a row, each with level, element and quirks. */
+.rival-line {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rival-line li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.rival-line .creature {
+  width: 64px;
+  height: 64px;
+}
+
+.rival-lv {
+  font-weight: bold;
+}
+
+.rival-quirks {
+  min-height: 18px;
+  color: #6e1f17;
+  letter-spacing: 2px;
+}
+
+.rival-lore {
+  margin: 0;
+  text-align: center;
 }
