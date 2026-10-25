@@ -4,6 +4,7 @@ import type { Spawn } from '../game/spawns';
 import type { Encounter } from '../creatures/stats';
 import { THREATS, type Threat } from '../creatures/foes';
 import { createCreatureSvg } from '../creatures/view';
+import { inkbinderSvg } from '../creatures/art/inkbinder';
 
 interface Placed {
   marker: Marker;
@@ -52,11 +53,9 @@ export class CreatureMarkers {
           ? `${rival.grade === 'arch' ? 'Archbinder' : 'Inkbinder'} ${rival.name} with three Taken, level ${encounter.level}`
           : `${encounter.species.kind === 'pet' ? 'Wild' : `Hostile ${rankName}`}${encounter.species.name}, level ${encounter.level}`,
       );
-      // An Inkbinder's camp shows the whole line: the lead in front, the other two Taken behind it.
-      if (rival)
-        for (const e of rival.line.slice(1))
-          el.appendChild(createCreatureSvg({ speciesId: e.species.id, seed: e.seed, size: 40 })).classList.add('rival-back');
-      el.appendChild(createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 64 }));
+      // An Inkbinder's camp shows the Inkbinder; their Taken wait on the challenge sheet.
+      if (rival) el.insertAdjacentHTML('beforeend', inkbinderSvg(rival, 52));
+      else el.appendChild(createCreatureSvg({ speciesId: encounter.species.id, seed: encounter.seed, size: 64 }));
       el.addEventListener('click', (event) => {
         event.stopPropagation();
         this.onTap(spawn, this.placed.get(spawn.id)?.encounter ?? encounter);

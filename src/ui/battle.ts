@@ -33,6 +33,7 @@ import { elementTag, wheelHelp } from './wheel';
 import { healList } from './tonics';
 import { sound } from '../audio/sound';
 import { HERO_SPELLS, type HeroSpellId } from '../game/hero';
+import { inkbinderSvg } from '../creatures/art/inkbinder';
 import { GRADES, rivalTitle, unbound, type Rival } from '../game/rivals';
 import { bandFull, startFollowing } from '../creatures/befriend';
 import { lineWanted } from '../creatures/scarcity';
@@ -218,7 +219,10 @@ function openRivalGate(ctx: GameContext, rival: Rival, onFight: () => void): voi
           : arch
             ? 'A hard fight. Swap to the right Wildling for each Taken and keep tonics close.'
             : 'A fair fight. Swap to the right Wildling for each Taken.';
+  const figure = h('div', { class: 'rival-figure' });
+  figure.innerHTML = inkbinderSvg(rival, 72);
   sheet.body.append(
+    figure,
     h(
       'p',
       { class: 'hint rival-lore' },

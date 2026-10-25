@@ -3736,32 +3736,34 @@ span.forge-up {
 
 /* ---------- Inkbinders: rival camps with a line of three Taken ---------- */
 
-/* On the map: the lead Taken in front, the other two smaller behind, under a quill. */
-.map-creature-rival > .creature.rival-back {
-  width: calc(40px * var(--marker-scale, 1));
-  height: calc(40px * var(--marker-scale, 1));
-  margin-right: calc(-18px * var(--marker-scale, 1));
-  opacity: 0.85;
+/* On the map: the Inkbinder themselves, a hooded scribe with a raised quill. */
+.map-creature-rival > .inkbinder {
+  width: calc(52px * var(--marker-scale, 1));
+  height: calc(65px * var(--marker-scale, 1));
+  filter: drop-shadow(0 0 5px rgba(40, 18, 60, 0.85));
 }
 
-.map-creature-rival > .creature:last-child {
-  filter: drop-shadow(0 0 6px rgba(40, 18, 60, 0.95));
+.map-creature-rival-arch > .inkbinder {
+  filter: drop-shadow(0 0 6px rgba(224, 185, 74, 0.8));
 }
 
 .map-creature-rival::after {
-  content: '✒';
-  position: absolute;
-  top: -14px;
-  left: 50%;
-  translate: -50% 0;
-  color: #e9dcc0;
-  font-size: 18px;
-  text-shadow: 0 0 3px #1c0f26, 0 0 6px #3b1f52;
+  content: none;
 }
 
-.map-creature-rival-arch::after {
-  color: var(--gold);
-  text-shadow: 0 0 3px #6e1f17, 0 0 6px #6e1f17;
+.inkbinder-tome {
+  animation: tome-float 3s ease-in-out infinite;
+}
+
+@keyframes tome-float {
+  50% {
+    translate: 0 -2px;
+  }
+}
+
+.rival-figure {
+  display: flex;
+  justify-content: center;
 }
 
 /* In battle: one pip per Taken in the line, dimmed once freed. */
