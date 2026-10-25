@@ -1,5 +1,5 @@
 import { exportSave, importSave } from '../game/save';
-import { MATERIALS, REALMS, type MaterialId, type RealmId } from '../game/realms';
+import { REALMS, type RealmId } from '../game/realms';
 import { STEP_XP, type GameState } from '../game/state';
 import { UNLOCKS } from '../game/wayfarer';
 import { sound } from '../audio/sound';
@@ -22,7 +22,7 @@ export class Hud {
   private realm: RealmId | undefined;
 
   constructor(private readonly game: GameState) {
-    journal.onShow('wayfarer', () => this.renderSatchel());
+    journal.onShow('bag', () => this.renderSatchel());
     $('steps').addEventListener('click', () => this.toast(`${formatCount(game.stepsToday())} steps today. Every step gives ${STEP_XP} XP.`));
     this.setupSoundChoice();
     $('save-export').addEventListener('click', () => this.exportFile());
@@ -68,7 +68,7 @@ export class Hud {
     this.stepsEl.textContent = formatCount(this.game.stepsToday());
     this.coinEl.textContent = formatCount(s.currencies.coin);
     document.body.classList.toggle('blessed', this.game.isBlessed());
-    if (journal.showing('wayfarer')) this.renderSatchel();
+    if (journal.showing('bag')) this.renderSatchel();
   }
 
   /** Unfurls the realm's name for a few seconds when the Wayfarer walks into it. */
@@ -115,15 +115,6 @@ export class Hud {
         `<li class="${u.level <= lvl.level ? 'open' : ''}"><span>${u.level}</span>${u.what}</li>`,
     ).join('');
 
-    // Only what is actually in the satchel; the empty slots were noise.
-    const mats = (Object.keys(MATERIALS) as MaterialId[])
-      .filter((id) => (s.materials[id] ?? 0) > 0)
-      .map((id) => `<li title="${MATERIALS[id].from}"><b>${formatCount(s.materials[id] ?? 0)}</b> ${MATERIALS[id].name}</li>`)
-      .join('');
-    $('satchel-materials').innerHTML = `
-      <li><b>${formatCount(s.currencies.coin)}</b> Coin</li>
-      <li title="Only from walking"><b>${formatCount(s.currencies.wanderlight)}</b> Wanderlight</li>
-      ${mats}`;
     $('satchel-stats').innerHTML = `
       <li><b>${formatDistance(s.distanceMetres)}</b> wandered</li>
       <li><b>${formatCount(s.shrinesVisited)}</b> shrine visits</li>

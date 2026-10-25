@@ -1,18 +1,20 @@
 import { sound } from '../audio/sound';
+import { hint } from './hint';
 
-export type JournalTab = 'wayfarer' | 'bestiary' | 'hearth' | 'settings';
+export type JournalTab = 'wayfarer' | 'bestiary' | 'bag' | 'hearth' | 'settings';
 
-const TABS: JournalTab[] = ['wayfarer', 'bestiary', 'hearth', 'settings'];
+const TABS: JournalTab[] = ['wayfarer', 'bestiary', 'bag', 'hearth', 'settings'];
 const TITLES: Record<JournalTab, string> = {
   wayfarer: 'Hero',
   bestiary: 'Bestiary',
+  bag: 'Bag',
   hearth: 'The Hearthstead',
   settings: 'Settings',
 };
 
 /**
- * The one sheet behind the hero's portrait button: the hero, the Bestiary, the Hearthstead
- * and settings as tabs, so the map keeps only a handful of buttons. Each panel
+ * The one sheet behind the hero's portrait button: the hero, the Bestiary, the bag, the
+ * Hearthstead and settings as tabs, so the map keeps only a handful of buttons. Each panel
  * renders into its pane when its tab is shown, and can light a dot on its tab and on
  * the map button when something waits there.
  */
@@ -20,7 +22,7 @@ class Journal {
   private readonly dialog = document.getElementById('journal') as HTMLDialogElement;
   private readonly button = document.getElementById('journal-open')!;
   private readonly renderers = new Map<JournalTab, (() => void)[]>();
-  private readonly badges = new Map<JournalTab, string>();
+  private readonly badges = new Set<JournalTab>();
   private tab: JournalTab = 'wayfarer';
 
   constructor() {
@@ -64,13 +66,12 @@ class Journal {
     if (hidden && this.tab === tab) this.tab = 'wayfarer';
   }
 
-  /** A dot (or a short count) on a tab, echoed on the map button. Empty clears it. */
+  /** The ready mark on a tab, echoed as a dot on the map button. False clears it. */
   setBadge(tab: JournalTab, badge: string | boolean): void {
-    const text = badge === true ? '•' : badge || '';
-    if (text) this.badges.set(tab, text);
+    if (badge) this.badges.add(tab);
     else this.badges.delete(tab);
-    this.tabButton(tab).dataset.badge = text;
-    this.button.dataset.badge = this.badges.size ? '•' : '';
+    hint(this.tabButton(tab), badge);
+    hint(this.button, this.badges.size > 0);
   }
 
   /** Changes the heading, e.g. to show the Wayfarer's level. */

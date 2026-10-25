@@ -162,3 +162,8 @@ export function collect(def: BuildingDef, b: BuildingState): number {
 export function msUntilFull(b: BuildingState): number {
   return Math.max(0, capMs(b.level) - b.progressMs);
 }
+
+/** True once a building's storage is full, counting time since the last tick. */
+export function isFull(h: HearthsteadState, b: BuildingState, now: number): boolean {
+  return msUntilFull(b) <= Math.max(0, now - h.lastTick);
+}

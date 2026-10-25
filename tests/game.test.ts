@@ -6,6 +6,7 @@ import { rollShrineReward, shrineKind, SHRINE_COOLDOWN_MS, type Shrine } from '.
 import { spawnsInCell, spawnsNear, SPAWN_WINDOW_MS } from '../src/game/spawns';
 import { GameState, STEP_XP, STRIDE_M } from '../src/game/state';
 import { levelFromXp, nextUnlock, xpForLevel } from '../src/game/wayfarer';
+import { capMs, isFull } from '../src/game/hearthstead';
 
 describe('wayfarer levels', () => {
   it('follows 100 × level^1.5 per level, matching the roadmap table', () => {
@@ -214,5 +215,23 @@ describe('save files', () => {
     expect(save.currencies).toEqual({ coin: 0, wanderlight: 0 });
     expect(save.materials).toEqual({ ironbark: 2 });
     expect(save.visitedCells).toEqual([]);
+  });
+});
+
+describe('bag and ready marks', () => {
+  it('takes Wildling XP from the bag, never more than there is', () => {
+    const game = new GameState(newSave(0));
+    game.save.supplies.petXp = 60;
+    expect(game.takeWildlingXp(100)).toBe(60);
+    expect(game.save.supplies.petXp).toBe(0);
+    expect(game.takeWildlingXp(100)).toBe(0);
+  });
+
+  it('counts a building as full once time since the last tick fills it', () => {
+    const h = { ...newSave(0).hearthstead, lastTick: 0 };
+    const b = { level: 1, progressMs: 0 };
+    expect(isFull(h, b, 1000)).toBe(false);
+    expect(isFull(h, b, capMs(1))).toBe(true);
+    expect(isFull(h, { level: 1, progressMs: capMs(1) }, 0)).toBe(true);
   });
 });

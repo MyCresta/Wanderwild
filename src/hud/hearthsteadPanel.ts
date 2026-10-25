@@ -1,4 +1,4 @@
-import { BUILDING_IDS, BUILDINGS, capMs, MAX_BUILDING_LEVEL, msUntilFull, ratePerHour, storageCap, stored, STRIDE_DAILY_CAP_MS, strideLeftToday, upgradeCost } from '../game/hearthstead';
+import { BUILDING_IDS, BUILDINGS, capMs, isFull, MAX_BUILDING_LEVEL, msUntilFull, ratePerHour, storageCap, stored, STRIDE_DAILY_CAP_MS, strideLeftToday, upgradeCost } from '../game/hearthstead';
 import { MATERIALS } from '../game/realms';
 import type { GameState } from '../game/state';
 import { EGG_UNLOCK_LEVEL } from '../game/state';
@@ -9,6 +9,7 @@ import { grantPetXp, partyPets } from '../creatures/collection';
 import { getSpecies } from '../creatures/species';
 import type { GameContext } from '../ui/context';
 import { journal } from '../ui/journal';
+import { hintAttr } from '../ui/hint';
 
 const HEARTHSTEAD_LEVEL = Math.min(...BUILDING_IDS.map((id) => BUILDINGS[id].unlockLevel));
 
@@ -86,7 +87,7 @@ export class HearthsteadPanel {
         const done = expeditionProgress(e, now) >= 1;
         return `<li class="building"><div class="building-head"><b>${name}</b><small>Exploring ${REALMS[e.realm].name}</small></div>
           <div class="building-bar"><span style="width:${100 * expeditionProgress(e, now)}%"></span></div>
-          ${done ? `<button type="button" data-act="exp-claim" data-pet="${e.petUid}">Welcome home</button>` : `<p class="building-stats">Back in ${formatDuration(msLeft(e, now))}</p>`}</li>`;
+          ${done ? `<button type="button" data-act="exp-claim" data-pet="${e.petUid}"${hintAttr(true)}>Welcome home</button>` : `<p class="building-stats">Back in ${formatDuration(msLeft(e, now))}</p>`}</li>`;
       })
       .join('');
     const free = c.pets.filter((p) => !away.has(p.uid) && !party.has(p.uid));
@@ -105,12 +106,15 @@ export class HearthsteadPanel {
     return `${active ? `<ul class="buildings">${active}</ul>` : ''}${form}`;
   }
 
+  /** Marks the Hearth tab once a building is full or a Wildling is back from an expedition. */
   private markReady(): void {
-    const h = this.game.save.hearthstead;
-    const ready = BUILDING_IDS.some((id) => {
-      const b = h.buildings[id];
-      return b && stored(BUILDINGS[id], b) >= storageCap(BUILDINGS[id], b) * 0.25;
-    });
+    const s = this.game.save;
+    const now = Date.now();
+    const ready =
+      BUILDING_IDS.some((id) => {
+        const b = s.hearthstead.buildings[id];
+        return b && isFull(s.hearthstead, b, now);
+      }) || s.expeditions.some((e) => expeditionProgress(e, now) >= 1);
     journal.setBadge('hearth', ready);
     journal.setTabHidden('hearth', this.game.level.level < HEARTHSTEAD_LEVEL);
   }
@@ -145,7 +149,7 @@ export class HearthsteadPanel {
         <div class="building-bar" aria-hidden="true"><span style="width:${(100 * b.progressMs) / capMs(b.level)}%"></span></div>
         <p class="building-stats">${formatCount(have)} / ${formatCount(cap)} ${def.productName} · ${full ? `full in ${formatDuration(full)}` : '<b>full</b>'}</p>
         <div class="building-actions">
-          <button type="button" data-act="collect" data-id="${id}" ${have ? '' : 'disabled'}>Collect</button>
+          <button type="button" data-act="collect" data-id="${id}" ${have ? '' : 'disabled'}${hintAttr(!full)}>Collect</button>
           <button type="button" data-act="upgrade" data-id="${id}" ${this.game.canUpgrade(id) ? '' : 'disabled'}
             title="${maxed ? '' : `${formatCount(ratePerHour(def, b.level))}/h now`}">
             ${maxed ? 'Max level' : `Upgrade · ${formatCount(cost.coin)}c, ${cost.amount} ${MATERIALS[cost.material].name}`}
@@ -168,7 +172,6 @@ export class HearthsteadPanel {
     this.body.innerHTML = `
       <p class="stride-note" title="Every 100 m you walk moves all timers forward 10 minutes">Walking skips time: <b>${formatDuration(STRIDE_DAILY_CAP_MS - left)}</b> of ${formatDuration(STRIDE_DAILY_CAP_MS)} today</p>
       <ul class="buildings">${cards}</ul>
-      <p class="satchel-hint">${formatCount(s.supplies.tonic)} Tonic · ${formatCount(s.supplies.petXp)} Wildling XP</p>
       <h3>Expeditions</h3>
       ${this.expeditionsHtml()}
       <h3>Incubator</h3>

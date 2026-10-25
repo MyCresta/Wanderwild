@@ -197,7 +197,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   if (!owned.length) return;
   if (!owned.some((p) => fitToFight(p))) {
     const soonest = Math.ceil(Math.min(...owned.map((p) => (FIT_TO_FIGHT - vigorNow(p)) * REST_FULL_MS)) / 60_000);
-    toast(`Your party is worn out. Let them rest${soonest > 0 ? ` about ${soonest} min` : ''}, or give them a tonic on the Hero page.`);
+    toast(`Your party is worn out. Let them rest${soonest > 0 ? ` about ${soonest} min` : ''}, or give them a tonic from your Bag.`);
     return;
   }
   if (encounter.rank === 'boss' && !opts.gateSeen) {
