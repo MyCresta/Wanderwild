@@ -2719,17 +2719,59 @@ body:has(> .catch-scene) .parchment-overlay {
   height: 100%;
 }
 
-/* Something waits inside: a ready building, an evolution. */
-.journal-open:not([data-badge=''])[data-badge]::after {
-  content: '';
+/* The one "something waits here" mark (src/ui/hint.ts): a dot, or a short count, laid over
+   the top right corner of a tab or button so it never moves anything. */
+[data-hint]:not([data-hint=''])::after {
+  content: attr(data-hint);
   position: absolute;
+  top: 3px;
+  right: 3px;
+  z-index: 1;
+  box-sizing: border-box;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border: 2px solid var(--parchment);
+  border-radius: 999px;
+  background: #8e2b22;
+  color: #fdf6e3;
+  font: 700 9px/11px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+
+[data-hint='•']::after {
+  content: '' !important;
+  width: 12px;
+  min-width: 12px;
+  height: 12px;
+  padding: 0;
+}
+
+.journal-open[data-hint]::after {
   top: -2px;
   right: -2px;
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--parchment);
-  border-radius: 50%;
-  background: #8e2b22;
+}
+
+/* Tabs are narrow: a smaller dot tucked into the corner, clear of the label. */
+.journal-tabs .tab[data-hint='•']::after {
+  top: 3px;
+  right: 1px;
+  width: 10px;
+  min-width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+}
+
+.talent-level[data-hint]::after {
+  top: -10px;
+  right: -4px;
+}
+
+.building-actions button,
+.talent-level,
+.bag-item {
+  position: relative;
 }
 
 .rail > .hunt-button {
@@ -2788,21 +2830,6 @@ body:has(> .catch-scene) .parchment-overlay {
 
 .journal-tabs .tab[hidden] {
   display: none;
-}
-
-.journal-tabs .tab:not([data-badge=''])[data-badge]::after {
-  content: attr(data-badge);
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 3px;
-  border-radius: 999px;
-  background: #8e2b22;
-  color: #fdf6e3;
-  font-size: 9px;
-  line-height: 14px;
 }
 
 .journal-pane {
@@ -3408,3 +3435,66 @@ body:has(> .catch-scene) .parchment-overlay {
   opacity: 0.7;
 }
 
+
+/* ---------- The bag: one grid of fixed tiles, then what the picked one is ---------- */
+
+.bag-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bag-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 100%;
+  height: 78px;
+  padding: 4px 2px;
+  border: 1px solid rgba(59, 42, 26, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 248, 225, 0.5);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.bag-item[aria-pressed='true'] {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold) inset;
+}
+
+.bag-item svg {
+  width: 30px;
+  height: 30px;
+  flex: none;
+}
+
+.bag-item b {
+  font-size: 14px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.bag-item small {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bag-detail h3 {
+  margin-top: 14px;
+}
+
+.bag-detail > .satchel-hint {
+  min-height: 2.6em;
+  margin: 0;
+}

@@ -18,6 +18,7 @@ import { FORGE_LEVEL, power, RARITIES, SLOT_DEFS, SLOTS } from '../game/gear';
 import type { GameState } from '../game/state';
 import { nextUnlock } from '../game/wayfarer';
 import { journal } from '../ui/journal';
+import { hintAttr } from '../ui/hint';
 import { h, openSheet } from '../ui/dom';
 import { sound } from '../audio/sound';
 import { formatCount } from './format';
@@ -132,7 +133,8 @@ export class HeroPanel {
               aria-pressed="${r.picked === i}" ${open ? '' : 'disabled'}><b>${t.name}</b><small>${t.blurb}</small></button>`,
           )
           .join('');
-        return `<li class="talent-row${open && r.picked === undefined ? ' talent-open' : ''}"><span class="talent-level">${r.level}</span>${opts}</li>`;
+        const waiting = open && r.picked === undefined;
+        return `<li class="talent-row${waiting ? ' talent-open' : ''}"><span class="talent-level"${hintAttr(waiting)}>${r.level}</span>${opts}</li>`;
       })
       .join('');
     const anyPicked = rows.some((r) => r.picked !== undefined);

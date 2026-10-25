@@ -172,6 +172,15 @@ export class GameState {
     return true;
   }
 
+  /** Takes up to `max` Kennel Wildling XP from the bag. Returns how much was taken. */
+  takeWildlingXp(max: number): number {
+    const amount = Math.max(0, Math.min(Math.floor(max), this.save.supplies.petXp));
+    if (!amount) return 0;
+    this.save.supplies.petXp -= amount;
+    this.changed();
+    return amount;
+  }
+
   // ---- The hero ----
 
   get maxMana(): number {

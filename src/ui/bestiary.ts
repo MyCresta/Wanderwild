@@ -10,6 +10,7 @@ import { bandSize, releasePet } from '../creatures/befriend';
 import { REALMS } from '../game/realms';
 import { openEvolution } from './evolution';
 import { h, openSheet, type Sheet } from './dom';
+import { hint } from './hint';
 
 /** Where the bestiary draws: a journal pane, with a title and a way to step aside for a scene. */
 export type Page = Pick<Sheet, 'body' | 'setTitle' | 'close'>;
@@ -17,7 +18,7 @@ export type Page = Pick<Sheet, 'body' | 'setTitle' | 'close'>;
 function petCard(pet: OwnedPet, isCompanion: boolean, onClick: () => void) {
   const species = getSpecies(pet.speciesId);
   const { gilded } = individualFromSeed(pet.seed, species.kind);
-  return h(
+  const card = h(
     'button',
     { class: `pet-card${isCompanion ? ' pet-card-companion' : ''}`, type: 'button', onclick: onClick },
     createCreatureSvg({ speciesId: pet.speciesId, seed: pet.seed, size: 92 }),
@@ -25,6 +26,8 @@ function petCard(pet: OwnedPet, isCompanion: boolean, onClick: () => void) {
     h('span', { class: 'pet-card-level' }, `Lv ${pet.level}`),
     isCompanion && h('span', { class: 'pet-card-tag' }, 'Companion'),
   );
+  hint(card, !!evolutionStatus(pet)?.ready);
+  return card;
 }
 
 function petDetail(ctx: GameContext, sheet: Page, pet: OwnedPet, back: () => void) {

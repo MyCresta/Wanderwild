@@ -23,6 +23,7 @@ import { HearthsteadPanel } from './hud/hearthsteadPanel';
 import { renderParty } from './hud/partyPanel';
 import { journal } from './ui/journal';
 import { ForgePanel } from './hud/forgePanel';
+import { BagPanel } from './hud/bagPanel';
 import { HeroPanel, openHeroChoice } from './hud/heroPanel';
 import { heroSvg } from './hud/heroArt';
 import { formatWait } from './hud/format';
@@ -44,7 +45,7 @@ import { HuntController } from './ui/hunt';
 import { Trace } from './game/glyphs';
 import { waymarkSpawn } from './game/waymarks';
 import { GlyphLayer } from './map/glyphLayer';
-import { ringInRealm, walkInRealm } from './creatures/evolution';
+import { evolutionStatus, ringInRealm, walkInRealm } from './creatures/evolution';
 import { playerReach } from './geo/reach';
 import { watchLayout } from './ui/layout';
 import { installOrbitCamera } from './map/orbitCamera';
@@ -147,6 +148,7 @@ const creatureGame: GameContext = {
     saveCollection(collection);
     companionMarker.setPet(companion(collection));
     followerMarker.set(collection.follower);
+    journal.setBadge('bestiary', collection.pets.some((p) => evolutionStatus(p)?.ready));
   },
 };
 creatureGame.wayfarer = {
@@ -170,6 +172,7 @@ journal.onShow('bestiary', () =>
 );
 new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame);
 new HeroPanel(game, forge, (text) => hud.toast(text));
+new BagPanel(game, creatureGame, (text) => hud.toast(text));
 
 // Glyphwalking: the shape of the walk, kept in memory only, and the Waymarks it ties.
 const trace = new Trace();
