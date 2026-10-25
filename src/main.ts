@@ -39,7 +39,7 @@ import { openBattle } from './ui/battle';
 import { lairsNear } from './game/lairs';
 import { renderBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
-import { openJoined, openMeeting } from './ui/meet';
+import { openFollower, openJoined, openMeeting } from './ui/meet';
 import { BLOT_TRUST_M, followerTrust, type FollowOutcome } from './creatures/befriend';
 import { sound } from './audio/sound';
 import { HuntController } from './ui/hunt';
@@ -142,7 +142,11 @@ const curioLayer = new CurioLayer(map, (curio) => takeCurio(curio));
 // Creatures: the collection, wild spawns around the player, and the companion at their side.
 const collection = loadCollection();
 const companionMarker = new CompanionMarker(map);
-const followerMarker = new FollowerMarker(map);
+const followerMarker = new FollowerMarker(map, () => {
+  // Bring its trust up to date first; it may decide to stay right then.
+  settleFollower(followerTrust(collection, 0));
+  if (collection.follower) openFollower(creatureGame);
+});
 const creatureGame: GameContext = {
   collection,
   changed() {
