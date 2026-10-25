@@ -576,6 +576,8 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
         owned.forEach((p, i) => {
           if (grantPetXp(p, shares[i]) > 0) grew.push(`${getSpecies(p.speciesId).name} grew to level ${p.level}!`);
         });
+        const loot = way?.findGear?.({ rank: battle.foe.rank, tier: battle.foe.tier }) ?? null;
+        if (loot) setTimeout(() => sound.play('equip'), 600);
         ctx.changed();
         log.replaceChildren(
           `${foeName(encounter)} dissolves into a puddle of harmless ink. `,
@@ -583,6 +585,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
           owned.length > 1 ? ' to each Wildling that fought (half to the rest)' : '',
           '.',
           ...grew.map((g) => h('strong', { class: 'level-up' }, ` ${g}`)),
+          loot ? h('strong', { class: 'gear-find' }, ` ${loot}`) : '',
         );
       }
     } else {

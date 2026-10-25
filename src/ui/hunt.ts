@@ -77,7 +77,7 @@ export class HuntController {
   private last: Warmth | undefined;
   private chestReady = false;
   /** A found chest waiting to be opened. */
-  private pending: { treasure: Treasure; name: string; hints: number; material: string } | null = null;
+  private pending: { treasure: Treasure; name: string; hints: number; material: string; gear: string | null } | null = null;
 
   constructor(private readonly deps: HuntDeps) {
     this.layer = new HuntLayer(deps.map);
@@ -142,8 +142,9 @@ export class HuntController {
     const treasure = finishHunt(this.log)!;
     this.last = undefined;
     const material = this.grant(treasure, landmark.lat, landmark.lng);
+    const gear = this.deps.game.findGear({ kind: 'chest', hints: hunt.hints })?.text ?? null;
     this.layer.markFound(landmark);
-    this.pending = { treasure, name: landmark.name, hints: hunt.hints, material };
+    this.pending = { treasure, name: landmark.name, hints: hunt.hints, material, gear };
     // Never close a battle or catch to show the chest; wait for a tap instead.
     if (document.querySelector('.sheet-backdrop, dialog[open]')) {
       this.chestReady = true;
@@ -197,6 +198,7 @@ export class HuntController {
       `${t.wanderlight} Wanderlight`,
       `${t.materials} ${found.material}`,
       t.relic && `1 ${MATERIALS.shrineRelic.name}`,
+      found.gear,
     ];
     for (const line of lines) {
       if (!line) continue;

@@ -19,6 +19,8 @@ export interface WayfarerHooks {
   spendMana(spell: HeroSpellId): boolean;
   /** Gear bonuses: multipliers on pet damage and health, and extra catch chance (0.06 = +6 points). */
   gear(): { petDamage: number; petHealth: number; catchBonus: number };
+  /** Rolls for a gear drop after a win; returns what was found, or null. */
+  findGear?(foe: { rank: 'normal' | 'rare' | 'elite' | 'boss'; tier: number }): string | null;
 }
 
 /** What the creature screens need from the rest of the game. */

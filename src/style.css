@@ -1923,33 +1923,12 @@ body:has(> .catch-scene) .parchment-overlay {
 
 /* ---------- The Forge ---------- */
 
-.forge-card {
-  background: linear-gradient(rgba(184, 85, 42, 0.12), rgba(255, 255, 255, 0.2));
-}
-
-.gear-slots,
-.gear-list,
 .exp-pets {
   display: grid;
   gap: 8px;
   margin: 8px 0 0;
   padding: 0;
   list-style: none;
-}
-
-.gear-slot,
-.gear-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-}
-
-.gear-slot small,
-.gear-info small {
-  display: block;
-  font-size: 12px;
-  color: var(--leather);
 }
 
 .gear-svg {
@@ -1961,49 +1940,188 @@ body:has(> .catch-scene) .parchment-overlay {
   opacity: 0.35;
 }
 
-.gear-item {
-  flex-wrap: wrap;
-  padding: 8px;
+.forge-rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Every row is the same size whatever it holds: no jumps when gear is found or upgraded. */
+.forge-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 64px;
+  padding: 0 8px;
   border: 1px solid var(--parchment-dark);
-  border-radius: 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.18);
 }
 
-.gear-equipped {
-  border-color: #2f6b55;
-  background: rgba(47, 107, 85, 0.08);
+.forge-empty {
+  border-style: dashed;
+  background: none;
 }
 
-.gear-info {
+.forge-info {
   flex: 1;
   min-width: 0;
-}
-
-.gear-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  width: 100%;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.gear-tag {
-  align-self: center;
+.forge-info b,
+.forge-info small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.forge-info b {
+  font-size: 14px;
+}
+
+.forge-info small {
   font-size: 12px;
-  font-weight: bold;
-  color: #2f6b55;
+  color: var(--leather);
 }
 
-.gear-runes {
-  color: #8a3fa0 !important;
+.forge-empty .forge-info {
+  opacity: 0.6;
 }
 
-.forge-craft {
+.forge-runes {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.forge-runes button {
+  flex: none;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid #8a3fa0;
+  border-radius: 11px;
+  background: rgba(138, 63, 160, 0.12);
+  color: #6a2f7c;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.forge-pips {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: none;
+}
+
+.pip {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 6px;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1.5px solid var(--parchment-dark);
+  border-radius: 50%;
+  background: none;
+  font: inherit;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 1;
+  color: #fff;
 }
 
-.forge-craft button,
-.gear-actions button,
+.pip-shut {
+  visibility: hidden;
+}
+
+.pip-open {
+  border-color: #8a3fa0;
+  border-style: dashed;
+}
+
+button.pip-open {
+  color: #8a3fa0;
+  cursor: pointer;
+}
+
+button.pip-open[aria-pressed='true'] {
+  background: rgba(138, 63, 160, 0.2);
+}
+
+.pip-full {
+  border-color: #6a2f7c;
+  background: #8a3fa0;
+}
+
+.forge-up {
+  box-sizing: border-box;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 96px;
+  height: 48px;
+  padding: 0 6px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 8px;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+span.forge-up {
+  visibility: hidden;
+}
+
+.forge-up b {
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+.forge-up small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  line-height: 1.2;
+  opacity: 0.9;
+}
+
+.forge-up small.short {
+  color: #ffb3a1;
+}
+
+.forge-up:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.coin-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 1px solid #5a3e12;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff1b8, #c99a3a 60%, #8a6420);
+  vertical-align: -1px;
+}
+
+.gear-find {
+  display: block;
+  margin-top: 4px;
+  color: #3f6f9a;
+}
+
 .exp-pets button {
   display: flex;
   align-items: center;
@@ -2020,18 +2138,11 @@ body:has(> .catch-scene) .parchment-overlay {
   cursor: pointer;
 }
 
-.forge-craft small,
 .exp-pets small {
   display: block;
   font-size: 11px;
   font-weight: normal;
   opacity: 0.85;
-}
-
-.forge-craft button:disabled,
-.gear-actions button:disabled {
-  opacity: 0.45;
-  cursor: default;
 }
 
 .exp-form {
@@ -3173,11 +3284,31 @@ body:has(> .catch-scene) .parchment-overlay {
   text-align: center;
 }
 
-.hero-gear li {
+.hero-gear button {
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
+  min-height: 56px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
   font-size: 11px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.hero-gear button:active {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.hero-gear small {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .class-picker {
