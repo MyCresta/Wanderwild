@@ -292,7 +292,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   let foe = battle.foe;
   let foeEnc = line[0];
   const rankName = foe.rank === 'rare' || foe.rank === 'elite' ? `${RANKS[foe.rank].name} ` : '';
-  const title = practice ? 'Practice bout' : rival ? `${rivalTitle(rival)} challenges you` : `${rankName}${foeName(encounter)} blocks the way`;
+  const title = practice ? 'Practice bout' : rival ? rivalTitle(rival) : `${rankName}${foeName(encounter)} blocks the way`;
   const sheet = openSheet(title, { className: `sheet-battle battle-rank-${foe.rank}${rival ? ' battle-rival' : ''}` });
   let reported = false;
   const finish = (won: boolean) => {
