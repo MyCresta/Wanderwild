@@ -1,6 +1,7 @@
-import { bandFull, bandSize, dismissFollower, followerWaitMs, followerWalkLeftM, HOURS_TO_BEFRIEND, startFollowing, walkNeeded } from '../creatures/befriend';
+import { dismissFollower, followerWaitMs, followerWalkLeftM, HOURS_TO_BEFRIEND, startFollowing, walkNeeded } from '../creatures/befriend';
 import { formatDistance, formatDuration } from '../hud/format';
 import { markSeen, type OwnedPet } from '../creatures/collection';
+import { keptOfLine, lineOf } from '../creatures/roost';
 import { getSpecies } from '../creatures/species';
 import { individualFromSeed, type Encounter } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
@@ -19,7 +20,6 @@ export function openMeeting(ctx: GameContext, spawnId: string, encounter: Encoun
   markSeen(ctx.collection, species.id);
   ctx.changed();
   const sheet = openSheet(`${individual.gilded ? '✦ Gilded ' : ''}${species.name}`, { className: 'sheet-meet' });
-  const wayfarerLevel = ctx.wayfarer?.level() ?? 1;
   const following = ctx.collection.follower;
   const charm = ctx.wayfarer?.gear().catchBonus ?? 0;
   const need = walkNeeded(species.rarity, charm);
@@ -36,9 +36,10 @@ export function openMeeting(ctx: GameContext, spawnId: string, encounter: Encoun
   };
 
   let action: Node;
-  if (bandFull(ctx.collection, wayfarerLevel))
-    action = h('p', { class: 'hint' }, `Your band is full (${ctx.collection.pets.length}/${bandSize(wayfarerLevel)}). Release a companion in the bestiary to make room, or grow as a Wayfarer.`);
-  else if (following)
+  const line = lineOf(species.id);
+  const kept = line ? keptOfLine(ctx.collection, line.id) : null;
+  const upgrade = kept && h('p', { class: 'hint' }, `You keep a level ${kept.level} ${getSpecies(kept.speciesId).name}. If this one stays, yours grows to level ${Math.max(kept.level, level)}.`);
+  if (following)
     action = h(
       'div',
       { class: 'actions' },
@@ -50,6 +51,7 @@ export function openMeeting(ctx: GameContext, spawnId: string, encounter: Encoun
   sheet.body.append(
     h('div', { class: 'stage stage-small' }, createCreatureSvg({ speciesId: species.id, seed, size: 180 })),
     h('p', { class: 'encounter-info' }, h('strong', {}, `Lv ${level}`), ' ', elementBadge(species), ' ', rarityBadge(species)),
+    upgrade || '',
     h('p', { class: 'lore' }, `${species.epithet[0].toUpperCase()}${species.epithet.slice(1)}. It watches you from the margin of the map. Keep it with you for about ${hours} h and it may choose to stay. Walking ${need} m together wins it over far sooner.`),
     action,
   );
@@ -102,13 +104,19 @@ export function openFollower(ctx: GameContext): void {
 }
 
 /** The moment a follower decides to stay. */
-export function openJoined(ctx: GameContext, pet: OwnedPet): void {
+export function openJoined(ctx: GameContext, pet: OwnedPet, upgraded = false, fromLevel = pet.level): void {
   const species = getSpecies(pet.speciesId);
-  const sheet = openSheet(`${species.name} stays`, { className: 'sheet-meet' });
+  const sheet = openSheet(upgraded ? `${species.name} grows` : `${species.name} stays`, { className: 'sheet-meet' });
   sound.play('achievement');
   sheet.body.append(
     h('div', { class: 'stage stage-small' }, createCreatureSvg({ speciesId: pet.speciesId, seed: pet.seed, size: 180 })),
-    h('p', { class: 'lore' }, `After your time together, ${species.name} has decided to stay. It joins your band at level ${pet.level}.`),
+    h(
+      'p',
+      { class: 'lore' },
+      upgraded
+        ? `Your ${species.name} and the newcomer have become one: ${pet.level > fromLevel ? `level ${fromLevel} → ${pet.level}` : `still level ${pet.level}`}. You keep one of each kind.`
+        : `After your time together, ${species.name} has decided to stay. It joins you at level ${pet.level}.`,
+    ),
     h(
       'div',
       { class: 'actions' },

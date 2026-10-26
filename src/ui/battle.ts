@@ -35,7 +35,8 @@ import { sound } from '../audio/sound';
 import { HERO_SPELLS, type HeroSpellId } from '../game/hero';
 import { inkbinderSvg } from '../creatures/art/inkbinder';
 import { GRADES, rivalTitle, unbound, type Rival } from '../game/rivals';
-import { bandFull, startFollowing } from '../creatures/befriend';
+import { startFollowing } from '../creatures/befriend';
+import { setBonus } from '../creatures/roost';
 import { lineWanted } from '../creatures/scarcity';
 
 /** How long the timing needle takes to sweep across an attack button. */
@@ -281,7 +282,12 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   const way = ctx.wayfarer;
   const heroName = way?.heroName?.() ?? 'Your hero';
   const battle = new Battle(
-    owned.map((p) => makeFighter(getSpecies(p.speciesId), p.level, p.seed, p.uid)),
+    owned.map((p) => {
+      const f = makeFighter(getSpecies(p.speciesId), p.level, p.seed, p.uid);
+      // A completed element in the bestiary makes its Wildlings hit harder.
+      f.atk = Math.round(f.atk * setBonus(ctx.collection, p.speciesId));
+      return f;
+    }),
     line.map((e) => makeFighter(e.species, e.level, e.seed, undefined, e)),
     {
       petDamage: way?.gear().petDamage,
@@ -781,7 +787,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
 function freeOne(ctx: GameContext, rival: Rival): string | null {
   const last = rival.line[rival.line.length - 1];
   const species = unbound(last.species.id);
-  if (!species || ctx.collection.follower || bandFull(ctx.collection, ctx.wayfarer?.level() ?? 1)) return null;
+  if (!species || ctx.collection.follower) return null;
   const wildling: Encounter = { species, level: Math.max(1, last.level - 2), seed: last.seed };
   if (!lineWanted(wildling, ctx.collection)) return null;
   if (!startFollowing(ctx.collection, `${rival.id}:freed`, wildling, ctx.wayfarer?.gear().catchBonus ?? 0)) return null;

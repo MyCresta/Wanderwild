@@ -1,4 +1,5 @@
-import { addPet, markSeen, type Collection, type Follower, type OwnedPet } from './collection';
+import { markSeen, type Collection, type Follower, type OwnedPet } from './collection';
+import { keepWildling } from './roost';
 import { getSpecies, type Rarity } from './species';
 import type { Encounter } from './stats';
 
@@ -9,13 +10,6 @@ export const HOURS_TO_BEFRIEND: Record<Rarity, number> = { common: 3, uncommon: 
 /** Driving off a Blotspawn while one follows earns this much trust, in metres (half by Farsight). */
 export const BLOT_TRUST_M = 150;
 const HOUR_MS = 60 * 60 * 1000;
-export const BASE_BAND = 6;
-export const MAX_BAND = 12;
-
-/** How many companions the Wayfarer can keep: 6, plus one every 5 Wayfarer levels, up to 12. */
-export const bandSize = (wayfarerLevel: number) => Math.min(MAX_BAND, BASE_BAND + Math.floor(wayfarerLevel / 5));
-
-export const bandFull = (c: Collection, wayfarerLevel: number) => c.pets.length >= bandSize(wayfarerLevel);
 
 /** Metres a Wildling wants to walk, shortened by a charm (`charm` is 0..1, capped at half). */
 export const walkNeeded = (rarity: Rarity, charm = 0) => Math.round(WALK_TO_BEFRIEND[rarity] * (1 - Math.min(0.5, Math.max(0, charm))));
@@ -37,7 +31,8 @@ export function startFollowing(c: Collection, spawnId: string, encounter: Encoun
   return c.follower;
 }
 
-export type FollowOutcome = { kind: 'joined'; pet: OwnedPet } | null;
+/** `upgraded` means you already kept one of its kind, which took on the newcomer's level instead. */
+export type FollowOutcome = { kind: 'joined'; pet: OwnedPet; upgraded: boolean; fromLevel: number } | null;
 
 /** Trust a follower gains per millisecond just by staying with you, in metres. A charm shortens the wait as it shortens the walk. */
 const idleTrustPerMs = (f: Follower) => WALK_TO_BEFRIEND[getSpecies(f.speciesId).rarity] / (HOURS_TO_BEFRIEND[getSpecies(f.speciesId).rarity] * HOUR_MS);
@@ -60,8 +55,7 @@ export function followerTrust(c: Collection, metres: number, now = Date.now()): 
   f.walkedM = Math.min(f.needM, f.walkedM + metres + idle);
   if (f.walkedM < f.needM) return null;
   c.follower = null;
-  const pet = addPet(c, { species: getSpecies(f.speciesId), level: f.level, seed: f.seed });
-  return { kind: 'joined', pet };
+  return { kind: 'joined', ...keepWildling(c, { species: getSpecies(f.speciesId), level: f.level, seed: f.seed }) };
 }
 
 /** Lets the follower go back to the wild. */
@@ -69,11 +63,3 @@ export function dismissFollower(c: Collection): void {
   c.follower = null;
 }
 
-/** Sends a companion back to the wild to make room. The last one always stays. */
-export function releasePet(c: Collection, uid: string): boolean {
-  if (c.pets.length <= 1 || !c.pets.some((p) => p.uid === uid)) return false;
-  c.pets = c.pets.filter((p) => p.uid !== uid);
-  c.lineup = c.lineup.filter((u) => u !== uid);
-  if (c.companionUid === uid) c.companionUid = c.pets[0].uid;
-  return true;
-}

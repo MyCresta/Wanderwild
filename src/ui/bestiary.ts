@@ -1,13 +1,13 @@
 import { addPet, companion, STARTERS, type OwnedPet } from '../creatures/collection';
 import { hashString, mulberry32 } from '../creatures/rng';
-import { ALL_SPECIES, getSpecies } from '../creatures/species';
+import { ALL_SPECIES, ELEMENTS, getSpecies } from '../creatures/species';
 import { moveList } from './moves';
 import { individualFromSeed, MAX_LEVEL, statsAt, xpToNext } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
 import { elementBadge, rarityBadge } from './badges';
 import type { GameContext } from './context';
 import { evolutionStatus } from '../creatures/evolution';
-import { bandSize, releasePet } from '../creatures/befriend';
+import { elementSets, roosting, SET_BONUS } from '../creatures/roost';
 import { REALMS } from '../game/realms';
 import { openEvolution } from './evolution';
 import { h, openSheet, type Sheet } from './dom';
@@ -40,7 +40,7 @@ function petDetail(ctx: GameContext, sheet: Page, pet: OwnedPet, back: () => voi
   const need = xpToNext(pet.level);
   sheet.setTitle(species.name);
   sheet.body.replaceChildren(
-    h('button', { class: 'link-back', type: 'button', onclick: back }, '‹ All companions'),
+    h('button', { class: 'link-back', type: 'button', onclick: back }, '‹ All Wildlings'),
     h('p', { class: 'epithet' }, species.epithet),
     h('div', { class: 'stage stage-small' }, createCreatureSvg({ speciesId: pet.speciesId, seed: pet.seed, size: 200 })),
     h(
@@ -82,28 +82,6 @@ function petDetail(ctx: GameContext, sheet: Page, pet: OwnedPet, back: () => voi
     h(
       'div',
       { class: 'actions' },
-      ctx.collection.pets.length > 1 &&
-        h(
-          'button',
-          {
-            class: 'btn',
-            type: 'button',
-            onclick: (e: Event) => {
-              const btn = e.currentTarget as HTMLButtonElement;
-              // Ask twice: it cannot be undone.
-              if (!btn.dataset.sure) {
-                btn.dataset.sure = '1';
-                btn.textContent = `Really let ${species.name} go?`;
-                return;
-              }
-              if (releasePet(ctx.collection, pet.uid)) {
-                ctx.changed();
-                back();
-              }
-            },
-          },
-          'Release to the wild',
-        ),
       isCompanion
         ? h('span', { class: 'badge badge-companion' }, 'Walking with you')
         : h(
@@ -170,7 +148,7 @@ export function renderBestiary(ctx: GameContext, sheet: Page): void {
     const tabs = h(
       'div',
       { class: 'tabs', role: 'tablist' },
-      h('button', { class: 'tab', type: 'button', role: 'tab', 'aria-selected': String(tab === 'pets'), onclick: () => ((tab = 'pets'), render()) }, `Band (${ctx.collection.pets.length}/${bandSize(ctx.wayfarer?.level() ?? 1)})`),
+      h('button', { class: 'tab', type: 'button', role: 'tab', 'aria-selected': String(tab === 'pets'), onclick: () => ((tab = 'pets'), render()) }, `Wildlings (${ctx.collection.pets.length})`),
       h('button', { class: 'tab', type: 'button', role: 'tab', 'aria-selected': String(tab === 'dex'), onclick: () => ((tab = 'dex'), render()) }, `Bestiary (${ctx.collection.seen.length}/${ALL_SPECIES.length})`),
     );
     sheet.body.replaceChildren(tabs, tab === 'pets' ? petsTab() : dexTab());
@@ -179,15 +157,37 @@ export function renderBestiary(ctx: GameContext, sheet: Page): void {
   const petsTab = () => {
     if (!ctx.collection.pets.length) return h('p', { class: 'hint' }, 'No companions yet. Meet a Wildling on the map and ask it to walk with you.');
     const current = companion(ctx.collection);
-    const pets = [...ctx.collection.pets].sort((a, b) => Number(b.uid === current?.uid) - Number(a.uid === current?.uid) || b.level - a.level);
-    return h('div', { class: 'pet-grid' }, ...pets.map((pet) => petCard(pet, pet.uid === current?.uid, () => petDetail(ctx, sheet, pet, render))));
+    const resting = roosting(ctx.collection);
+    const byLevel = (a: OwnedPet, b: OwnedPet) => Number(b.uid === current?.uid) - Number(a.uid === current?.uid) || b.level - a.level;
+    const out = ctx.collection.pets.filter((p) => !resting.includes(p)).sort(byLevel);
+    const card = (pet: OwnedPet) => petCard(pet, pet.uid === current?.uid, () => petDetail(ctx, sheet, pet, render));
+    return h(
+      'div',
+      { class: 'band' },
+      h('h3', { class: 'band-head' }, 'With you'),
+      h('div', { class: 'pet-grid' }, ...out.map(card)),
+      h('h3', { class: 'band-head' }, `Roost (${resting.length})`),
+      h('p', { class: 'hint' }, 'Wildlings outside your party rest here, nothing to manage. Each gathers its realm’s material every 2 h.'),
+      resting.length > 0 && h('div', { class: 'pet-grid' }, ...resting.sort(byLevel).map(card)),
+    );
   };
 
   const dexTab = () =>
     h(
       'div',
       { class: 'dex' },
-      h('p', { class: 'hint' }, 'Wildlings join you after a long walk together. Blotspawn are spilled ink gone sour: send your companion to drive them off.'),
+      h('p', { class: 'hint' }, `You keep one of each kind. Keep every kind of an element and its Wildlings hit ${Math.round(SET_BONUS * 100)}% harder.`),
+      h(
+        'div',
+        { class: 'element-sets' },
+        ...elementSets(ctx.collection).map((set) =>
+          h(
+            'span',
+            { class: `element-set${set.complete ? ' element-set-done' : ''}`, title: set.kinds.map((k) => k.name).join(', ') },
+            `${ELEMENTS[set.element].glyph} ${set.complete ? '✓' : `${set.kept}/${set.kinds.length}`}`,
+          ),
+        ),
+      ),
       ...ALL_SPECIES.map((species) => {
         const seen = ctx.collection.seen.includes(species.id);
         const owned = ctx.collection.pets.filter((p) => p.speciesId === species.id).length;
