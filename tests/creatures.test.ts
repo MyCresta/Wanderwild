@@ -4,7 +4,7 @@ import { addPet, emptyCollection, walkRewards } from '../src/creatures/collectio
 import { mulberry32 } from '../src/creatures/rng';
 import { spawnsNear } from '../src/game/spawns';
 import { ALL_SPECIES, getSpecies, MONSTERS, PETS } from '../src/creatures/species';
-import { addXp, creatureForSpawn, effectiveness, individualFromSeed, MAX_LEVEL, statsAt, xpToNext } from '../src/creatures/stats';
+import { addXp, creatureForSpawn, effectiveness, MAX_LEVEL, statsAt, xpToNext } from '../src/creatures/stats';
 import { PET_ART } from '../src/creatures/art/pets';
 import { WILDLING2_ART } from '../src/creatures/art/wildlings2';
 import { WILDLING3_ART } from '../src/creatures/art/wildlings3';
@@ -59,9 +59,8 @@ describe('levelling', () => {
 
   it('grows stats with level', () => {
     const { base } = getSpecies('bramblet');
-    const trait = individualFromSeed(1, 'pet').trait;
-    const low = statsAt(base, 1, trait);
-    const high = statsAt(base, 10, trait);
+    const low = statsAt(base, 1);
+    const high = statsAt(base, 10);
     expect(high.hp).toBeGreaterThan(low.hp);
     expect(high.atk).toBeGreaterThan(low.atk);
   });
@@ -158,7 +157,7 @@ describe('evolution', () => {
   });
 });
 
-describe('moves and temperaments', () => {
+describe('moves', () => {
   it('gives every Wildling three known moves: one usable every turn, one of its own element', async () => {
     const { EVOLVED } = await import('../src/creatures/species');
     const { getMove } = await import('../src/creatures/moves');
@@ -187,17 +186,5 @@ describe('moves and temperaments', () => {
     expect(powerPips(getMove('thistle-volley'))).toBe(4);
     expect(powerPips(getMove('rampart-slam'))).toBe(5);
     expect(powerPips(getMove('wellspring'))).toBe(0);
-  });
-
-  it('makes every temperament a trade-off, so none is simply best', async () => {
-    const { TRAITS } = await import('../src/creatures/stats');
-    for (const t of TRAITS) {
-      const stats = [t.hp, t.atk, t.def, t.spd];
-      if (t.xp > 1) expect(stats.every((k) => k === 1)).toBe(true);
-      else {
-        expect(stats.some((k) => k > 1)).toBe(true);
-        expect(stats.some((k) => k < 1)).toBe(true);
-      }
-    }
   });
 });

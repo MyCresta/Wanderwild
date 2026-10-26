@@ -35,7 +35,7 @@ function petCard(pet: OwnedPet, isCompanion: boolean, onClick: () => void, away 
 function petDetail(ctx: GameContext, sheet: Page, pet: OwnedPet, back: () => void) {
   const species = getSpecies(pet.speciesId);
   const individual = individualFromSeed(pet.seed, species.kind);
-  const stats = statsAt(species.base, pet.level, individual.trait);
+  const stats = statsAt(species.base, pet.level);
   const isCompanion = companion(ctx.collection)?.uid === pet.uid;
   const maxed = pet.level >= MAX_LEVEL;
   const need = xpToNext(pet.level);
@@ -53,9 +53,7 @@ function petDetail(ctx: GameContext, sheet: Page, pet: OwnedPet, back: () => voi
       ' ',
       rarityBadge(species),
       individual.gilded && h('span', { class: 'badge badge-gilded' }, '✦ Gilded'),
-      ' ',
-      h('em', { class: 'trait-name', title: individual.trait.blurb }, individual.trait.name),
-      h('small', { class: 'trait-blurb' }, ` · ${individual.trait.blurb}`),
+
     ),
     h(
       'div',

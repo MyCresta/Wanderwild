@@ -1,4 +1,4 @@
-import { addXp, individualFromSeed, statsAt, type Encounter } from './stats';
+import { addXp, statsAt, type Encounter } from './stats';
 import { getSpecies } from './species';
 
 /** A Wildling the player has bound. */
@@ -175,10 +175,9 @@ export function addPet(c: Collection, encounter: Encounter): OwnedPet {
   return pet;
 }
 
-/** Gives a pet experience, scaled by its trait. Returns levels gained. */
+/** Gives a pet experience. Returns levels gained. */
 export function grantPetXp(pet: OwnedPet, amount: number): number {
-  const trait = individualFromSeed(pet.seed, getSpecies(pet.speciesId).kind).trait;
-  return addXp(pet, amount * trait.xp);
+  return addXp(pet, amount);
 }
 
 /** Turns walked metres into companion experience. */
@@ -222,7 +221,7 @@ export const fitToFight = (pet: OwnedPet, now = Date.now()) => vigorNow(pet, now
 /** Health at full, before gear. */
 export function petMaxHp(pet: OwnedPet): number {
   const species = getSpecies(pet.speciesId);
-  return statsAt(species.base, pet.level, individualFromSeed(pet.seed, species.kind).trait).hp;
+  return statsAt(species.base, pet.level).hp;
 }
 
 /** Heals a pet by a flat amount of health outside battle, e.g. with a tonic. */

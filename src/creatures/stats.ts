@@ -1,4 +1,4 @@
-import { mulberry32, pick, range } from './rng';
+import { mulberry32, range } from './rng';
 import {
   FOES,
   PETS,
@@ -16,36 +16,9 @@ import type { Rival } from '../game/rivals';
 
 export const MAX_LEVEL = 30;
 
-export interface Trait {
-  name: string;
-  hp: number;
-  atk: number;
-  def: number;
-  spd: number;
-  /** Multiplier on experience earned. */
-  xp: number;
-  /** What it changes, in a few words. */
-  blurb: string;
-}
-
-/**
- * Temperaments: every one gives a little and takes a little, so no Wildling is simply the
- * best of its kind; two of the same kind just fight in a different style.
- * The order is kept, since saved Wildlings get theirs from their seed.
- */
-export const TRAITS: readonly Trait[] = [
-  { name: 'Brave', hp: 1, atk: 1.1, def: 0.92, spd: 1, xp: 1, blurb: 'More attack, less defence' },
-  { name: 'Sturdy', hp: 1, atk: 1, def: 1.12, spd: 0.9, xp: 1, blurb: 'More defence, less speed' },
-  { name: 'Hearty', hp: 1.12, atk: 0.93, def: 1, spd: 1, xp: 1, blurb: 'More health, less attack' },
-  { name: 'Fierce', hp: 0.9, atk: 1.12, def: 1, spd: 1, xp: 1, blurb: 'More attack, less health' },
-  { name: 'Curious', hp: 1, atk: 1, def: 1, spd: 1, xp: 1.2, blurb: 'Learns faster: 20% more XP' },
-  { name: 'Nimble', hp: 0.92, atk: 1, def: 1, spd: 1.15, xp: 1, blurb: 'More speed, less health' },
-];
-
-/** What an individual's seed decides: colouring, temperament, and a rare golden coat. */
+/** What an individual's seed decides: its colouring and a rare golden coat. Every one of a kind fights the same. */
 export interface Individual {
   hueShift: number;
-  trait: Trait;
   gilded: boolean;
 }
 
@@ -53,22 +26,21 @@ export const GILDED_CHANCE = 1 / 48;
 
 export function individualFromSeed(seed: number, kind: Species['kind']): Individual {
   const rng = mulberry32(seed ^ 0x9e3779b9);
-  return {
-    hueShift: range(rng, -14, 14),
-    trait: pick(rng, TRAITS),
-    gilded: kind === 'pet' && rng() < GILDED_CHANCE,
-  };
+  const hueShift = range(rng, -14, 14);
+  // This draw once picked a temperament (retired 2026-10-26); it stays so saved Wildlings keep their golden coats.
+  rng();
+  return { hueShift, gilded: kind === 'pet' && rng() < GILDED_CHANCE };
 }
 
 export const xpToNext = (level: number) => Math.round(20 * Math.pow(level, 1.5));
 
-export function statsAt(base: BaseStats, level: number, trait: Trait): BaseStats {
+export function statsAt(base: BaseStats, level: number): BaseStats {
   const growth = 1 + 0.1 * (level - 1);
   return {
-    hp: Math.round((base.hp * growth + level * 2) * trait.hp),
-    atk: Math.round(base.atk * growth * trait.atk),
-    def: Math.round(base.def * growth * trait.def),
-    spd: Math.round(base.spd * growth * trait.spd),
+    hp: Math.round(base.hp * growth + level * 2),
+    atk: Math.round(base.atk * growth),
+    def: Math.round(base.def * growth),
+    spd: Math.round(base.spd * growth),
   };
 }
 
