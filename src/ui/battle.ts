@@ -344,7 +344,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   const speedChip = (f: Fighter, first: boolean) =>
     h(
       'span',
-      { class: `trait-chip chip-speed${first ? ' chip-first' : ''}`, title: 'Speed: the faster one attacks first each turn. Swaps and tonics always go first.' },
+      { class: `trait-chip chip-speed${first ? ' chip-first' : ''}`, title: 'Speed: a faster foe strikes before you choose your move; otherwise your Wildling goes first.' },
       `⚡ ${f.spd}${first ? ' · first' : ''}`,
     );
   const foeSpeed = h('span', { class: 'speed-slot' });
@@ -744,9 +744,12 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       action = { ...action, quality: await timingSweep(attacks[action.slot], sweepBar, battle.critAt) };
     }
     panel.classList.add('cmd-waiting');
-    // The faster side goes first, so the banner follows whoever is acting.
-    let side: 'pet' | 'foe' = 'pet';
-    for (const e of battle.turn(action)) {
+    await playAll(battle.turn(action));
+  };
+
+  /** Plays a batch of events, the banner following whoever is acting, then hands control back. */
+  const playAll = async (events: BattleEvent[], side: 'pet' | 'foe' = 'pet') => {
+    for (const e of events) {
       const next: 'pet' | 'foe' = foeSide(e) ? 'foe' : e.kind === 'faint' || e.kind === 'foe-in' ? side : 'pet';
       if (next !== side) {
         side = next;
@@ -774,6 +777,15 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   for (const { id, el } of spellBtns) el.addEventListener('click', () => cast(id));
   tonicBtn.addEventListener('click', () => act({ kind: 'tonic' }));
   refresh();
+  // A foe faster than the lead strikes before the first move is chosen.
+  const firstStrike = battle.open();
+  if (firstStrike.length) {
+    busy = true;
+    all().forEach((b) => ((b as HTMLButtonElement).disabled = true));
+    panel.classList.add('cmd-waiting');
+    setTurn('foe');
+    void wait(TURN_PAUSE_MS * 2).then(() => playAll(firstStrike, 'foe'));
+  }
 }
 
 /**

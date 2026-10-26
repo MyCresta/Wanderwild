@@ -39,7 +39,7 @@ describe('party battles', () => {
     expect(battle.mustSwap).toBe(true);
     expect(battle.winner).toBeNull();
     expect(battle.turn({ kind: 'attack', slot: 0 })).toEqual([]);
-    expect(battle.turn({ kind: 'swap', to: 1 })).toEqual([{ kind: 'swap', to: 1 }]);
+    expect(battle.turn({ kind: 'swap', to: 1 })[0]).toEqual({ kind: 'swap', to: 1 });
     expect(battle.pet.species.id).toBe('cragmite');
     expect(battle.canSwapTo(0)).toBe(false);
   });
@@ -307,31 +307,33 @@ describe('wayfarer support in battle', () => {
 });
 
 describe('speed', () => {
-  it('lets the faster side attack first, with ties to the party', () => {
+  it('lets a faster foe strike before the first move is chosen, with ties to the party', () => {
     const quick = new Battle([pet('kitewisp', 10)], pet('cragmite', 10), { rng: () => 0.5 });
     expect(quick.petFirst).toBe(true);
-    expect(hits(quick.turn({ kind: 'attack', slot: 0 }))[0]).toMatchObject({ attacker: 'pet' });
+    expect(quick.open()).toEqual([]);
+    expect(hits(quick.turn({ kind: 'attack', slot: 0 })).map((e) => e.kind === 'hit' && e.attacker)).toEqual(['pet', 'foe']);
     const slow = new Battle([pet('cragmite', 10)], pet('kitewisp', 10), { rng: () => 0.5 });
     expect(slow.petFirst).toBe(false);
-    expect(hits(slow.turn({ kind: 'attack', slot: 0 }))[0]).toMatchObject({ attacker: 'foe' });
-    const a = pet('bramblet', 10);
-    const b = pet('bramblet', 10);
-    expect(new Battle([a], b).petFirst).toBe(true);
+    expect(hits(slow.open())).toHaveLength(1);
+    expect(slow.open()).toEqual([]);
+    // After the opening blow, every turn is the party's move and then the foe's answer.
+    expect(hits(slow.turn({ kind: 'attack', slot: 0 })).map((e) => e.kind === 'hit' && e.attacker)).toEqual(['pet', 'foe']);
+    expect(new Battle([pet('bramblet', 10)], pet('bramblet', 10)).petFirst).toBe(true);
   });
 
-  it('still lets swaps and tonics go before a faster foe', () => {
-    const battle = new Battle([pet('cragmite', 10), pet('shellop', 10)], pet('kitewisp', 10), { rng: () => 0.5 });
-    battle.turn({ kind: 'attack', slot: 0 });
-    expect(battle.turn({ kind: 'swap', to: 1 })[0]).toMatchObject({ kind: 'swap' });
+  it('lets guards raised now meet the very next foe attack', () => {
+    const battle = new Battle([pet('cragmite', 10)], pet('kitewisp', 10), { rng: () => 0.5 });
+    battle.open();
+    expect(foeHit(battle.turn({ kind: 'attack', slot: 2 }))).toMatchObject({ guarded: true });
   });
 
-  it('loses the turn when felled before acting', () => {
+  it('has a faster foe strike a Wildling sent in after a faint', () => {
     const weak = pet('cragmite', 1);
     weak.hp = 1;
     const battle = new Battle([weak, pet('cragmite', 10)], pet('kitewisp', 20), { rng: () => 0.5 });
-    const events = battle.turn({ kind: 'attack', slot: 1, quality: 1 });
-    expect(events.map((e) => e.kind)).toEqual(['hit', 'faint']);
+    expect(battle.open().map((e) => e.kind)).toEqual(['hit', 'faint']);
     expect(battle.mustSwap).toBe(true);
+    expect(battle.turn({ kind: 'swap', to: 1 }).map((e) => e.kind)).toEqual(['swap', 'hit']);
   });
 
   it('grows with level, so a stronger Wildling outpaces its younger self', () => {

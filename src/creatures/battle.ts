@@ -175,6 +175,8 @@ export class Battle {
   cast = false;
   readonly hero: HeroPower | undefined;
   private foeTurns = 0;
+  /** Whether the opening has been played: a faster foe's first strike. */
+  private started = false;
   /** Whether the player has taken a first action yet. */
   private opened = false;
   private readonly rng: Rng;
@@ -551,23 +553,16 @@ export class Battle {
     if (this.mustSwap || (this.freeSwap && action.kind === 'swap')) {
       if (action.kind !== 'swap' || !this.canSwapTo(action.to)) return [];
       // Who opens has not fought yet; the one sent back only watches.
+      const fresh = this.mustSwap;
       if (this.freeSwap) this.fought.delete(this.active);
-      return [this.swapTo(action.to)];
+      events.push(this.swapTo(action.to));
+      // A Wildling sent in after a faint starts a new round: a faster foe strikes it at once.
+      if (fresh) this.roundStart(events);
+      return events;
     }
     if (action.kind === 'attack' && !this.ready(action.slot)) return [];
     if (action.kind === 'swap' && !this.canSwapTo(action.to)) return [];
     this.opened = true;
-
-    const foeFirst = action.kind === 'attack' && !this.petFirst;
-    if (foeFirst) {
-      events.push(...this.foeAttack());
-      if (this.foeDown(events)) return this.endTurn(events);
-      if (this.fainted(events)) {
-        // Felled before it could act: the turn still passes.
-        this.tick();
-        return this.endTurn(events);
-      }
-    }
 
     switch (action.kind) {
       case 'attack': {
@@ -587,13 +582,42 @@ export class Battle {
         break;
     }
     this.cast = false;
-    if (this.foeDown(events)) return events;
+    if (this.foeDown(events)) return this.newFoe(events);
 
-    if (!foeFirst) {
-      events.push(...this.foeAttack());
-      if (this.foeDown(events) || this.fainted(events)) return this.endTurn(events);
-    }
-    return this.endTurn(events);
+    events.push(...this.foeAttack());
+    if (this.foeDown(events)) return this.newFoe(this.endTurn(events));
+    this.fainted(events);
+    return this.newFoe(this.endTurn(events));
+  }
+
+  /**
+   * The start of the fight. A foe faster than the Wildling in front strikes before the first
+   * move is chosen, so the player always sees the faster side's blow before deciding.
+   */
+  open(): BattleEvent[] {
+    if (this.started) return [];
+    this.started = true;
+    const events: BattleEvent[] = [];
+    this.roundStart(events);
+    return events;
+  }
+
+  /**
+   * A new round with a new pairing (the fight opening, a Wildling sent in after a faint, a
+   * rival's next foe): a faster foe strikes at once. Otherwise the party's Wildling acts first,
+   * and each turn after that is the party's move and then the foe's answer.
+   */
+  private roundStart(events: BattleEvent[]): void {
+    if (this.winner || this.petFirst || this.pet.hp <= 0 || this.foe.hp <= 0) return;
+    events.push(...this.foeAttack());
+    if (this.foeDown(events)) return;
+    this.fainted(events);
+  }
+
+  /** After a rival's next foe steps in, a faster one strikes straight away. */
+  private newFoe(events: BattleEvent[]): BattleEvent[] {
+    if (events.some((e) => e.kind === 'foe-in')) this.roundStart(events);
+    return events;
   }
 
   /** True when the Wildling in front has just fallen; ends the fight if nobody is left. */
