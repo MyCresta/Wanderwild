@@ -233,7 +233,7 @@ function settleFollower(outcome: FollowOutcome): void {
     const species = getSpecies(outcome.pet.speciesId);
     game.grantXp(CREATURE_XP[species.rarity]);
     game.changed();
-    openJoined(creatureGame, outcome.pet, outcome.upgraded, outcome.fromLevel);
+    openJoined(creatureGame, outcome.pet, outcome.upgraded, outcome.fromLevel, outcome.gained);
   }
   creatureGame.changed();
 }

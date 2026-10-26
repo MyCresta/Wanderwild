@@ -32,15 +32,40 @@ export function individualFromSeed(seed: number, kind: Species['kind']): Individ
   return { hueShift, gilded: kind === 'pet' && rng() < GILDED_CHANCE };
 }
 
+export type StatKey = 'hp' | 'atk' | 'def' | 'spd';
+export const STAT_KEYS: readonly StatKey[] = ['hp', 'atk', 'def', 'spd'];
+export const STAT_NAMES: Record<StatKey, string> = { hp: 'Vigour', atk: 'Might', def: 'Guard', spd: 'Speed' };
+/** Extra percent on each stat. Every Wildling is born with its own, and kin that join it add more. */
+export type Boost = Record<StatKey, number>;
+/** A newly met Wildling rolls 0 to this much on each stat. */
+export const BOOST_ROLL = 10;
+/** Each of a kind that joins the one you keep adds this much to every stat, on top of the better roll. */
+export const BOOST_PER_KIN = 2;
+export const BOOST_MAX = 30;
+
+/** The stat bonuses a Wildling is born with, from its seed. */
+export function rollBoost(seed: number): Boost {
+  const rng = mulberry32(seed ^ 0x5bd1e995);
+  return { hp: Math.floor(rng() * (BOOST_ROLL + 1)), atk: Math.floor(rng() * (BOOST_ROLL + 1)), def: Math.floor(rng() * (BOOST_ROLL + 1)), spd: Math.floor(rng() * (BOOST_ROLL + 1)) };
+}
+
+/** Folds a newcomer's bonuses into a kept Wildling's: the better of each, plus a little for the bond. */
+export function mergeBoost(kept: Boost, newcomer: Boost): Boost {
+  const out = { ...kept };
+  for (const k of STAT_KEYS) out[k] = Math.min(BOOST_MAX, Math.max(kept[k], newcomer[k]) + BOOST_PER_KIN);
+  return out;
+}
+
 export const xpToNext = (level: number) => Math.round(20 * Math.pow(level, 1.5));
 
-export function statsAt(base: BaseStats, level: number): BaseStats {
+export function statsAt(base: BaseStats, level: number, boost?: Boost): BaseStats {
   const growth = 1 + 0.1 * (level - 1);
+  const b = (k: StatKey) => 1 + (boost?.[k] ?? 0) / 100;
   return {
-    hp: Math.round(base.hp * growth + level * 2),
-    atk: Math.round(base.atk * growth),
-    def: Math.round(base.def * growth),
-    spd: Math.round(base.spd * growth),
+    hp: Math.round((base.hp * growth + level * 2) * b('hp')),
+    atk: Math.round(base.atk * growth * b('atk')),
+    def: Math.round(base.def * growth * b('def')),
+    spd: Math.round(base.spd * growth * b('spd')),
   };
 }
 

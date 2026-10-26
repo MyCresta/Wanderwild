@@ -1,4 +1,4 @@
-import { addXp, statsAt, type Encounter } from './stats';
+import { addXp, rollBoost, statsAt, type Boost, type Encounter } from './stats';
 import { getSpecies } from './species';
 
 /** A Wildling the player has bound. */
@@ -15,6 +15,8 @@ export interface OwnedPet {
   homeRing?: boolean;
   /** How well it was sketched when it was bound (from before Wildlings were befriended). */
   sketch?: string;
+  /** Extra percent on each stat; absent means what its seed rolled. Kin that join it raise these. */
+  boost?: Boost;
   /** Share of its health left after a fight (0..1) and when; it rests back to full over time. Absent means full. */
   vigor?: number;
   vigorAt?: number;
@@ -152,6 +154,9 @@ export function partyLevel(c: Collection): number {
   return pets.length ? Math.round(pets.reduce((sum, p) => sum + p.level, 0) / pets.length) : 1;
 }
 
+/** A Wildling's stat bonuses: what kin have raised them to, or what it was born with. */
+export const petBoost = (pet: OwnedPet): Boost => pet.boost ?? rollBoost(pet.seed);
+
 export function markSeen(c: Collection, speciesId: string): void {
   if (!c.seen.includes(speciesId)) c.seen.push(speciesId);
 }
@@ -164,6 +169,7 @@ export function addPet(c: Collection, encounter: Encounter): OwnedPet {
     level: encounter.level,
     xp: 0,
     caughtAt: Date.now(),
+    boost: rollBoost(encounter.seed),
   };
   c.pets.push(pet);
   markSeen(c, pet.speciesId);
@@ -221,7 +227,7 @@ export const fitToFight = (pet: OwnedPet, now = Date.now()) => vigorNow(pet, now
 /** Health at full, before gear. */
 export function petMaxHp(pet: OwnedPet): number {
   const species = getSpecies(pet.speciesId);
-  return statsAt(species.base, pet.level).hp;
+  return statsAt(species.base, pet.level, petBoost(pet)).hp;
 }
 
 /** Heals a pet by a flat amount of health outside battle, e.g. with a tonic. */

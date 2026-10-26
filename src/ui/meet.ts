@@ -3,7 +3,7 @@ import { formatDistance, formatDuration } from '../hud/format';
 import { markSeen, type OwnedPet } from '../creatures/collection';
 import { keptOfLine, lineOf } from '../creatures/roost';
 import { getSpecies } from '../creatures/species';
-import { individualFromSeed, type Encounter } from '../creatures/stats';
+import { individualFromSeed, STAT_KEYS, STAT_NAMES, type Boost, type Encounter } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
 import { elementBadge, rarityBadge } from './badges';
 import type { GameContext } from './context';
@@ -38,7 +38,7 @@ export function openMeeting(ctx: GameContext, spawnId: string, encounter: Encoun
   let action: Node;
   const line = lineOf(species.id);
   const kept = line ? keptOfLine(ctx.collection, line.id) : null;
-  const upgrade = kept && h('p', { class: 'hint' }, `You keep a level ${kept.level} ${getSpecies(kept.speciesId).name}. If this one stays, yours grows to level ${Math.max(kept.level, level)}.`);
+  const upgrade = kept && h('p', { class: 'hint' }, `You keep a level ${kept.level} ${getSpecies(kept.speciesId).name}. If this one stays, the two become one: yours ${level > kept.level ? `grows to level ${level} and ` : ''}gets stronger.`);
   if (following)
     action = h(
       'div',
@@ -104,7 +104,7 @@ export function openFollower(ctx: GameContext): void {
 }
 
 /** The moment a follower decides to stay. */
-export function openJoined(ctx: GameContext, pet: OwnedPet, upgraded = false, fromLevel = pet.level): void {
+export function openJoined(ctx: GameContext, pet: OwnedPet, upgraded = false, fromLevel = pet.level, gained: Partial<Boost> = {}): void {
   const species = getSpecies(pet.speciesId);
   const sheet = openSheet(upgraded ? `${species.name} grows` : `${species.name} stays`, { className: 'sheet-meet' });
   sound.play('achievement');
@@ -117,6 +117,15 @@ export function openJoined(ctx: GameContext, pet: OwnedPet, upgraded = false, fr
         ? `Your ${species.name} and the newcomer have become one: ${pet.level > fromLevel ? `level ${fromLevel} → ${pet.level}` : `still level ${pet.level}`}. You keep one of each kind.`
         : `After your time together, ${species.name} has decided to stay. It joins you at level ${pet.level}.`,
     ),
+    upgraded
+      ? h(
+          'p',
+          { class: 'stat-gains' },
+          STAT_KEYS.filter((k) => gained[k])
+            .map((k) => `${STAT_NAMES[k]} +${gained[k]}%`)
+            .join(' · ') || 'Its bonuses are already at their best.',
+        )
+      : '',
     h(
       'div',
       { class: 'actions' },
