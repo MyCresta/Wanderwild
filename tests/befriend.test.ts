@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BLOT_TRUST_M, dismissFollower, followerTrust, followerWaitMs, HOURS_TO_BEFRIEND, startFollowing, walkNeeded, WALK_TO_BEFRIEND } from '../src/creatures/befriend';
-import { elementSets, gatherRoost, keepWildling, roosting, SET_BONUS, setBonus } from '../src/creatures/roost';
-import { emptyCollection } from '../src/creatures/collection';
+import { elementSets, gatherRoost, keepWildling, mergeDuplicates, roosting, SET_BONUS, setBonus } from '../src/creatures/roost';
+import { addPet, emptyCollection } from '../src/creatures/collection';
 import { getSpecies, PETS } from '../src/creatures/species';
 
 const wild = (id = 'driftfin', level = 4) => ({ species: getSpecies(id), level, seed: 42 });
@@ -100,6 +100,23 @@ describe('the Roost', () => {
     expect(gatherRoost(c, 6 * hour)).not.toEqual({});
     const week = gatherRoost(c, 6 * hour + 7 * 24 * hour);
     expect(Object.values(week).reduce((a, b) => a + (b ?? 0), 0)).toBe(3 * 12);
+  });
+
+  it('folds duplicates from older saves into one, keeping the best of both', () => {
+    const c = emptyCollection();
+    const low = addPet(c, wild('emberkit', 4));
+    const high = addPet(c, wild('emberkit', 9));
+    const other = addPet(c, wild('driftfin', 2));
+    low.homeRing = true;
+    c.companionUid = low.uid;
+    c.lineup = [low.uid, high.uid, other.uid];
+    const folded = mergeDuplicates(c);
+    expect(folded.get(low.uid)).toBe(high.uid);
+    expect(c.pets.map((p) => p.uid)).toEqual([high.uid, other.uid]);
+    expect(high).toMatchObject({ level: 9, homeRing: true });
+    expect(c.companionUid).toBe(high.uid);
+    expect(c.lineup).toEqual([high.uid, other.uid]);
+    expect(mergeDuplicates(c).size).toBe(0);
   });
 
   it('Wildlings away on an expedition neither roost nor gather', () => {

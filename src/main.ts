@@ -41,7 +41,7 @@ import { rivalsNear } from './game/rivals';
 import { renderBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
 import { openFollower, openJoined, openMeeting } from './ui/meet';
-import { gatherRoost, materialName } from './creatures/roost';
+import { gatherRoost, materialName, mergeDuplicates } from './creatures/roost';
 import { BLOT_TRUST_M, followerTrust, type FollowOutcome } from './creatures/befriend';
 import { sound } from './audio/sound';
 import { HuntController } from './ui/hunt';
@@ -143,6 +143,14 @@ const curioLayer = new CurioLayer(map, (curio) => takeCurio(curio));
 
 // Creatures: the collection, wild spawns around the player, and the companion at their side.
 const collection = loadCollection();
+// One of each kind: fold any second Wildling of a kind into the first, and send its expedition home under the one kept.
+const folded = mergeDuplicates(collection);
+if (folded.size) {
+  for (const e of game.save.expeditions) e.petUid = folded.get(e.petUid) ?? e.petUid;
+  game.save.expeditions = game.save.expeditions.filter((e, i, all) => all.findIndex((x) => x.petUid === e.petUid) === i);
+  saveCollection(collection);
+  game.changed();
+}
 const companionMarker = new CompanionMarker(map);
 const followerMarker = new FollowerMarker(map, () => {
   // Bring its trust up to date first; it may decide to stay right then.
