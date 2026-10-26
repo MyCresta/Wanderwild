@@ -28,7 +28,6 @@ export type SfxName =
   | 'crit'
   | 'victory'
   | 'defeat'
-  | 'hatch'
   | 'equip'
   | 'forge'
   | 'discover'
@@ -165,14 +164,6 @@ const RECIPES: Record<SfxName, Recipe> = {
   defeat(ctx, out, t) {
     run(ctx, out, t, [64, 62, 60, 59], 0.28, 0.6, 0.06);
     tone(ctx, out, t + 1.1, 40, 1.5, 0.08, 'triangle');
-  },
-  // An eggshell cracking open and something new chirping.
-  hatch(ctx, out, t) {
-    for (let i = 0; i < 3; i++) whoosh(ctx, out, t + i * 0.18, 0.05, 3000, 1500, 0.15, 'bandpass');
-    sparkle(ctx, out, t + 0.6, 79, 6, 0.03);
-    const env = envelope(ctx, out, t + 0.9, 0.05, 0.01, 0.15);
-    const o = osc(ctx, 'sine', 1400, env, t + 0.9, t + 1.1);
-    o.frequency.exponentialRampToValueAtTime(2200, t + 0.98);
   },
   equip(ctx, out, t) {
     whoosh(ctx, out, t, 0.12, 600, 1800, 0.08);

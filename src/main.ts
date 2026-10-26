@@ -41,7 +41,7 @@ import { rivalsNear } from './game/rivals';
 import { renderBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
 import { openFollower, openJoined, openMeeting } from './ui/meet';
-import { gatherRoost, keepWildling, materialName } from './creatures/roost';
+import { gatherRoost, materialName } from './creatures/roost';
 import { BLOT_TRUST_M, followerTrust, type FollowOutcome } from './creatures/befriend';
 import { sound } from './audio/sound';
 import { HuntController } from './ui/hunt';
@@ -149,15 +149,25 @@ const followerMarker = new FollowerMarker(map, () => {
   settleFollower(followerTrust(collection, 0));
   if (collection.follower) openFollower(creatureGame);
 });
+/** Wildlings away on an expedition leave the party, and the companion's place goes to one at home. */
+function benchAway(): void {
+  const away = creatureGame.away?.();
+  if (!away?.size) return;
+  collection.lineup = collection.lineup.filter((uid) => !away.has(uid));
+  if (collection.companionUid && away.has(collection.companionUid)) collection.companionUid = collection.pets.find((p) => !away.has(p.uid))?.uid ?? collection.companionUid;
+}
+
 const creatureGame: GameContext = {
   collection,
   changed() {
+    benchAway();
     saveCollection(collection);
     companionMarker.setPet(companion(collection));
     followerMarker.set(collection.follower);
     journal.setBadge('bestiary', collection.pets.some((p) => evolutionStatus(p)?.ready));
   },
 };
+creatureGame.away = () => new Set(game.save.expeditions.map((e) => e.petUid));
 creatureGame.wayfarer = {
   level: () => game.level.level,
   tonics: () => game.save.supplies.tonic,
@@ -197,24 +207,6 @@ game.on((e) => {
   toast(rung.ready ? `${name} is glowing… it's ready to evolve! Open its page in the Bestiary.` : `${name} felt the Ring close around its home. One step nearer to changing.`);
   creatureGame.changed();
 });
-
-/** Hatched eggs join the collection as Wildlings (re-rolling past any Blotspawn the seed picks). */
-function claimHatchlings(): void {
-  const level = companion(collection)?.level ?? 1;
-  for (const h of game.save.hatchlings.splice(0)) {
-    for (let i = 0; i < 20; i++) {
-      const encounter = creatureForSpawn({ seed: (h.seed + i * 7919) >>> 0, rarity: h.rarity }, level);
-      if (encounter.species.kind !== 'pet') continue;
-      const { upgraded } = keepWildling(collection, { ...encounter, level: Math.max(1, Math.min(level, encounter.level)) });
-      toast(upgraded ? `A ${encounter.species.name} hatched and joined the one you keep.` : `A ${encounter.species.name} hatched and joined your bestiary!`);
-      break;
-    }
-  }
-  game.changed();
-  creatureGame.changed();
-}
-game.on((event) => event.kind === 'hatch' && claimHatchlings());
-if (game.save.hatchlings.length) claimHatchlings();
 
 /** Removes a spawn that was caught, beaten or fled; only the first two earn Wayfarer XP, less by Farsight. */
 function clearSpawn(spawn: Spawn, won: boolean, remote = false): void {
@@ -477,7 +469,7 @@ map.on('idle', () => {
 // Cooled-down shrines and an ending blessing need a redraw even when nothing moves.
 /** Banks what roosting Wildlings gathered while you were busy or away. */
 function gatherRoostNow(): void {
-  const found = gatherRoost(collection);
+  const found = gatherRoost(collection, Date.now(), creatureGame.away?.());
   const parts = Object.entries(found).map(([id, n]) => `${n} ${materialName(id as MaterialId)}`);
   if (!parts.length) return;
   game.addMaterials(found);

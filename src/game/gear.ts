@@ -47,7 +47,7 @@ export const RARITIES: Record<GearRarity, { name: string; power: number; color: 
 
 export const RUNES: Record<RuneId, { name: string; blurb: string }> = {
   nightfang: { name: 'Nightfang', blurb: '+20% Wildling damage at night' },
-  hatchstone: { name: 'Hatchstone', blurb: 'Eggs hatch 15% sooner' },
+  hatchstone: { name: 'Kinstone', blurb: 'Wildlings trust you 15% sooner' },
   swiftsole: { name: 'Swiftsole', blurb: '+10% stride boost' },
   seer: { name: 'Seer', blurb: '+10 m reach' },
   warding: { name: 'Warding', blurb: '+10% party health' },
@@ -155,13 +155,12 @@ export interface GearBonuses {
   stride: number;
   reachM: number;
   catchBonus: number;
-  eggSpeed: number;
   /** Extra pet damage that only applies at night. */
   nightDamage: number;
 }
 
 export function gearBonuses(equipped: GearItem[]): GearBonuses {
-  const b: GearBonuses = { petDamage: 1, petHealth: 1, stride: 1, reachM: 0, catchBonus: 0, eggSpeed: 1, nightDamage: 0 };
+  const b: GearBonuses = { petDamage: 1, petHealth: 1, stride: 1, reachM: 0, catchBonus: 0, nightDamage: 0 };
   for (const item of equipped) {
     const p = power(item);
     if (item.slot === 'staff') b.petDamage += p * PER_POWER.staff;
@@ -171,7 +170,8 @@ export function gearBonuses(equipped: GearItem[]): GearBonuses {
     if (item.slot === 'charm') b.catchBonus += p * PER_POWER.charm;
     for (const rune of item.runes) {
       if (rune === 'nightfang') b.nightDamage += 0.2;
-      if (rune === 'hatchstone') b.eggSpeed += 0.15;
+      // Once sped up eggs; the id stays so runes already found keep working.
+      if (rune === 'hatchstone') b.catchBonus += 0.15;
       if (rune === 'swiftsole') b.stride += 0.1;
       if (rune === 'seer') b.reachM += 10;
       if (rune === 'warding') b.petHealth += 0.1;

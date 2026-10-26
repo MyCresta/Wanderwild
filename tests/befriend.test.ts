@@ -102,6 +102,17 @@ describe('the Roost', () => {
     expect(Object.values(week).reduce((a, b) => a + (b ?? 0), 0)).toBe(3 * 12);
   });
 
+  it('Wildlings away on an expedition neither roost nor gather', () => {
+    const c = emptyCollection();
+    for (const id of ['bramblet', 'driftfin', 'emberkit']) keepWildling(c, wild(id));
+    c.lineup = [c.pets[0].uid];
+    c.companionUid = c.pets[0].uid;
+    const away = new Set([c.pets[1].uid]);
+    expect(roosting(c, away).map((p) => p.speciesId)).toEqual(['emberkit']);
+    gatherRoost(c, 0, away);
+    expect(Object.values(gatherRoost(c, 2 * hour, away)).reduce((a, b) => a + (b ?? 0), 0)).toBe(1);
+  });
+
   it('completing an element makes its Wildlings hit harder', () => {
     const c = emptyCollection();
     keepWildling(c, wild('bramblet'));

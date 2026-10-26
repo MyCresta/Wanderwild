@@ -29,4 +29,6 @@ export interface GameContext {
   /** Saves the collection and refreshes the HUD and companion. */
   changed(): void;
   wayfarer?: WayfarerHooks;
+  /** Wildlings away on an expedition, by uid: they cannot fight or walk with you until they return. */
+  away?(): ReadonlySet<string>;
 }

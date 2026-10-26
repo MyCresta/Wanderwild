@@ -16,7 +16,7 @@ import { hint } from './hint';
 /** Where the bestiary draws: a journal pane, with a title and a way to step aside for a scene. */
 export type Page = Pick<Sheet, 'body' | 'setTitle' | 'close'>;
 
-function petCard(pet: OwnedPet, isCompanion: boolean, onClick: () => void) {
+function petCard(pet: OwnedPet, isCompanion: boolean, onClick: () => void, away = false) {
   const species = getSpecies(pet.speciesId);
   const { gilded } = individualFromSeed(pet.seed, species.kind);
   const card = h(
@@ -26,6 +26,7 @@ function petCard(pet: OwnedPet, isCompanion: boolean, onClick: () => void) {
     h('span', { class: 'pet-card-name' }, `${gilded ? '✦ ' : ''}${species.name}`),
     h('span', { class: 'pet-card-level' }, `Lv ${pet.level}`),
     isCompanion && h('span', { class: 'pet-card-tag' }, 'Companion'),
+    away && h('span', { class: 'pet-card-tag pet-card-away' }, 'Away'),
   );
   hint(card, !!evolutionStatus(pet)?.ready);
   return card;
@@ -84,6 +85,8 @@ function petDetail(ctx: GameContext, sheet: Page, pet: OwnedPet, back: () => voi
       { class: 'actions' },
       isCompanion
         ? h('span', { class: 'badge badge-companion' }, 'Walking with you')
+        : ctx.away?.().has(pet.uid)
+          ? h('span', { class: 'badge' }, 'Away on an expedition')
         : h(
             'button',
             {
@@ -160,7 +163,8 @@ export function renderBestiary(ctx: GameContext, sheet: Page): void {
     const resting = roosting(ctx.collection);
     const byLevel = (a: OwnedPet, b: OwnedPet) => Number(b.uid === current?.uid) - Number(a.uid === current?.uid) || b.level - a.level;
     const out = ctx.collection.pets.filter((p) => !resting.includes(p)).sort(byLevel);
-    const card = (pet: OwnedPet) => petCard(pet, pet.uid === current?.uid, () => petDetail(ctx, sheet, pet, render));
+    const away = ctx.away?.() ?? new Set<string>();
+    const card = (pet: OwnedPet) => petCard(pet, pet.uid === current?.uid, () => petDetail(ctx, sheet, pet, render), away.has(pet.uid));
     return h(
       'div',
       { class: 'band' },

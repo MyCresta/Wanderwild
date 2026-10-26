@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { hatchRarity, rollEgg, walkEggs } from '../src/game/eggs';
 import {
   BUILDINGS,
   capMs,
@@ -82,33 +81,6 @@ describe('hearthstead in the game', () => {
   });
 });
 
-describe('eggs', () => {
-  it('hatch after walking their distance', () => {
-    const egg = { ...rollEgg('test', 0), km: 2 as const };
-    const eggs = [egg];
-    expect(walkEggs(eggs, 1500, 0)).toEqual([]);
-    const hatched = walkEggs(eggs, 600, 5);
-    expect(hatched).toHaveLength(1);
-    expect(hatched[0]).toMatchObject({ seed: egg.seed, fromKm: 2, hatchedAt: 5 });
-    expect(eggs).toEqual([]);
-  });
-
-  it('give rarer creatures from longer eggs', () => {
-    const rare = (km: 2 | 10) =>
-      Array.from({ length: 300 }, (_, i) => hatchRarity({ ...rollEgg(String(i), i), km })).filter(
-        (r) => r === 'rare' || r === 'epic' || r === 'legendary',
-      ).length;
-    expect(rare(10)).toBeGreaterThan(rare(2) * 3);
-  });
-
-  it('hatchlings wait in the save for the creatures code', () => {
-    const game = new GameState(newSave(0));
-    game.save.eggs.push({ ...rollEgg('x', 0), km: 2 });
-    game.recordWalk(2100, 0);
-    expect(game.save.hatchlings).toHaveLength(1);
-  });
-});
-
 describe('save migration', () => {
   it('upgrades a version 1 save with an empty Hearthstead', () => {
     const v1 = { version: 1, currencies: { coin: 7, wanderlight: 3 }, wayfarer: { xp: 900 } };
@@ -116,6 +88,11 @@ describe('save migration', () => {
     expect(save.version).toBe(5);
     expect(save.currencies.coin).toBe(7);
     expect(save.hearthstead).toEqual({ buildings: {}, lastTick: 10, strideDay: '', strideUsedMs: 0 });
-    expect(save.eggs).toEqual([]);
+  });
+
+  it('drops retired eggs and hatchlings from old saves', () => {
+    const save = migrate({ version: 5, eggs: [{ id: 'e', km: 2, seed: 1, walkedM: 10, foundAt: 0 }], hatchlings: [{ seed: 3 }] }, 10);
+    expect('eggs' in save).toBe(false);
+    expect('hatchlings' in save).toBe(false);
   });
 });

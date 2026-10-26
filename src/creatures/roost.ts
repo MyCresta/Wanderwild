@@ -51,9 +51,9 @@ export function keepWildling(c: Collection, encounter: Encounter): Kept {
   return { pet: kept, upgraded: true, fromLevel };
 }
 
-/** Wildlings at rest: everyone kept but the fighting party and the companion. */
-export function roosting(c: Collection): OwnedPet[] {
-  const busy = new Set([...partyPets(c).map((p) => p.uid), c.companionUid]);
+/** Wildlings at rest: everyone kept but the fighting party, the companion and any away on an expedition. */
+export function roosting(c: Collection, away: ReadonlySet<string> = new Set()): OwnedPet[] {
+  const busy = new Set([...partyPets(c).map((p) => p.uid), c.companionUid, ...away]);
   return c.pets.filter((p) => !busy.has(p.uid));
 }
 
@@ -69,7 +69,7 @@ export const materialName = (id: MaterialId) => MATERIALS[id].name;
  * Banks the Roost's gathering since it was last checked, even with the app closed (up to a day).
  * Each roosting kind gathers once per ROOST_GATHER_MS.
  */
-export function gatherRoost(c: Collection, now = Date.now()): Partial<Record<MaterialId, number>> {
+export function gatherRoost(c: Collection, now = Date.now(), away?: ReadonlySet<string>): Partial<Record<MaterialId, number>> {
   const since = c.roostAt ?? now;
   const elapsed = Math.min(ROOST_CAP_MS, Math.max(0, now - since));
   const rounds = Math.floor(elapsed / ROOST_GATHER_MS);
@@ -77,7 +77,7 @@ export function gatherRoost(c: Collection, now = Date.now()): Partial<Record<Mat
   const found: Partial<Record<MaterialId, number>> = {};
   if (!rounds) return found;
   const lines = new Set<string>();
-  for (const pet of roosting(c)) {
+  for (const pet of roosting(c, away)) {
     const line = lineOf(pet.speciesId)?.id;
     const material = roostMaterial(pet);
     if (!line || !material || lines.has(line)) continue;
