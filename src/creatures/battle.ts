@@ -4,7 +4,7 @@ import { FOE_TRAITS, foeScale, type FoeTrait, type Rank } from './foes';
 import { getMove, type Move } from './moves';
 import type { Rng } from './rng';
 import { signature, type Element, type Species } from './species';
-import { damage, statsAt } from './stats';
+import { damage, statsAt, type Boost } from './stats';
 
 export interface Fighter {
   species: Species;
@@ -30,8 +30,10 @@ export function makeFighter(
   _seed: number,
   uid?: string,
   foe: { rank?: Rank; tier?: number; traits?: FoeTrait[] } = {},
+  /** An owned Wildling's own stat bonuses. */
+  boost?: Boost,
 ): Fighter {
-  const stats = statsAt(species.base, level);
+  const stats = statsAt(species.base, level, boost);
   const rank = foe.rank ?? 'normal';
   const tier = foe.tier ?? 1;
   const traits = foe.traits ?? [];

@@ -1,5 +1,5 @@
-import { markSeen, type Collection, type Follower, type OwnedPet } from './collection';
-import { keepWildling } from './roost';
+import { markSeen, type Collection, type Follower } from './collection';
+import { keepWildling, type Kept } from './roost';
 import { getSpecies, type Rarity } from './species';
 import type { Encounter } from './stats';
 
@@ -32,7 +32,7 @@ export function startFollowing(c: Collection, spawnId: string, encounter: Encoun
 }
 
 /** `upgraded` means you already kept one of its kind, which took on the newcomer's level instead. */
-export type FollowOutcome = { kind: 'joined'; pet: OwnedPet; upgraded: boolean; fromLevel: number } | null;
+export type FollowOutcome = ({ kind: 'joined' } & Kept) | null;
 
 /** Trust a follower gains per millisecond just by staying with you, in metres. A charm shortens the wait as it shortens the walk. */
 const idleTrustPerMs = (f: Follower) => WALK_TO_BEFRIEND[getSpecies(f.speciesId).rarity] / (HOURS_TO_BEFRIEND[getSpecies(f.speciesId).rarity] * HOUR_MS);

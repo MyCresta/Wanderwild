@@ -16,6 +16,7 @@ import {
   grantPetXp,
   markSeen,
   partyPets,
+  petBoost,
   REST_FULL_MS,
   setVigor,
   vigorNow,
@@ -274,7 +275,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   const heroName = way?.heroName?.() ?? 'Your hero';
   const battle = new Battle(
     owned.map((p) => {
-      const f = makeFighter(getSpecies(p.speciesId), p.level, p.seed, p.uid);
+      const f = makeFighter(getSpecies(p.speciesId), p.level, p.seed, p.uid, {}, petBoost(p));
       // A completed element in the bestiary makes its Wildlings hit harder.
       f.atk = Math.round(f.atk * setBonus(ctx.collection, p.speciesId));
       return f;

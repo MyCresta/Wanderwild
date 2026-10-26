@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BLOT_TRUST_M, dismissFollower, followerTrust, followerWaitMs, HOURS_TO_BEFRIEND, startFollowing, walkNeeded, WALK_TO_BEFRIEND } from '../src/creatures/befriend';
 import { elementSets, gatherRoost, keepWildling, mergeDuplicates, roosting, SET_BONUS, setBonus } from '../src/creatures/roost';
-import { addPet, emptyCollection } from '../src/creatures/collection';
+import { addPet, emptyCollection, petBoost } from '../src/creatures/collection';
+import { BOOST_MAX, BOOST_PER_KIN, BOOST_ROLL, rollBoost, STAT_KEYS, statsAt } from '../src/creatures/stats';
 import { getSpecies, PETS } from '../src/creatures/species';
 
 const wild = (id = 'driftfin', level = 4) => ({ species: getSpecies(id), level, seed: 42 });
@@ -76,6 +77,27 @@ describe('the Roost', () => {
     c.pets[0].speciesId = PETS.find((p) => p.id === 'driftfin')!.evolution!.into;
     expect(keepWildling(c, wild('driftfin', 2)).pet.level).toBe(9);
     expect(c.pets).toHaveLength(1);
+  });
+
+  it('gives each Wildling its own stat bonuses, and kin that join raise them', () => {
+    const c = emptyCollection();
+    const first = keepWildling(c, wild('emberkit', 4)).pet;
+    const born = petBoost(first);
+    for (const k of STAT_KEYS) {
+      expect(born[k]).toBeGreaterThanOrEqual(0);
+      expect(born[k]).toBeLessThanOrEqual(BOOST_ROLL);
+    }
+    const out = keepWildling(c, { ...wild('emberkit', 2), seed: 99 });
+    const now = petBoost(first);
+    for (const k of STAT_KEYS) {
+      expect(now[k]).toBe(Math.max(born[k], rollBoost(99)[k]) + BOOST_PER_KIN);
+      expect(out.gained?.[k]).toBe(now[k] - born[k]);
+    }
+    // Stronger stats in battle and the bestiary, never past the cap.
+    const plain = statsAt(getSpecies('emberkit').base, 10);
+    expect(statsAt(getSpecies('emberkit').base, 10, now).atk).toBeGreaterThanOrEqual(plain.atk);
+    for (let i = 0; i < 30; i++) keepWildling(c, { ...wild('emberkit', 1), seed: 1000 + i });
+    for (const k of STAT_KEYS) expect(petBoost(first)[k]).toBe(BOOST_MAX);
   });
 
   it('a follower joining a kind you keep upgrades it instead of adding another', () => {

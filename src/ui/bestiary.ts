@@ -1,8 +1,8 @@
-import { addPet, companion, STARTERS, type OwnedPet } from '../creatures/collection';
+import { addPet, companion, petBoost, STARTERS, type OwnedPet } from '../creatures/collection';
 import { hashString, mulberry32 } from '../creatures/rng';
 import { ALL_SPECIES, ELEMENTS, getSpecies } from '../creatures/species';
 import { moveList } from './moves';
-import { individualFromSeed, MAX_LEVEL, statsAt, xpToNext } from '../creatures/stats';
+import { individualFromSeed, MAX_LEVEL, STAT_KEYS, STAT_NAMES, statsAt, xpToNext, type StatKey } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
 import { elementBadge, rarityBadge } from './badges';
 import type { GameContext } from './context';
@@ -35,7 +35,9 @@ function petCard(pet: OwnedPet, isCompanion: boolean, onClick: () => void, away 
 function petDetail(ctx: GameContext, sheet: Page, pet: OwnedPet, back: () => void) {
   const species = getSpecies(pet.speciesId);
   const individual = individualFromSeed(pet.seed, species.kind);
-  const stats = statsAt(species.base, pet.level);
+  const boost = petBoost(pet);
+  const stats = statsAt(species.base, pet.level, boost);
+  const stat = (k: StatKey) => h('dd', {}, String(stats[k]), boost[k] > 0 && h('small', { class: 'stat-boost' }, ` +${boost[k]}%`));
   const isCompanion = companion(ctx.collection)?.uid === pet.uid;
   const maxed = pet.level >= MAX_LEVEL;
   const need = xpToNext(pet.level);
@@ -64,14 +66,7 @@ function petDetail(ctx: GameContext, sheet: Page, pet: OwnedPet, back: () => voi
     h(
       'dl',
       { class: 'stats' },
-      h('dt', {}, 'Vigour'),
-      h('dd', {}, String(stats.hp)),
-      h('dt', {}, 'Might'),
-      h('dd', {}, String(stats.atk)),
-      h('dt', {}, 'Guard'),
-      h('dd', {}, String(stats.def)),
-      h('dt', {}, 'Speed'),
-      h('dd', {}, String(stats.spd)),
+      ...STAT_KEYS.flatMap((k) => [h('dt', {}, STAT_NAMES[k]), stat(k)]),
       h('dt', {}, 'Moves'),
       h('dd', {}, species.kind === 'pet' ? moveList(species) : ''),
     ),

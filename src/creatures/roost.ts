@@ -1,7 +1,7 @@
 import { MATERIALS, REALMS, type MaterialId } from '../game/realms';
-import { addPet, markSeen, partyPets, type Collection, type OwnedPet } from './collection';
+import { addPet, markSeen, partyPets, petBoost, type Collection, type OwnedPet } from './collection';
 import { ELEMENTS, getSpecies, PETS, type Element, type PetSpecies } from './species';
-import { individualFromSeed, type Encounter } from './stats';
+import { individualFromSeed, mergeBoost, rollBoost, STAT_KEYS, type Boost, type Encounter } from './stats';
 
 /**
  * The Roost: every Wildling you keep that is not in your fighting party rests at home, with
@@ -30,11 +30,13 @@ export function keptOfLine(c: Collection, lineId: string): OwnedPet | null {
   return kept.sort((a, b) => b.level - a.level)[0] ?? null;
 }
 
-export type Kept = { pet: OwnedPet; upgraded: boolean; fromLevel: number };
+/** `gained` is how many percent each stat rose when kin joined the one you keep. */
+export type Kept = { pet: OwnedPet; upgraded: boolean; fromLevel: number; gained?: Partial<Boost> };
 
 /**
- * A Wildling joins you. If you already keep one of its kind, yours takes on the newcomer's level
- * (and its golden coat, if it has one) instead of a second one moving in.
+ * A Wildling joins you. If you already keep one of its kind, the two become one: yours takes the
+ * newcomer's level if higher, the better of each stat bonus plus a little more, and its golden
+ * coat if it has one.
  */
 export function keepWildling(c: Collection, encounter: Encounter): Kept {
   const line = lineOf(encounter.species.id);
@@ -45,10 +47,14 @@ export function keepWildling(c: Collection, encounter: Encounter): Kept {
     kept.level = encounter.level;
     kept.xp = 0;
   }
+  const before = petBoost(kept);
+  kept.boost = mergeBoost(before, rollBoost(encounter.seed));
+  const gained: Partial<Boost> = {};
+  for (const k of STAT_KEYS) if (kept.boost[k] > before[k]) gained[k] = kept.boost[k] - before[k];
   const kind = encounter.species.kind;
   if (individualFromSeed(encounter.seed, kind).gilded && !individualFromSeed(kept.seed, kind).gilded) kept.seed = encounter.seed;
   markSeen(c, encounter.species.id);
-  return { pet: kept, upgraded: true, fromLevel };
+  return { pet: kept, upgraded: true, fromLevel, gained };
 }
 
 /**
@@ -72,6 +78,7 @@ export function mergeDuplicates(c: Collection): Map<string, string> {
       keep.level = Math.max(keep.level, other.level);
       keep.realmWalkM = Math.max(keep.realmWalkM ?? 0, other.realmWalkM ?? 0) || undefined;
       keep.homeRing = keep.homeRing || other.homeRing || undefined;
+      keep.boost = mergeBoost(petBoost(keep), petBoost(other));
       if (individualFromSeed(other.seed, kind).gilded && !individualFromSeed(keep.seed, kind).gilded) keep.seed = other.seed;
       folded.set(other.uid, keep.uid);
     }

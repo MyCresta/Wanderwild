@@ -3937,3 +3937,16 @@ span.forge-up {
   background: rgba(196, 152, 58, 0.3);
   font-weight: 600;
 }
+
+/* A Wildling's own stat bonus, and what kin added when they joined it. */
+.stat-boost {
+  color: #3e7a2e;
+  font-size: 12px;
+}
+
+.stat-gains {
+  margin: 0 0 8px;
+  color: #3e7a2e;
+  font-weight: 600;
+  text-align: center;
+}
