@@ -3,7 +3,7 @@ import { evolve, evolutionStatus } from '../creatures/evolution';
 import { getSpecies } from '../creatures/species';
 import { getMove } from '../creatures/moves';
 import { moveRow } from './moves';
-import { individualFromSeed, statsAt } from '../creatures/stats';
+import { statsAt } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
 import { createBackdrop } from './catch/backdrop';
 import type { GameContext } from './context';
@@ -39,9 +39,8 @@ export function openEvolution(ctx: GameContext, pet: OwnedPet, onDone?: () => vo
   if (!status?.ready) return;
   const from = getSpecies(pet.speciesId);
   const into = status.into;
-  const trait = individualFromSeed(pet.seed, 'pet').trait;
-  const before = statsAt(from.base, pet.level, trait);
-  const after = statsAt(into.base, pet.level, trait);
+  const before = statsAt(from.base, pet.level);
+  const after = statsAt(into.base, pet.level);
 
   const backdrop = createBackdrop(into.element, pet.seed);
   const oldSvg = createCreatureSvg({ speciesId: from.id, seed: pet.seed, size: 240 });

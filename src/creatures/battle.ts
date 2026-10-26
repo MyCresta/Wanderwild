@@ -4,7 +4,7 @@ import { FOE_TRAITS, foeScale, type FoeTrait, type Rank } from './foes';
 import { getMove, type Move } from './moves';
 import type { Rng } from './rng';
 import { signature, type Element, type Species } from './species';
-import { damage, individualFromSeed, statsAt } from './stats';
+import { damage, statsAt } from './stats';
 
 export interface Fighter {
   species: Species;
@@ -26,11 +26,12 @@ export interface Fighter {
 export function makeFighter(
   species: Species,
   level: number,
-  seed: number,
+  // Every Wildling of a kind fights the same now; the seed only sets its look.
+  _seed: number,
   uid?: string,
   foe: { rank?: Rank; tier?: number; traits?: FoeTrait[] } = {},
 ): Fighter {
-  const stats = statsAt(species.base, level, individualFromSeed(seed, species.kind).trait);
+  const stats = statsAt(species.base, level);
   const rank = foe.rank ?? 'normal';
   const tier = foe.tier ?? 1;
   const traits = foe.traits ?? [];
