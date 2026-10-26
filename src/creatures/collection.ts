@@ -48,6 +48,8 @@ export interface Collection {
   xpProgressM: number;
   /** The Wildling currently walking along to see if it likes you. */
   follower?: Follower | null;
+  /** When the Roost last banked what its Wildlings gathered. */
+  roostAt?: number;
 }
 
 const KEY = 'wanderwild.bestiary';

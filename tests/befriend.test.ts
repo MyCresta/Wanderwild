@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { bandFull, bandSize, BLOT_TRUST_M, dismissFollower, followerTrust, followerWaitMs, HOURS_TO_BEFRIEND, releasePet, startFollowing, walkNeeded, WALK_TO_BEFRIEND } from '../src/creatures/befriend';
-import { addPet, emptyCollection } from '../src/creatures/collection';
-import { getSpecies } from '../src/creatures/species';
+import { BLOT_TRUST_M, dismissFollower, followerTrust, followerWaitMs, HOURS_TO_BEFRIEND, startFollowing, walkNeeded, WALK_TO_BEFRIEND } from '../src/creatures/befriend';
+import { elementSets, gatherRoost, keepWildling, roosting, SET_BONUS, setBonus } from '../src/creatures/roost';
+import { emptyCollection } from '../src/creatures/collection';
+import { getSpecies, PETS } from '../src/creatures/species';
 
 const wild = (id = 'driftfin', level = 4) => ({ species: getSpecies(id), level, seed: 42 });
 
@@ -60,25 +61,55 @@ describe('befriending a Wildling', () => {
   });
 });
 
-describe('the band', () => {
-  it('starts at 6 and grows with Wayfarer level to 12', () => {
-    expect(bandSize(1)).toBe(6);
-    expect(bandSize(10)).toBe(8);
-    expect(bandSize(99)).toBe(12);
+describe('the Roost', () => {
+  const hour = 60 * 60 * 1000;
+
+  it('keeps one of each kind: a stronger newcomer raises the one you keep', () => {
+    const c = emptyCollection();
+    const first = keepWildling(c, wild('driftfin', 4));
+    expect(first.upgraded).toBe(false);
+    const again = keepWildling(c, wild('driftfin', 9));
+    expect(again).toMatchObject({ upgraded: true, fromLevel: 4 });
+    expect(c.pets).toHaveLength(1);
+    expect(c.pets[0].level).toBe(9);
+    // An evolved one counts as the same kind, and a weaker newcomer changes nothing.
+    c.pets[0].speciesId = PETS.find((p) => p.id === 'driftfin')!.evolution!.into;
+    expect(keepWildling(c, wild('driftfin', 2)).pet.level).toBe(9);
+    expect(c.pets).toHaveLength(1);
   });
 
-  it('is full at its size, and releasing makes room but keeps the last one', () => {
+  it('a follower joining a kind you keep upgrades it instead of adding another', () => {
     const c = emptyCollection();
-    for (let i = 0; i < 6; i++) addPet(c, wild());
-    expect(bandFull(c, 1)).toBe(true);
-    const first = c.pets[0];
-    c.companionUid = first.uid;
-    c.lineup = [first.uid];
-    expect(releasePet(c, first.uid)).toBe(true);
-    expect(c.companionUid).not.toBe(first.uid);
-    expect(c.lineup).not.toContain(first.uid);
-    expect(bandFull(c, 1)).toBe(false);
-    while (c.pets.length > 1) releasePet(c, c.pets[0].uid);
-    expect(releasePet(c, c.pets[0].uid)).toBe(false);
+    keepWildling(c, wild('driftfin', 3));
+    const f = startFollowing(c, 'a', wild('driftfin', 8), 0, 0)!;
+    const out = followerTrust(c, f.needM, 0);
+    expect(out).toMatchObject({ kind: 'joined', upgraded: true, fromLevel: 3 });
+    expect(c.pets).toHaveLength(1);
+  });
+
+  it('roosting Wildlings gather their realm material, up to a day while away', () => {
+    const c = emptyCollection();
+    for (const id of ['bramblet', 'driftfin', 'emberkit', 'cragmite']) keepWildling(c, wild(id));
+    c.lineup = [c.pets[0].uid];
+    c.companionUid = c.pets[0].uid;
+    expect(roosting(c).map((p) => p.speciesId)).toEqual(['driftfin', 'emberkit', 'cragmite']);
+    expect(gatherRoost(c, 0)).toEqual({});
+    const found = gatherRoost(c, 5 * hour);
+    expect(Object.values(found).reduce((a, b) => a + (b ?? 0), 0)).toBe(3 * 2);
+    // The half-round left over carries on; a week away still only banks a day.
+    expect(gatherRoost(c, 6 * hour)).not.toEqual({});
+    const week = gatherRoost(c, 6 * hour + 7 * 24 * hour);
+    expect(Object.values(week).reduce((a, b) => a + (b ?? 0), 0)).toBe(3 * 12);
+  });
+
+  it('completing an element makes its Wildlings hit harder', () => {
+    const c = emptyCollection();
+    keepWildling(c, wild('bramblet'));
+    expect(setBonus(c, 'bramblet')).toBe(1);
+    const grove = elementSets(c).find((s) => s.element === 'grove')!;
+    for (const k of grove.kinds) keepWildling(c, wild(k.id));
+    expect(elementSets(c).find((s) => s.element === 'grove')!.complete).toBe(true);
+    expect(setBonus(c, 'bramblet')).toBe(1 + SET_BONUS);
+    expect(setBonus(c, 'driftfin')).toBe(1);
   });
 });

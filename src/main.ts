@@ -28,7 +28,7 @@ import { HeroPanel, openHeroChoice } from './hud/heroPanel';
 import { heroSvg } from './hud/heroArt';
 import { formatWait } from './hud/format';
 import { CompanionMarker, CreatureMarkers, FollowerMarker } from './map/creatures';
-import { addPet, companion, loadCollection, partyLevel, saveCollection, walkRewards } from './creatures/collection';
+import { companion, loadCollection, partyLevel, saveCollection, walkRewards } from './creatures/collection';
 import { foeThreat } from './creatures/foes';
 import { spawnsNear, type Spawn } from './game/spawns';
 import { getSpecies } from './creatures/species';
@@ -41,6 +41,7 @@ import { rivalsNear } from './game/rivals';
 import { renderBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
 import { openFollower, openJoined, openMeeting } from './ui/meet';
+import { gatherRoost, keepWildling, materialName } from './creatures/roost';
 import { BLOT_TRUST_M, followerTrust, type FollowOutcome } from './creatures/befriend';
 import { sound } from './audio/sound';
 import { HuntController } from './ui/hunt';
@@ -204,8 +205,8 @@ function claimHatchlings(): void {
     for (let i = 0; i < 20; i++) {
       const encounter = creatureForSpawn({ seed: (h.seed + i * 7919) >>> 0, rarity: h.rarity }, level);
       if (encounter.species.kind !== 'pet') continue;
-      addPet(collection, { ...encounter, level: Math.max(1, Math.min(level, encounter.level)) });
-      toast(`A ${encounter.species.name} hatched and joined your bestiary!`);
+      const { upgraded } = keepWildling(collection, { ...encounter, level: Math.max(1, Math.min(level, encounter.level)) });
+      toast(upgraded ? `A ${encounter.species.name} hatched and joined the one you keep.` : `A ${encounter.species.name} hatched and joined your bestiary!`);
       break;
     }
   }
@@ -232,7 +233,7 @@ function settleFollower(outcome: FollowOutcome): void {
     const species = getSpecies(outcome.pet.speciesId);
     game.grantXp(CREATURE_XP[species.rarity]);
     game.changed();
-    openJoined(creatureGame, outcome.pet);
+    openJoined(creatureGame, outcome.pet, outcome.upgraded, outcome.fromLevel);
   }
   creatureGame.changed();
 }
@@ -474,9 +475,22 @@ map.on('idle', () => {
   });
 });
 // Cooled-down shrines and an ending blessing need a redraw even when nothing moves.
+/** Banks what roosting Wildlings gathered while you were busy or away. */
+function gatherRoostNow(): void {
+  const found = gatherRoost(collection);
+  const parts = Object.entries(found).map(([id, n]) => `${n} ${materialName(id as MaterialId)}`);
+  if (!parts.length) return;
+  game.addMaterials(found);
+  game.changed();
+  creatureGame.changed();
+  toast(`Your Roost gathered ${parts.join(', ')}.`);
+}
+gatherRoostNow();
+
 setInterval(() => {
   // A follower warms to you just by staying near, even with the app closed.
   if (collection.follower) settleFollower(followerTrust(collection, 0));
+  gatherRoostNow();
   refreshWorld();
   hud.render();
 }, 15_000);
