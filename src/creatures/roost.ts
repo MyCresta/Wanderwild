@@ -51,6 +51,39 @@ export function keepWildling(c: Collection, encounter: Encounter): Kept {
   return { pet: kept, upgraded: true, fromLevel };
 }
 
+/**
+ * Folds any second Wildling of a kind into the first, for saves from before one-of-each-kind
+ * (or a newcomer that joined on an older copy of the game). The evolved or higher-level one
+ * stays, taking the best of both. Returns which uids were folded into which.
+ */
+export function mergeDuplicates(c: Collection): Map<string, string> {
+  const folded = new Map<string, string>();
+  const byLine = new Map<string, OwnedPet[]>();
+  for (const pet of c.pets) {
+    const line = lineOf(pet.speciesId)?.id;
+    if (line) byLine.set(line, [...(byLine.get(line) ?? []), pet]);
+  }
+  const stage = (p: OwnedPet) => (lineOf(p.speciesId)?.id === p.speciesId ? 1 : 2);
+  for (const pets of byLine.values()) {
+    if (pets.length < 2) continue;
+    const [keep, ...rest] = [...pets].sort((a, b) => stage(b) - stage(a) || b.level - a.level || b.xp - a.xp);
+    const kind = getSpecies(keep.speciesId).kind;
+    for (const other of rest) {
+      keep.level = Math.max(keep.level, other.level);
+      keep.realmWalkM = Math.max(keep.realmWalkM ?? 0, other.realmWalkM ?? 0) || undefined;
+      keep.homeRing = keep.homeRing || other.homeRing || undefined;
+      if (individualFromSeed(other.seed, kind).gilded && !individualFromSeed(keep.seed, kind).gilded) keep.seed = other.seed;
+      folded.set(other.uid, keep.uid);
+    }
+  }
+  if (!folded.size) return folded;
+  const to = (uid: string) => folded.get(uid) ?? uid;
+  c.pets = c.pets.filter((p) => !folded.has(p.uid));
+  if (c.companionUid) c.companionUid = to(c.companionUid);
+  c.lineup = [...new Set(c.lineup.map(to))];
+  return folded;
+}
+
 /** Wildlings at rest: everyone kept but the fighting party, the companion and any away on an expedition. */
 export function roosting(c: Collection, away: ReadonlySet<string> = new Set()): OwnedPet[] {
   const busy = new Set([...partyPets(c).map((p) => p.uid), c.companionUid, ...away]);
