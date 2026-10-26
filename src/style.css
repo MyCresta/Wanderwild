@@ -859,6 +859,10 @@ body {
   font-size: 10px;
 }
 
+.pet-card-away {
+  background: #6b5d4b;
+}
+
 .xp {
   display: flex;
   flex-direction: column;
@@ -1462,8 +1466,7 @@ body:has(> .catch-scene) .parchment-overlay {
   background: rgba(47, 107, 85, 0.1);
 }
 
-.buildings,
-.eggs {
+.buildings {
   display: grid;
   gap: 10px;
   margin: 0;
@@ -1557,35 +1560,6 @@ body:has(> .catch-scene) .parchment-overlay {
 .building button:disabled {
   opacity: 0.45;
   cursor: default;
-}
-
-.eggs li {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 4px 10px;
-  font-size: 14px;
-}
-
-.eggs .building-bar {
-  grid-column: 2;
-}
-
-.egg {
-  grid-row: span 2;
-  width: 24px;
-  height: 30px;
-  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-  border: 2px solid var(--leather-dark);
-  background: radial-gradient(circle at 35% 30%, #fff, #e8d9b5 60%);
-}
-
-.egg-5 {
-  background: radial-gradient(circle at 35% 30%, #fff, #9fe3d0 60%);
-}
-
-.egg-10 {
-  background: radial-gradient(circle at 35% 30%, #fff, #c9a0e8 60%);
 }
 
 /* ---------- Battle: timing ring, party bench, spells ---------- */

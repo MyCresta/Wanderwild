@@ -16,7 +16,6 @@ import {
   type HeroPower,
   type HeroSpellId,
 } from './hero';
-import { EGG_SHRINE_CHANCE, EGG_SLOTS, rollEgg, walkEggs, type Hatchling } from './eggs';
 import {
   BUILDINGS,
   collect,
@@ -36,6 +35,7 @@ import {
   RARITIES,
   rollGear,
   RUNE_IDS,
+  RUNES,
   RUNE_LEVEL,
   runeSockets,
   SLOT_DEFS,
@@ -66,7 +66,6 @@ export const WALK_REWARD = { wanderlight: 1, coin: 2 };
 export const STRIDE_M = 0.75;
 export const STEP_XP = 1;
 export const VISITED_CELL_M = 50;
-export const EGG_UNLOCK_LEVEL = 8;
 /** Chance a shrine gives a rune once runes are unlocked. */
 export const RUNE_SHRINE_CHANCE = 0.06;
 
@@ -89,7 +88,6 @@ export type GameEvent =
   | { kind: 'levelUp'; level: number; unlocks: Unlock[] }
   | { kind: 'reward'; text: string }
   | { kind: 'stride'; skippedMs: number }
-  | { kind: 'hatch'; hatchling: Hatchling }
   /** A walked glyph took effect. */
   | { kind: 'glyph'; glyph: Glyph; text: string; realm?: RealmId };
 
@@ -175,10 +173,6 @@ export class GameState {
     }
     // After the walk's XP, so a level gained on the way already counts toward the cap.
     this.fillMana(manaFromWalk(s.hero, this.level.level, metres));
-    for (const hatchling of walkEggs(s.eggs, metres * this.bonuses().eggSpeed, now)) {
-      s.hatchlings.push(hatchling);
-      this.emit({ kind: 'hatch', hatchling });
-    }
     this.changed();
     return steps;
   }
@@ -470,23 +464,18 @@ export class GameState {
     s.currencies.coin += reward.coin;
     this.addMaterials(reward.materials);
     this.grantXp(reward.xp);
-    let egg = '';
+    let found = '';
     if (this.level.level >= RUNE_LEVEL && Math.random() < RUNE_SHRINE_CHANCE) {
       const rune = RUNE_IDS[Math.floor(Math.random() * RUNE_IDS.length)];
       s.runes.push(rune);
-      egg += ` A ${rune} rune glints in the stones!`;
-    }
-    if (this.level.level >= EGG_UNLOCK_LEVEL && s.eggs.length < EGG_SLOTS && Math.random() < EGG_SHRINE_CHANCE) {
-      const found = rollEgg(shrine.id, now);
-      s.eggs.push(found);
-      egg += ` You found a ${found.km} km egg!`;
+      found += ` A ${RUNES[rune].name} rune glints in the stones!`;
     }
     const gear = this.findGear({ kind: 'shrine' });
-    if (gear) egg += ` ${gear.text}`;
+    if (gear) found += ` ${gear.text}`;
     const mats = (Object.entries(reward.materials) as [MaterialId, number][])
       .map(([id, n]) => `${n} ${MATERIALS[id].name}`)
       .join(', ');
-    this.emit({ kind: 'reward', text: `+${reward.coin} coin, ${mats}, +${reward.xp} XP. Blessed for 10 minutes.${egg}` });
+    this.emit({ kind: 'reward', text: `+${reward.coin} coin, ${mats}, +${reward.xp} XP. Blessed for 10 minutes.${found}` });
     this.changed();
     return true;
   }

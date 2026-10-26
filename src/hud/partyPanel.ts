@@ -59,6 +59,7 @@ export function renderParty(host: HTMLElement, ctx: GameContext): void {
   }
 
   const inParty = new Set(party.map((p) => p.uid));
+  const away = ctx.away?.() ?? new Set<string>();
   const full = party.length >= PARTY_SIZE;
   const list = document.createElement('ul');
   list.className = 'party-list';
@@ -69,8 +70,9 @@ export function renderParty(host: HTMLElement, ctx: GameContext): void {
     const picked = inParty.has(pet.uid);
     btn.setAttribute('aria-pressed', String(picked));
     // A full party takes no more until one steps out; the last one cannot.
-    btn.disabled = picked ? party.length === 1 : full;
-    petCard(btn, pet, '');
+    // One away on an expedition cannot fight until it is home.
+    btn.disabled = picked ? party.length === 1 : full || away.has(pet.uid);
+    petCard(btn, pet, away.has(pet.uid) ? ' · away' : '');
     btn.addEventListener('click', () => {
       togglePartyMember(c, pet.uid);
       rerender();

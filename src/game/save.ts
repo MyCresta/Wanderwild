@@ -1,4 +1,3 @@
-import type { Egg, Hatchling } from './eggs';
 import { BUILDING_IDS, newHearthstead, type HearthsteadState, type SupplyId } from './hearthstead';
 import type { Expedition } from './expeditions';
 import { MELT, RARITY_ORDER, RUNE_IDS, runeSockets, SLOT_DEFS, SLOTS, type GearItem, type GearRarity, type RuneId, type Slot } from './gear';
@@ -38,9 +37,6 @@ export interface SaveData {
   visitedCells: string[];
   supplies: Record<SupplyId, number>;
   hearthstead: HearthsteadState;
-  eggs: Egg[];
-  /** Hatched creatures waiting for the creatures code to add them to the roster. */
-  hatchlings: Hatchling[];
   /** Owned by the creatures code; its shape is defined there. */
   pets: unknown[];
   /** The piece worn in each slot, with the slot's Forge upgrades and runes. */
@@ -77,8 +73,6 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     visitedCells: [],
     supplies: { tonic: 0, petXp: 0 },
     hearthstead: newHearthstead(now),
-    eggs: [],
-    hatchlings: [],
     pets: [],
     gear: {},
     runes: [],
@@ -146,14 +140,7 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
       strideDay: typeof hearth.strideDay === 'string' ? hearth.strideDay : '',
       strideUsedMs: num(hearth.strideUsedMs),
     },
-    eggs: records(raw.eggs).map((e) => ({
-      id: String(e.id),
-      km: ([2, 5, 10].includes(e.km as number) ? e.km : 2) as Egg['km'],
-      seed: num(e.seed),
-      walkedM: num(e.walkedM),
-      foundAt: num(e.foundAt, now),
-    })),
-    hatchlings: records(raw.hatchlings) as unknown as Hatchling[],
+    // Eggs and their hatchlings were retired (2026-10-26); old saves simply drop them.
     pets: Array.isArray(raw.pets) ? raw.pets : [],
     gear: gear.gear,
     runes: gear.runes,

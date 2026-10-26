@@ -15,7 +15,6 @@ A mobile-first, location-based fantasy game: explore the real world on a fantasy
 - **Shared spawns.** `src/game/spawns.ts` derives creature spawns from a 150 m map cell plus the current 15-minute window, so friends standing together see the same ones and reopening the app cannot reroll them.
 - **The Hearthstead** (from Wayfarer level 3). Herb Garden, Mine, Lumber Grove and Kennel produce while the app is closed, up to 8 hours of storage (24 hours at building level 9). Upgrade them with coin and materials.
 - **Stride boost.** Every 100 m walked moves all Hearthstead timers forward 10 minutes, up to 8 hours a day.
-- **Wild eggs** (from level 8). Shrines sometimes give a 2, 5 or 10 km egg; walk that far to hatch it. Longer eggs hold rarer Wildlings.
 - **Glyphwalking.** The shape of your walk is a spell. A Ring (a round loop of 250 m or more) can finish a companion's evolution, a Stroke (300 m dead straight) pays XP and Wanderlight, and a Knot (the same corner three times in 15 minutes) sets a Waymark where a creature always waits. The trail lives in memory only and is never saved.
 - **Save system.** All progress is one versioned save in IndexedDB, with export and import as a file from the satchel to move to another phone.
 - **The Inkbound Bestiary.** Creatures that wandered off the margins of old maps now roam the streets around you, all drawn and animated in code with SVG and trigonometry (no image files).
@@ -28,9 +27,8 @@ A mobile-first, location-based fantasy game: explore the real world on a fantasy
   - **Timing strikes.** Each attack shows a rune circle closing on the foe; tap as the rings meet for a critical hit.
   - **Wayfarer spells** charged by walking: Fireball after 300 m (damage grows with your level, ignores defence) and Mending after 500 m (heals the party). **Tonics** from the Herb Garden heal the active Wildling.
   - **Gear and the Forge** (from level 5, in the Hearthstead). Craft a Staff (Wildling damage and Fireball), Cloak (party health), Boots (stride boost and Wanderlight), Lantern (reach for creatures and shrines) and Charm (catch chance), each from a different realm's material. Rarities run Worn, Fine, Rare and Mythic (level 30); upgrade to +5, or +10 from level 15, and the look changes at +5 and +10. Your cloak, staff and lantern show on your map token. Spare gear can be salvaged.
-  - **Runes** (from level 15) come from shrines and socket into gear at +5 and +10: Nightfang, Hatchstone, Swiftsole, Seer and Warding.
+  - **Runes** (from level 15) come from shrines and socket into gear at +5 and +10: Nightfang, Kinstone (Wildlings trust you sooner), Swiftsole, Seer and Warding.
   - **Wildling expeditions** (from level 8). Wildlings outside the party travel to a realm you have visited for 1, 2 or 4 hours and bring back its material, coin and Wildling XP. Walking speeds them up.
-  - Eggs that hatch join the bestiary as new Wildlings.
   - Each kind leans towards its realm: Bramble kin in the Wildwood, Tide kin by water, and more Blotspawn in the Barrows.
 
 ## Run it

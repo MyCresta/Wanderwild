@@ -37,7 +37,7 @@ export const UNLOCKS: Unlock[] = [
   { level: 1, what: 'Map, wayshrines, Wildlings, Blotspawn, and Glyphwalking' },
   { level: 3, what: 'The Hearthstead: Herb Garden and Mine' },
   { level: 5, what: 'Forge upgrades to +5' },
-  { level: 8, what: 'Wildling expeditions and wild eggs' },
+  { level: 8, what: 'Wildling expeditions' },
   { level: 10, what: 'Wardens and realm claiming' },
   { level: 15, what: 'Runes and Forge upgrades to +10' },
   { level: 20, what: 'A second hero class, Mythic gear, and Rifts' },

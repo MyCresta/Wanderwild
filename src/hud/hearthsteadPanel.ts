@@ -1,11 +1,10 @@
 import { BUILDING_IDS, BUILDINGS, capMs, isFull, MAX_BUILDING_LEVEL, msUntilFull, ratePerHour, storageCap, stored, STRIDE_DAILY_CAP_MS, strideLeftToday, upgradeCost } from '../game/hearthstead';
 import { MATERIALS } from '../game/realms';
 import type { GameState } from '../game/state';
-import { EGG_UNLOCK_LEVEL } from '../game/state';
-import { formatCount, formatDistance, formatDuration } from './format';
+import { formatCount, formatDuration } from './format';
 import { EXPEDITION_LENGTHS, EXPEDITION_LEVEL, EXPEDITION_SLOTS, expeditionProgress, msLeft } from '../game/expeditions';
 import { REALMS } from '../game/realms';
-import { grantPetXp, partyPets } from '../creatures/collection';
+import { companion, grantPetXp, partyPets } from '../creatures/collection';
 import { getSpecies } from '../creatures/species';
 import type { GameContext } from '../ui/context';
 import { journal } from '../ui/journal';
@@ -13,7 +12,7 @@ import { hintAttr } from '../ui/hint';
 
 const HEARTHSTEAD_LEVEL = Math.min(...BUILDING_IDS.map((id) => BUILDINGS[id].unlockLevel));
 
-/** The journal's Hearth tab: buildings to build, collect and upgrade, expeditions and the egg incubator. */
+/** The journal's Hearth tab: buildings to build, collect and upgrade, and expeditions. */
 export class HearthsteadPanel {
   private readonly body = journal.pane('hearth');
 
@@ -90,11 +89,12 @@ export class HearthsteadPanel {
           ${done ? `<button type="button" data-act="exp-claim" data-pet="${e.petUid}"${hintAttr(true)}>Welcome home</button>` : `<p class="building-stats">Back in ${formatDuration(msLeft(e, now))}</p>`}</li>`;
       })
       .join('');
-    const free = c.pets.filter((p) => !away.has(p.uid) && !party.has(p.uid));
+    // The companion walks with you and the party fights, so only the rest can go.
+    const free = c.pets.filter((p) => !away.has(p.uid) && !party.has(p.uid) && p.uid !== companion(c)?.uid);
     let form = '';
     if (s.expeditions.length >= EXPEDITION_SLOTS) form = '<p class="satchel-hint">All expedition slots are in use.</p>';
     else if (!s.realmsVisited.length) form = '<p class="satchel-hint">Walk into a realm first; Wildlings can only go where you have been.</p>';
-    else if (!free.length) form = '<p class="satchel-hint">Every Wildling is in your party or away. Those outside the party can explore.</p>';
+    else if (!free.length) form = '<p class="satchel-hint">Every Wildling is in your party, walking with you or away. Roosting ones can explore.</p>';
     else
       form = `<div class="exp-form">
         <label>Realm <select id="exp-realm">${s.realmsVisited.map((r) => `<option value="${r}">${REALMS[r].name}</option>`).join('')}</select></label>
@@ -157,24 +157,10 @@ export class HearthsteadPanel {
         </div>
       </li>`;
     }).join('');
-    const eggs =
-      level < EGG_UNLOCK_LEVEL
-        ? `<p class="satchel-hint">Opens at level ${EGG_UNLOCK_LEVEL}.</p>`
-        : s.eggs.length
-          ? `<ul class="eggs">${s.eggs
-              .map(
-                (e) =>
-                  `<li><span class="egg egg-${e.km}" aria-hidden="true"></span><b>${e.km} km egg</b> ${formatDistance(e.walkedM)} of ${e.km} km
-                  <span class="building-bar"><span style="width:${(100 * e.walkedM) / (e.km * 1000)}%"></span></span></li>`,
-              )
-              .join('')}</ul>`
-          : '<p class="satchel-hint">No eggs yet. Touch shrines to find one.</p>';
     this.body.innerHTML = `
       <p class="stride-note" title="Every 100 m you walk moves all timers forward 10 minutes">Walking skips time: <b>${formatDuration(STRIDE_DAILY_CAP_MS - left)}</b> of ${formatDuration(STRIDE_DAILY_CAP_MS)} today</p>
       <ul class="buildings">${cards}</ul>
       <h3>Expeditions</h3>
-      ${this.expeditionsHtml()}
-      <h3>Incubator</h3>
-      ${eggs}`;
+      ${this.expeditionsHtml()}`;
   }
 }
