@@ -44,7 +44,7 @@ export const MOVES: Record<string, Move> = Object.fromEntries(
     m('strike', 'Strike', null, 1, 0),
     m('nip', 'Nip', null, 0.75, 0, 'drain'),
     m('headbutt', 'Headbutt', null, 1.5, 2),
-    m('maul', 'Maul', null, 2.1, 3),
+    m('maul', 'Maul', null, 2, 3),
     // Quick element jabs, shared by every creature that knows them.
     m('vine-lash', 'Vine Lash', 'grove', JAB, 0),
     m('spray', 'Spray', 'tide', JAB, 0),
@@ -53,12 +53,12 @@ export const MOVES: Record<string, Move> = Object.fromEntries(
     m('gust', 'Gust', 'gale', JAB, 0),
     m('glint', 'Glint', 'lumen', JAB, 0),
     // Element arts: tricks rather than blows.
-    m('kindle', 'Kindle', 'ember', 0.6, 3, 'burn'),
+    m('kindle', 'Kindle', 'ember', 0.7, 3, 'burn'),
     m('wellspring', 'Wellspring', 'tide', 0, 3, 'heal'),
     m('thornguard', 'Thornguard', 'grove', 0, 3, 'thorns'),
     m('bulwark', 'Bulwark', 'stone', 0, 3, 'bulwark'),
-    m('updraft', 'Updraft', 'gale', 0.6, 3, 'dodge'),
-    m('glimmer', 'Glimmer', 'lumen', 0, 3, 'focus'),
+    m('updraft', 'Updraft', 'gale', 0.5, 3, 'dodge'),
+    m('glimmer', 'Glimmer', 'lumen', 1, 3, 'focus'),
     // Signatures of the wild forms.
     m('thistle-volley', 'Thistle Volley', 'grove', SIG, 2),
     m('undertow', 'Undertow', 'tide', SIG, 2),
@@ -115,20 +115,32 @@ export const pipText = (move: Move) => {
 
 /** A few words for what the move does besides hitting. */
 export const EFFECT_TEXT: Record<MoveEffect, { short: string; long: string }> = {
-  burn: { short: 'burns', long: 'Sets the foe burning for 3 turns.' },
-  dodge: { short: 'then dodges', long: 'Then dodges the next attack.' },
-  heal: { short: 'Heals a third', long: 'Heals a third of its health.' },
-  thorns: { short: 'Halves + thorns', long: 'Halves the next hit and throws half of it back.' },
-  bulwark: { short: 'Guard 2 turns', long: 'Takes 60% less damage for 2 turns.' },
-  focus: { short: 'Next hit crits', long: 'Marks the weak spot: the next attack is critical.' },
-  drain: { short: 'drains', long: 'Heals half the damage it deals.' },
+  burn: { short: '🔥', long: 'Sets the foe burning for 3 turns.' },
+  dodge: { short: '💨', long: 'Then dodges the next attack.' },
+  heal: { short: '♥ Heal', long: 'Heals a third of its health.' },
+  thorns: { short: '⛨ Thorns', long: 'Takes half damage for 2 turns and throws half of what it blocks back.' },
+  bulwark: { short: '⛨ Shield', long: 'Takes 70% less damage for 2 turns.' },
+  focus: { short: '✦', long: 'Marks the weak spot: the next attack is critical.' },
+  drain: { short: '♥', long: 'Heals half the damage it deals.' },
 };
+
+/** How often a move can be used, in a few words. */
+export const cadence = (wait: number) => (wait <= 0 ? 'Every turn' : wait === 2 ? 'Every 2nd turn' : wait === 3 ? 'Every 3rd turn' : `Every ${wait}th turn`);
+
+/** How long until a resting move is ready again, short enough for a button. */
+export const readyIn = (turns: number) => `Ready in ${turns}`;
+
+/** What a move does at a glance: power pips, then any trick; a pure trick says what it does. */
+export function moveSummary(move: Move): string {
+  if (move.power <= 0) return move.effect ? EFFECT_TEXT[move.effect].short : '';
+  return `${pipText(move)}${move.effect ? ` +${EFFECT_TEXT[move.effect].short}` : ''}`;
+}
 
 /** One line describing a move fully, for tooltips and the Bestiary. */
 export function moveBlurb(move: Move): string {
   const parts: string[] = [];
   if (move.power > 0) parts.push(`Power ${Math.round(move.power * 50)}${move.element ? '' : ', plain (no element)'}.`);
   if (move.effect) parts.push(EFFECT_TEXT[move.effect].long);
-  parts.push(move.wait ? `Usable every ${move.wait === 2 ? 'other' : 'third'} turn.` : 'Usable every turn.');
+  parts.push(`${cadence(move.wait)}.`);
   return parts.join(' ');
 }

@@ -63,6 +63,6 @@ export function wheelHelp(highlight?: Element): HTMLElement {
     { class: 'wheel-help' },
     h('summary', {}, 'Elemental Wheel'),
     h('div', { class: 'wheel-body' }, wheelFigure(highlight), wheelLines()),
-    h('p', { class: 'hint' }, 'Strong hits deal ×1.5, weak ones ×0.6. Plain ⚔ moves are never strong or weak. ● pips show power; ⚡ the faster side attacks first.'),
+    h('p', { class: 'hint' }, 'Strong hits deal ×1.5, weak ones ×0.6. ▲ marks a strong move, ▼ a weak one; plain moves are neither. ● dots show power; ⚡ the faster side attacks first.'),
   );
 }
