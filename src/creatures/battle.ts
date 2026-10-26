@@ -235,7 +235,7 @@ export class Battle {
   }
 
   /** Turns a move rests after use; Quick Arts talents shorten the slow ones. */
-  private waitFor(move: Move): number {
+  waitFor(move: Move): number {
     return move.wait >= 3 ? Math.max(2, move.wait - (this.hero?.artHaste ?? 0)) : move.wait;
   }
 
@@ -442,11 +442,11 @@ export class Battle {
         break;
       }
       case 'thorns':
-        this.guard = { turns: 1, through: 0.5, reflect: 0.5 };
+        this.guard = { turns: 2, through: 0.5, reflect: 0.5 };
         events.push({ kind: 'status', target: 'pet', status: 'guard', name });
         break;
       case 'bulwark':
-        this.guard = { turns: 2, through: 0.4, reflect: 0 };
+        this.guard = { turns: 2, through: 0.3, reflect: 0 };
         events.push({ kind: 'status', target: 'pet', status: 'guard', name });
         break;
       case 'focus':

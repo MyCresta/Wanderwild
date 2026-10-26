@@ -9,7 +9,6 @@ import {
   type Fighter,
   type HpSnap,
 } from '../creatures/battle';
-import { STRONG } from '../creatures/elements';
 import { BOSS_TITLES, FOE_TRAITS, RANKS, rankLabel } from '../creatures/foes';
 import {
   FIT_TO_FIGHT,
@@ -25,8 +24,7 @@ import {
 import { ELEMENTS, getSpecies } from '../creatures/species';
 import type { Encounter } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
-import { EFFECT_TEXT, moveBlurb, pipText } from '../creatures/moves';
-import { moveGlyph } from './moves';
+import { cadence, moveBlurb, moveSummary, readyIn } from '../creatures/moves';
 import type { GameContext } from './context';
 import { h, openSheet, toast, wait } from './dom';
 import { elementTag, wheelHelp } from './wheel';
@@ -69,13 +67,6 @@ function floatText(host: HTMLElement, text: string, kind: string) {
   const node = h('span', { class: `float-text float-${kind}` }, text);
   host.appendChild(node);
   setTimeout(() => node.remove(), 1100);
-}
-
-/** "Strong ×1.5", "Weak ×0.6" or nothing, for a button or a bench pet. */
-function edgeTag(edge: number): HTMLElement | null {
-  if (edge > 1) return h('span', { class: 'edge edge-strong' }, `Strong ×${STRONG}`);
-  if (edge < 1) return h('span', { class: 'edge edge-weak' }, 'Weak ×0.6');
-  return null;
 }
 
 /**
@@ -458,10 +449,15 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       const btn = attacks[slot];
       const wait = cd[slot];
       const edge = battle.edge(move);
-      // Power as pips, so moves compare at a glance; a trick says what it does instead.
-      const sub = wait > 0 ? `Ready in ${wait}` : move.power > 0 ? `${pipText(move)}${move.effect ? ` ${EFFECT_TEXT[move.effect].short}` : ''}` : EFFECT_TEXT[move.effect!].short;
-      card(btn, `${moveGlyph(move)} ${move.name}`, sub, wait === 0 ? edgeTag(edge) : null);
-      btn.title = moveBlurb(move);
+      // Fixed lines: the name (its colour edge shows the element), power pips and any trick, and how often it can be used.
+      // A ▲ or ▼ in the corner marks it strong or weak against this foe.
+      btn.replaceChildren(
+        h('span', { class: 'cmd-name' }, move.name),
+        h('span', { class: 'cmd-sub cmd-power' }, moveSummary(move)),
+        h('span', { class: `cmd-sub cmd-wait${wait > 0 ? ' cmd-resting' : ''}` }, wait > 0 ? readyIn(wait) : cadence(battle.waitFor(move))),
+        h('span', { class: `cmd-edge${edge > 1 ? ' edge-strong' : edge < 1 ? ' edge-weak' : ''}`, 'aria-hidden': 'true' }, edge > 1 ? '▲' : edge < 1 ? '▼' : ''),
+      );
+      btn.title = `${moveBlurb(move)}${edge > 1 ? ' Strong against this foe (×1.5).' : edge < 1 ? ' Weak against this foe (×0.6).' : ''}`;
       btn.disabled = busy || forced || wait > 0;
       btn.classList.toggle('cmd-strong', wait === 0 && edge > 1);
       btn.style.setProperty('--el', move.element ? ELEMENTS[move.element].color : 'var(--leather)');

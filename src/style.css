@@ -3845,10 +3845,16 @@ span.forge-up {
 }
 
 .move-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 8px;
   font-weight: normal;
+}
+
+.move-cadence {
+  grid-column: 1 / -1;
+  margin-top: -2px;
+  opacity: 0.65;
 }
 
 .move-name {
@@ -3865,11 +3871,55 @@ span.forge-up {
   opacity: 0.85;
 }
 
+/* Attack buttons keep one fixed size: room for a two-line name, then two single lines that trim rather than wrap. */
+.cmd-attack {
+  height: 80px;
+  min-height: 80px;
+}
+
+.cmd-attack .cmd-name {
+  display: -webkit-box;
+  height: 2.3em;
+  padding-right: 10px;
+  overflow: hidden;
+  font-size: 13px;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 .cmd-attack .cmd-sub {
-  letter-spacing: 1px;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.cmd-edge {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  font-size: 12px;
+}
+
+.cmd-power {
+  letter-spacing: 1px;
+}
+
+.cmd-wait {
+  opacity: 0.65;
+}
+
+.cmd-wait.cmd-resting {
+  font-weight: bold;
+  opacity: 1;
+}
+
+.edge-strong {
+  color: #3e7a2e;
+}
+
+.edge-weak {
+  color: #a3352a;
 }
 
 .trait-blurb {
