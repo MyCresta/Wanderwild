@@ -56,6 +56,8 @@ import {
   type ExpeditionReward,
 } from './expeditions';
 import { hashString, seededRandom } from './rng';
+import { reachMark, trailChest, trailDone, trailToday, type Trail, type TrailChest } from './trail';
+import type { CompanionFind } from './companionFinds';
 import type { Glyph } from './glyphs';
 import { MAX_WAYMARKS } from './waymarks';
 
@@ -502,6 +504,43 @@ export class GameState {
     const gear = this.findGear({ kind: 'curio', onFoot });
     this.changed();
     return { ...reward, gear };
+  }
+
+  /** Banks what the companion sniffed out on the road. */
+  takeFind(find: CompanionFind): void {
+    this.save.currencies.coin += find.coin;
+    this.save.currencies.wanderlight += find.wanderlight;
+    this.addMaterials(find.materials);
+    this.changed();
+  }
+
+  /** Today's wander trail around `at`, drawing a fresh one each morning. */
+  trail(at: { lat: number; lng: number }, now = Date.now()): { trail: Trail; fresh: boolean } {
+    const trail = trailToday(this.save.trail, at, now);
+    const fresh = trail !== this.save.trail;
+    if (fresh) {
+      this.save.trail = trail;
+      this.changed();
+    }
+    return { trail, fresh };
+  }
+
+  /** Reaches a mark of today's trail; the last one opens the chest. Null if it did not count. */
+  reachTrailMark(index: number, how: 'foot' | 'farsight', realm: RealmId): { chest: (TrailChest & { gear: GearFind | null }) | null } | null {
+    const trail = this.save.trail;
+    if (!trail || !reachMark(trail, index, how)) return null;
+    let chest: (TrailChest & { gear: GearFind | null }) | null = null;
+    if (trailDone(trail) && !trail.opened) {
+      trail.opened = true;
+      const loot = trailChest(trail, realm);
+      this.save.currencies.coin += loot.coin;
+      this.save.currencies.wanderlight += loot.wanderlight;
+      this.addMaterials(loot.materials);
+      this.grantXp(loot.xp);
+      chest = { ...loot, gear: this.findGear({ kind: 'chest', hints: loot.peeked ? 2 : 1 }) };
+    }
+    this.changed();
+    return { chest };
   }
 
   changed(): void {
