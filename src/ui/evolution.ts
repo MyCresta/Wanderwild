@@ -1,4 +1,4 @@
-import { petBoost, type OwnedPet } from '../creatures/collection';
+import { petBonus, type OwnedPet } from '../creatures/collection';
 import { evolve, evolutionStatus } from '../creatures/evolution';
 import { getSpecies } from '../creatures/species';
 import { getMove } from '../creatures/moves';
@@ -39,8 +39,8 @@ export function openEvolution(ctx: GameContext, pet: OwnedPet, onDone?: () => vo
   if (!status?.ready) return;
   const from = getSpecies(pet.speciesId);
   const into = status.into;
-  const before = statsAt(from.base, pet.level, petBoost(pet));
-  const after = statsAt(into.base, pet.level, petBoost(pet));
+  const before = statsAt(from.base, pet.level, petBonus(pet));
+  const after = statsAt(into.base, pet.level, petBonus(pet));
 
   const backdrop = createBackdrop(into.element, pet.seed);
   const oldSvg = createCreatureSvg({ speciesId: from.id, seed: pet.seed, size: 240 });

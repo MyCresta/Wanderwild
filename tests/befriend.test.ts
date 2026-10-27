@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BLOT_TRUST_M, dismissFollower, followerTrust, followerWaitMs, HOURS_TO_BEFRIEND, startFollowing, walkNeeded, WALK_TO_BEFRIEND } from '../src/creatures/befriend';
 import { elementSets, gatherRoost, keepWildling, mergeDuplicates, roosting, SET_BONUS, setBonus } from '../src/creatures/roost';
-import { addPet, emptyCollection, petBoost } from '../src/creatures/collection';
-import { BOOST_MAX, BOOST_PER_KIN, BOOST_ROLL, rollBoost, STAT_KEYS, statsAt } from '../src/creatures/stats';
+import { addPet, emptyCollection, loadCollection, petBonus } from '../src/creatures/collection';
+import { BONUS_MAX, BONUS_ROLL, BONUS_STEP, STAT_KEYS, statsAt } from '../src/creatures/stats';
 import { getSpecies, PETS } from '../src/creatures/species';
 
 const wild = (id = 'driftfin', level = 4) => ({ species: getSpecies(id), level, seed: 42 });
@@ -79,25 +79,37 @@ describe('the Roost', () => {
     expect(c.pets).toHaveLength(1);
   });
 
-  it('gives each Wildling its own stat bonuses, and kin that join raise them', () => {
+  it('gives each Wildling its own flat stat bonuses, and each kin that joins adds a point', () => {
     const c = emptyCollection();
     const first = keepWildling(c, wild('emberkit', 4)).pet;
-    const born = petBoost(first);
+    const born = petBonus(first);
     for (const k of STAT_KEYS) {
-      expect(born[k]).toBeGreaterThanOrEqual(0);
-      expect(born[k]).toBeLessThanOrEqual(BOOST_ROLL);
+      expect(born[k] % BONUS_STEP[k]).toBe(0);
+      expect(born[k]).toBeLessThanOrEqual(BONUS_ROLL * BONUS_STEP[k]);
     }
     const out = keepWildling(c, { ...wild('emberkit', 2), seed: 99 });
-    const now = petBoost(first);
-    for (const k of STAT_KEYS) {
-      expect(now[k]).toBe(Math.max(born[k], rollBoost(99)[k]) + BOOST_PER_KIN);
-      expect(out.gained?.[k]).toBe(now[k] - born[k]);
-    }
-    // Stronger stats in battle and the bestiary, never past the cap.
+    const now = petBonus(first);
+    expect(out.gained).toBeTruthy();
+    const { stat, amount } = out.gained!;
+    expect(amount).toBe(BONUS_STEP[stat]);
+    for (const k of STAT_KEYS) expect(now[k]).toBe(born[k] + (k === stat ? amount : 0));
+    // Flat on top of the plain stat, never past the cap.
     const plain = statsAt(getSpecies('emberkit').base, 10);
-    expect(statsAt(getSpecies('emberkit').base, 10, now).atk).toBeGreaterThanOrEqual(plain.atk);
-    for (let i = 0; i < 30; i++) keepWildling(c, { ...wild('emberkit', 1), seed: 1000 + i });
-    for (const k of STAT_KEYS) expect(petBoost(first)[k]).toBe(BOOST_MAX);
+    expect(statsAt(getSpecies('emberkit').base, 10, now).atk).toBe(plain.atk + now.atk);
+    for (let i = 0; i < 60; i++) keepWildling(c, { ...wild('emberkit', 1), seed: 1000 + i });
+    for (const k of STAT_KEYS) expect(petBonus(first)[k]).toBe(BONUS_MAX * BONUS_STEP[k]);
+    expect(keepWildling(c, { ...wild('emberkit', 1), seed: 7 }).gained).toBeNull();
+  });
+
+  it('turns percent bonuses from older saves into flat points', () => {
+    const pet = { uid: 'a', speciesId: 'emberkit', seed: 5, level: 6, xp: 0, caughtAt: 0, boost: { hp: 30, atk: 30, def: 30, spd: 30 } };
+    const saved = JSON.stringify({ ...emptyCollection(), pets: [pet] });
+    const c = loadCollection({ getItem: () => saved });
+    const loaded = c.pets[0] as typeof c.pets[0] & { boost?: unknown };
+    expect(loaded.boost).toBeUndefined();
+    const total = STAT_KEYS.reduce((sum, k) => sum + loaded.bonus![k] / BONUS_STEP[k], 0);
+    expect(total).toBeGreaterThan(0);
+    for (const k of STAT_KEYS) expect(loaded.bonus![k]).toBeLessThanOrEqual(BONUS_MAX * BONUS_STEP[k]);
   });
 
   it('a follower joining a kind you keep upgrades it instead of adding another', () => {

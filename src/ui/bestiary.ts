@@ -1,4 +1,4 @@
-import { addPet, companion, petBoost, STARTERS, type OwnedPet } from '../creatures/collection';
+import { addPet, companion, petBonus, STARTERS, type OwnedPet } from '../creatures/collection';
 import { hashString, mulberry32 } from '../creatures/rng';
 import { ALL_SPECIES, ELEMENTS, getSpecies } from '../creatures/species';
 import { moveList } from './moves';
@@ -35,9 +35,9 @@ function petCard(pet: OwnedPet, isCompanion: boolean, onClick: () => void, away 
 function petDetail(ctx: GameContext, sheet: Page, pet: OwnedPet, back: () => void) {
   const species = getSpecies(pet.speciesId);
   const individual = individualFromSeed(pet.seed, species.kind);
-  const boost = petBoost(pet);
-  const stats = statsAt(species.base, pet.level, boost);
-  const stat = (k: StatKey) => h('dd', {}, String(stats[k]), boost[k] > 0 && h('small', { class: 'stat-boost' }, ` +${boost[k]}%`));
+  const bonus = petBonus(pet);
+  const stats = statsAt(species.base, pet.level, bonus);
+  const stat = (k: StatKey) => h('dd', {}, String(stats[k]), bonus[k] > 0 && h('small', { class: 'stat-boost' }, ` +${bonus[k]}`));
   const isCompanion = companion(ctx.collection)?.uid === pet.uid;
   const maxed = pet.level >= MAX_LEVEL;
   const need = xpToNext(pet.level);
