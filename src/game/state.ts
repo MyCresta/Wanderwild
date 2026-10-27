@@ -58,6 +58,8 @@ import {
 import { hashString, seededRandom } from './rng';
 import { reachMark, trailChest, trailDone, trailToday, type Trail, type TrailChest } from './trail';
 import type { CompanionFind } from './companionFinds';
+import { peddlerToday, peddlerWare, type Peddler, type PeddlerWare } from './peddler';
+import { keepStreak, STREAK_XP_PER_DAY, STREAK_MAX_DAYS, streakDays, streakXp } from './streak';
 import type { Glyph } from './glyphs';
 import { MAX_WAYMARKS } from './waymarks';
 
@@ -135,7 +137,7 @@ export class GameState {
 
   grantXp(amount: number): void {
     const before = this.level.level;
-    this.save.wayfarer.xp += Math.round(amount * (this.blessing() === 'archive' ? INSIGHT_XP : 1));
+    this.save.wayfarer.xp += Math.round(amount * (this.blessing() === 'archive' ? INSIGHT_XP : 1) * streakXp(this.save.streak));
     const after = this.level.level;
     if (after > before) this.emit({ kind: 'levelUp', level: after, unlocks: unlocksBetween(before, after) });
   }
@@ -150,6 +152,12 @@ export class GameState {
     return this.save.steps.day === dayKey(now) ? this.save.steps.count : 0;
   }
 
+  /** Days in the walk streak that is still alive, and whether today has kept it. */
+  streak(now = Date.now()): { days: number; kept: boolean } {
+    const days = streakDays(this.save.streak, now);
+    return { days, kept: days > 0 && this.save.streak.day === dayKey(now) };
+  }
+
   /** Records metres walked: STEP_XP per step, and the rest every full 100 m. Returns the number of 100 m paid. */
   recordWalk(metres: number, now = Date.now()): number {
     const s = this.save;
@@ -160,6 +168,12 @@ export class GameState {
       if (s.steps.day !== today) s.steps = { day: today, count: 0 };
       s.steps.count += footfalls;
       this.grantXp(footfalls * STEP_XP);
+      const days = keepStreak(s.streak, s.steps.count, now);
+      if (days) {
+        const bonus = Math.round(100 * STREAK_XP_PER_DAY * Math.min(STREAK_MAX_DAYS, days));
+        const line = days === 1 ? 'Walk streak lit' : `Walk streak: ${days} days`;
+        this.emit({ kind: 'reward', text: `${line}! +${bonus}% XP while you keep it.` });
+      }
     }
     const steps = Math.floor((s.distanceMetres - s.rewardedMetres) / WALK_REWARD_STEP_M);
     if (steps > 0) {
@@ -541,6 +555,41 @@ export class GameState {
     }
     this.changed();
     return { chest };
+  }
+
+  /** Today's peddler around `at`, a new one each morning. */
+  peddler(at: { lat: number; lng: number }, now = Date.now()): { peddler: Peddler; fresh: boolean } {
+    const peddler = peddlerToday(this.save.peddler, at, now);
+    const fresh = peddler !== this.save.peddler;
+    if (fresh) {
+      this.save.peddler = peddler;
+      this.changed();
+    }
+    return { peddler, fresh };
+  }
+
+  /** What today's peddler sells, judged against what the Wayfarer wears now. */
+  peddlerWare(): PeddlerWare | null {
+    const p = this.save.peddler;
+    return p ? peddlerWare(p, this.level.level, this.save.gear) : null;
+  }
+
+  /** Buys the peddler's ware. Returns a line saying what was bought, or null if it could not be. */
+  buyFromPeddler(): string | null {
+    const s = this.save;
+    const ware = this.peddlerWare();
+    if (!s.peddler || !ware || s.currencies.coin < ware.price) return null;
+    s.currencies.coin -= ware.price;
+    s.peddler.sold = true;
+    let text: string;
+    if (ware.kind === 'rune') {
+      s.runes.push(ware.rune);
+      text = `Bought a ${RUNES[ware.rune].name} rune. Set it at the Forge.`;
+    } else {
+      text = this.takeGear(ware.slot, ware.rarity).text.replace('Found', 'Bought');
+    }
+    this.changed();
+    return text;
   }
 
   changed(): void {

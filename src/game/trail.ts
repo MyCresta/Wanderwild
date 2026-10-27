@@ -41,7 +41,7 @@ export interface TrailChest {
 }
 
 /** A point `metres` from `from` on a compass bearing in degrees. */
-function offset(from: { lat: number; lng: number }, bearing: number, metres: number): { lat: number; lng: number } {
+export function offset(from: { lat: number; lng: number }, bearing: number, metres: number): { lat: number; lng: number } {
   const rad = (bearing * Math.PI) / 180;
   const dLat = (metres * Math.cos(rad)) / 111_320;
   const dLng = (metres * Math.sin(rad)) / (111_320 * Math.cos((from.lat * Math.PI) / 180));
