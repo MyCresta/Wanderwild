@@ -28,11 +28,11 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   herbGarden: {
     id: 'herbGarden',
     name: 'Herb Garden',
-    blurb: 'Brews healing tonics for battle.',
+    blurb: 'Brews a healing tonic every two hours.',
     unlockLevel: 3,
     product: { kind: 'supply', id: 'tonic' },
     productName: 'Tonic',
-    baseRate: 2,
+    baseRate: 0.5,
     upgradeMaterial: 'hearthgrain',
   },
   mine: {

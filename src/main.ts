@@ -13,20 +13,20 @@ import { watchLocation } from './geo/location';
 import { setupInstallButton } from './install';
 import { loadSave } from './game/save';
 import { GameState } from './game/state';
-import type { Shrine } from './game/shrines';
+import { BLESSINGS, type Shrine } from './game/shrines';
 import { isNight } from './game/gear';
 import { MATERIALS, type MaterialId, type RealmId } from './game/realms';
 import { installProbeLayers, realmAt, shrinesNear } from './map/realmProbe';
 import { ShrineLayer } from './map/shrineLayer';
 import { Hud } from './hud/hud';
 import { HearthsteadPanel } from './hud/hearthsteadPanel';
+import { ExpeditionsPanel } from './hud/expeditionsPanel';
 import { renderParty } from './hud/partyPanel';
 import { journal } from './ui/journal';
 import { ForgePanel } from './hud/forgePanel';
 import { BagPanel } from './hud/bagPanel';
 import { HeroPanel, openHeroChoice } from './hud/heroPanel';
 import { heroSvg } from './hud/heroArt';
-import { formatWait } from './hud/format';
 import { CompanionMarker, CreatureMarkers, FollowerMarker } from './map/creatures';
 import { companion, loadCollection, partyLevel, saveCollection, walkRewards } from './creatures/collection';
 import { foeThreat } from './creatures/foes';
@@ -36,7 +36,10 @@ import { creatureForSpawn, type Encounter } from './creatures/stats';
 import { wildlingWanted } from './creatures/scarcity';
 import type { GameContext } from './ui/context';
 import { openBattle } from './ui/battle';
-import { lairsNear } from './game/lairs';
+import { lairsNear, lairWeek } from './game/lairs';
+import { wantedAnchor, wantedPosts, type Bounty, type WantedAnchor, type WantedPost } from './game/wanted';
+import { WantedBoard } from './hud/wantedBoard';
+import { SkyWatch } from './game/weather';
 import { rivalsNear } from './game/rivals';
 import { renderBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
@@ -55,7 +58,10 @@ import { watchLayout } from './ui/layout';
 import { installOrbitCamera } from './map/orbitCamera';
 import { Farsight } from './ui/farsight';
 import { CurioLayer } from './map/curioLayer';
-import { CURIO_KINDS, curiosNear, FARSIGHT_RANGE_M, FARSIGHT_SHARE, type Curio } from './game/farsight';
+import { CURIO_KINDS, curiosNear, FARSIGHT_SHARE, farsightRange, type Curio } from './game/farsight';
+import { companionFind, FIND_EVERY_M, findsBetween } from './game/companionFinds';
+import { marksReached, peekUsed, TRAIL_MARKS } from './game/trail';
+import { TrailLayer } from './map/trailLayer';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -133,10 +139,12 @@ function useShrine(shrine: Shrine): void {
   if (!lastFix) return hud.toast('Find your location first to reach a shrine.');
   const away = haversine(lastFix, shrine);
   if (!onFoot(shrine)) return hud.toast(`${shrine.name} is ${Math.round(away)} m away. Walk until it is inside your ring to touch it.`);
-  const wait = game.shrineReadyAt(shrine) - Date.now();
-  if (wait > 0) return hud.toast(`${shrine.name} is gathering its power. Ready in ${formatWait(wait)}.`);
+  const blessing = BLESSINGS[shrine.kind];
+  if (game.shrineReadyAt(shrine) > Date.now())
+    return hud.toast(`${shrine.name} already blessed you today. Its ${blessing.name} (${blessing.effect}) returns tomorrow.`);
   if (game.useShrine(shrine, realmAt(map, shrine.lng, shrine.lat) ?? currentRealm ?? 'hearthfields')) sound.play('shrine');
   refreshWorld();
+  showReach();
 }
 
 const shrines = new ShrineLayer(map, useShrine);
@@ -198,7 +206,18 @@ journal.onShow('wayfarer', () => renderParty($('satchel-party'), creatureGame));
 journal.onShow('bestiary', () =>
   renderBestiary(creatureGame, { body: journal.pane('bestiary'), setTitle: (text) => journal.setTitle(text), close: () => journal.close() }),
 );
-new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame);
+new HearthsteadPanel(game, (text) => hud.toast(text));
+new WantedBoard({
+  posts: () => wanted(),
+  claimed: (id) => id in collection.cleared,
+  here: () => lastFix,
+  show(post) {
+    journal.close();
+    setFollowing(false);
+    map.easeTo({ center: [post.spawn.lng, post.spawn.lat], zoom: Math.max(map.getZoom(), 16) });
+  },
+});
+new ExpeditionsPanel(game, creatureGame, (text) => hud.toast(text));
 new HeroPanel(game, forge, (text) => hud.toast(text));
 new BagPanel(game, creatureGame, (text) => hud.toast(text));
 
@@ -229,6 +248,19 @@ function clearSpawn(spawn: Spawn, won: boolean, remote = false): void {
   creatureGame.changed();
 }
 
+/** Pays a Wanted poster's bounty on top of the fight's own spoils; by Farsight it pays a share. */
+function claimBounty(bounty: Bounty, remote: boolean): void {
+  const share = remote ? FARSIGHT_SHARE : 1;
+  const coin = Math.round(bounty.coin * share);
+  const xp = Math.round(bounty.xp * share);
+  game.save.currencies.coin += coin;
+  game.grantXp(xp);
+  const gear = bounty.gear ? game.findGear({ kind: 'chest', hints: 0 }) : null;
+  game.changed();
+  sound.play('coin');
+  toast(`Bounty on ${bounty.name} claimed: +${coin} coin, +${xp} XP.${gear ? ` ${gear.text}` : ''}`);
+}
+
 /** A follower has been won over, or has given up and wandered off. */
 function settleFollower(outcome: FollowOutcome): void {
   if (outcome?.kind === 'joined') {
@@ -242,8 +274,10 @@ function settleFollower(outcome: FollowOutcome): void {
 
 /** Within the purple ring of where the Wayfarer actually stands. */
 const onFoot = (p: { lat: number; lng: number }) => !!lastFix && haversine(lastFix, p) <= playerReach(game.bonuses().reachM);
+/** How far Farsight sees: a lantern widens it three times as much as it widens reach. */
+const farsightReach = () => farsightRange(game.bonuses().reachM);
 /** In Farsight, and inside the dashed ring the eye may roam. */
-const byFarsight = (p: { lat: number; lng: number }) => farsight.active && !!lastFix && haversine(lastFix, p) <= FARSIGHT_RANGE_M;
+const byFarsight = (p: { lat: number; lng: number }) => farsight.active && !!lastFix && haversine(lastFix, p) <= farsightReach();
 
 function meet(spawn: Spawn, encounter: Encounter): void {
   // By Farsight anything on the map can be met, for a smaller reward; in person it pays in full.
@@ -264,6 +298,7 @@ function meet(spawn: Spawn, encounter: Encounter): void {
     openBattle(creatureGame, encounter, (won) => {
       if (!won) return;
       clearSpawn(spawn, true, remote);
+      if (encounter.bounty) claimBounty(encounter.bounty, remote);
       // A Wildling that sees you drive off a Blotspawn trusts you all the faster.
       if (collection.follower) settleFollower(followerTrust(collection, remote ? BLOT_TRUST_M / 2 : BLOT_TRUST_M));
     });
@@ -293,7 +328,7 @@ const farsight = new Farsight({
     recenterEl.setAttribute('aria-pressed', 'false');
     recenterEl.hidden = true;
     orbit.setFree(true);
-    player.setFarsight(FARSIGHT_RANGE_M);
+    player.setFarsight(farsightReach());
     if (!seenFarsightHint()) {
       hud.toast(`Farsight: explore inside the dashed ring for ${Math.round(FARSIGHT_SHARE * 100)}% rewards. Walking pays full.`, 5000);
     }
@@ -312,8 +347,9 @@ map.on('move', () => {
   if (!farsight.active || !lastFix || leashing) return;
   const c = map.getCenter();
   const d = haversine(lastFix, c);
-  if (d <= FARSIGHT_RANGE_M) return;
-  const k = FARSIGHT_RANGE_M / d;
+  const range = farsightReach();
+  if (d <= range) return;
+  const k = range / d;
   leashing = true;
   map.setCenter([lastFix.lng + (c.lng - lastFix.lng) * k, lastFix.lat + (c.lat - lastFix.lat) * k]);
   leashing = false;
@@ -323,6 +359,21 @@ function focus(): { lat: number; lng: number } | null {
   if (!farsight.active) return lastFix;
   const c = map.getCenter();
   return { lat: c.lat, lng: c.lng };
+}
+
+// The real sky: weather and night change what turns up, so spawns are read again when it turns.
+const skyWatch = new SkyWatch((sky) => {
+  hud.setSky(sky);
+  refreshSpawns(true);
+});
+hud.setSky(skyWatch.sky);
+
+// The Wanted board is pinned where the Wayfarer was first seen this week.
+let wantedAt: WantedAnchor | null = null;
+function wanted(): WantedPost[] | null {
+  if (!lastFix) return null;
+  if (wantedAt?.week !== lairWeek(Date.now())) wantedAt = wantedAnchor(lastFix.lat, lastFix.lng);
+  return wantedPosts(wantedAt, partyLevel(collection));
 }
 
 let spawnCheck: { lat: number; lng: number; at: number } | null = null;
@@ -353,12 +404,14 @@ function refreshSpawns(force = false): void {
   const lairs = lairsNear(fix.lat, fix.lng, now, strongest).filter(({ spawn }) => !(spawn.id in collection.cleared));
   // Inkbinders camp for a day with three Taken, levelled against the party they will fight.
   const rivals = rivalsNear(fix.lat, fix.lng, now, level).filter(({ spawn }) => !(spawn.id in collection.cleared));
+  const posters = (wanted() ?? []).filter(({ spawn }) => !(spawn.id in collection.cleared));
   shown = [
     ...live
-      .map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) }))
+      .map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level, skyWatch.sky) }))
       .filter(({ spawn, encounter }) => wildlingWanted(spawn.id, encounter, collection)),
     ...lairs,
     ...rivals,
+    ...posters,
   ];
   creatures.show(shown, (e) => (e.species.kind === 'monster' ? foeThreat(e.level, level, e.rank, e.tier) : null));
   showReach();
@@ -369,6 +422,7 @@ function showReach(): void {
   const fix = focus();
   if (!fix) return;
   if (lastFix) player.setReach(playerReach(game.bonuses().reachM));
+  if (farsight.active) player.setFarsight(farsightReach());
   // By Farsight everything inside the dashed ring is in reach.
   creatures.markReach((spawn) => onFoot(spawn) || byFarsight(spawn));
   // Shrines need the Wayfarer in person; curios can still be taken by Farsight for a share.
@@ -401,14 +455,8 @@ function takeCurio(curio: Curio): void {
   const reward = game.findCurio(curio, realmAt(map, curio.lng, curio.lat) ?? currentRealm ?? 'hearthfields', here);
   curioLayer.remove(curio.id);
   if (!reward) return;
-  const parts = [
-    reward.coin && `+${reward.coin} coin`,
-    reward.xp && `+${reward.xp} XP`,
-    reward.wanderlight && `+${reward.wanderlight} Wanderlight`,
-    ...Object.entries(reward.materials).map(([id, n]) => `+${n} ${MATERIALS[id as MaterialId].name}`),
-  ].filter(Boolean);
   sound.play('coin');
-  toast(`${CURIO_KINDS[curio.kind].name}${here ? '' : ' (by Farsight)'}: ${parts.join(', ')}.${reward.gear ? ` ${reward.gear.text}` : ''}`);
+  toast(`${CURIO_KINDS[curio.kind].name}${here ? '' : ' (by Farsight)'}: ${rewardText(reward)}.${reward.gear ? ` ${reward.gear.text}` : ''}`);
 }
 
 /** Today's curios around wherever play is happening. */
@@ -422,6 +470,76 @@ function refreshCurios(): void {
 function pickUpNearby(fix: Fix): void {
   for (const curio of curiosNear(fix.lat, fix.lng, Date.now(), game.save.curiosFound, 1))
     if (haversine(fix, curio) <= Math.max(25, Math.min(fix.accuracy, 40))) takeCurio(curio);
+}
+
+/** Lists a reward as "+12 coin, +3 Ironbark". */
+function rewardText(r: { coin?: number; xp?: number; wanderlight?: number; materials: Partial<Record<MaterialId, number>> }): string {
+  return [
+    r.coin && `+${r.coin} coin`,
+    r.xp && `+${r.xp} XP`,
+    r.wanderlight && `+${r.wanderlight} Wanderlight`,
+    ...Object.entries(r.materials).map(([id, n]) => `+${n} ${MATERIALS[id as MaterialId].name}`),
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
+// Companion finds: every thousand steps or so the companion noses out something of its element.
+function companionFinds(before: number, after: number): void {
+  const pet = companion(collection);
+  const count = findsBetween(before, after);
+  if (!pet || !count) return;
+  const species = getSpecies(pet.speciesId);
+  const first = Math.floor(after / FIND_EVERY_M) - count + 1;
+  for (let n = first; n < first + count; n++) {
+    const find = companionFind(species.element, pet.level, n);
+    game.takeFind(find);
+    sound.play('coin');
+    toast(`${species.name} sniffed something out: ${rewardText(find)}.`);
+  }
+}
+
+// The daily wander trail: three ink marks within a kilometre, the last one holding a chest.
+const trailLayer = new TrailLayer(map, (i) => tapTrailMark(i));
+
+function reachTrailMark(i: number, how: 'foot' | 'farsight'): void {
+  const mark = game.save.trail?.marks[i];
+  if (!mark) return;
+  const result = game.reachTrailMark(i, how, realmAt(map, mark.lng, mark.lat) ?? currentRealm ?? 'hearthfields');
+  if (!result) return;
+  trailLayer.show(game.save.trail);
+  const by = how === 'farsight' ? ' (by Farsight)' : '';
+  if (result.chest) {
+    sound.play('reward');
+    hud.toast(`Trail chest${by}: ${rewardText(result.chest)}.${result.chest.gear ? ` ${result.chest.gear.text}` : ''}`, 6000);
+  } else {
+    sound.play('discover');
+    const done = marksReached(game.save.trail!);
+    toast(`Trail mark ${done} of ${TRAIL_MARKS}${by}. ${done === TRAIL_MARKS - 1 ? 'The last one holds a chest.' : 'Two more to go.'}`);
+  }
+}
+
+function tapTrailMark(i: number): void {
+  const trail = game.save.trail;
+  const mark = trail?.marks[i];
+  if (!trail || !mark) return;
+  if (mark.reached) return toast(trail.opened ? 'Today’s trail is walked. A new one is inked each morning.' : `Mark reached. ${TRAIL_MARKS - marksReached(trail)} still to go.`);
+  if (onFoot(mark)) return reachTrailMark(i, 'foot');
+  if (byFarsight(mark)) {
+    if (peekUsed(trail)) return toast('You already peeked a mark today. Walk to this one.');
+    return reachTrailMark(i, 'farsight');
+  }
+  sound.play('error');
+  const away = lastFix ? `${Math.round(haversine(lastFix, mark))} m away. ` : '';
+  toast(`Trail mark, ${away}Walk there, or peek one a day by Farsight 👁.`);
+}
+
+/** Draws today's trail around the Wayfarer, and reaches any mark they walk up to. */
+function walkTrail(fix: Fix): void {
+  const { trail, fresh } = game.trail(fix);
+  trailLayer.show(trail);
+  if (fresh) hud.toast('A wander trail is inked on your map: three marks within a kilometre, and a chest at the last.', 5000);
+  trail.marks.forEach((mark, i) => !mark.reached && onFoot(mark) && reachTrailMark(i, 'foot'));
 }
 
 /** Re-reads spawns, curios and shrines around the lens or the Wayfarer. */
@@ -507,7 +625,9 @@ function onFix(fix: Fix): void {
 
   const metres = walk.add(fix);
   if (metres > 0) {
+    const walkedBefore = game.save.distanceMetres;
     game.recordWalk(metres);
+    companionFinds(walkedBefore, game.save.distanceMetres);
     const before = companion(collection)?.level;
     const reward = walkRewards(collection, metres);
     const pet = companion(collection);
@@ -535,10 +655,12 @@ function onFix(fix: Fix): void {
     }
     glyphLayer.showTrace(trace.line);
   }
+  skyWatch.update(fix.lat, fix.lng);
   refreshSpawns(firstFix);
   showReach();
   if (firstFix || !farsight.active) refreshCurios();
   pickUpNearby(fix);
+  walkTrail(fix);
   hunts.update(fix, metres);
   if (fix.accuracy <= 40) game.visit(fix.lat, fix.lng);
 

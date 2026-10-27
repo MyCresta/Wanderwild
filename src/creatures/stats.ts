@@ -13,6 +13,8 @@ import { matchup } from './elements';
 import { ELITE_TIERS, INK_CELL_M, INK_LEVELS, inkDepth, rollFoe, type FoeTrait, type InkDepth, type Rank } from './foes';
 import { cellAt } from '../game/cells';
 import type { Rival } from '../game/rivals';
+import type { Bounty } from '../game/wanted';
+import { skyElements, type Sky } from '../game/weather';
 
 export const MAX_LEVEL = 30;
 
@@ -35,37 +37,59 @@ export function individualFromSeed(seed: number, kind: Species['kind']): Individ
 export type StatKey = 'hp' | 'atk' | 'def' | 'spd';
 export const STAT_KEYS: readonly StatKey[] = ['hp', 'atk', 'def', 'spd'];
 export const STAT_NAMES: Record<StatKey, string> = { hp: 'Vigour', atk: 'Might', def: 'Guard', spd: 'Speed' };
-/** Extra percent on each stat. Every Wildling is born with its own, and kin that join it add more. */
-export type Boost = Record<StatKey, number>;
-/** A newly met Wildling rolls 0 to this much on each stat. */
-export const BOOST_ROLL = 10;
-/** Each of a kind that joins the one you keep adds this much to every stat, on top of the better roll. */
-export const BOOST_PER_KIN = 2;
-export const BOOST_MAX = 30;
+/** Flat points added to each stat. Every Wildling is born with a few, and each of its kind that joins it adds one more. */
+export type Bonus = Record<StatKey, number>;
+/** How much one point is worth on each stat: health counts in threes so it keeps pace with the rest. */
+export const BONUS_STEP: Bonus = { hp: 3, atk: 1, def: 1, spd: 1 };
+/** A newly met Wildling is born with 0 to this many points on each stat. */
+export const BONUS_ROLL = 3;
+/** The most points any one stat can hold. */
+export const BONUS_MAX = 10;
 
 /** The stat bonuses a Wildling is born with, from its seed. */
-export function rollBoost(seed: number): Boost {
+export function rollBonus(seed: number): Bonus {
   const rng = mulberry32(seed ^ 0x5bd1e995);
-  return { hp: Math.floor(rng() * (BOOST_ROLL + 1)), atk: Math.floor(rng() * (BOOST_ROLL + 1)), def: Math.floor(rng() * (BOOST_ROLL + 1)), spd: Math.floor(rng() * (BOOST_ROLL + 1)) };
+  const roll = (k: StatKey) => Math.floor(rng() * (BONUS_ROLL + 1)) * BONUS_STEP[k];
+  return { hp: roll('hp'), atk: roll('atk'), def: roll('def'), spd: roll('spd') };
 }
 
-/** Folds a newcomer's bonuses into a kept Wildling's: the better of each, plus a little for the bond. */
-export function mergeBoost(kept: Boost, newcomer: Boost): Boost {
-  const out = { ...kept };
-  for (const k of STAT_KEYS) out[k] = Math.min(BOOST_MAX, Math.max(kept[k], newcomer[k]) + BOOST_PER_KIN);
-  return out;
+/**
+ * Adds a joining kin's point to a kept Wildling's bonuses: one stat, picked by the newcomer's seed,
+ * or the next one not yet full. Returns which stat rose and by how much, or null when all are full.
+ */
+export function addKinPoint(bonus: Bonus, seed: number): { stat: StatKey; amount: number } | null {
+  const first = Math.floor(mulberry32(seed ^ 0x27d4eb2f)() * STAT_KEYS.length);
+  for (let i = 0; i < STAT_KEYS.length; i++) {
+    const stat = STAT_KEYS[(first + i) % STAT_KEYS.length];
+    if (bonus[stat] < BONUS_MAX * BONUS_STEP[stat]) {
+      bonus[stat] += BONUS_STEP[stat];
+      return { stat, amount: BONUS_STEP[stat] };
+    }
+  }
+  return null;
+}
+
+/** Percent bonuses from before bonuses were flat points (2026-10-26), turned into points on load. */
+export function bonusFromPercent(seed: number, percent: Bonus): Bonus {
+  const rng = mulberry32(seed ^ 0x5bd1e995);
+  const oldRoll = STAT_KEYS.map(() => Math.floor(rng() * 11));
+  // Each kin that joined used to add 2% to every stat on top of the better roll.
+  const kin = Math.max(0, Math.round(Math.max(...STAT_KEYS.map((k, i) => percent[k] - oldRoll[i])) / 2));
+  const bonus = rollBonus(seed);
+  for (let i = 0; i < kin; i++) addKinPoint(bonus, seed + i);
+  return bonus;
 }
 
 export const xpToNext = (level: number) => Math.round(20 * Math.pow(level, 1.5));
 
-export function statsAt(base: BaseStats, level: number, boost?: Boost): BaseStats {
+export function statsAt(base: BaseStats, level: number, bonus?: Bonus): BaseStats {
   const growth = 1 + 0.1 * (level - 1);
-  const b = (k: StatKey) => 1 + (boost?.[k] ?? 0) / 100;
+  const b = (k: StatKey) => bonus?.[k] ?? 0;
   return {
-    hp: Math.round((base.hp * growth + level * 2) * b('hp')),
-    atk: Math.round(base.atk * growth * b('atk')),
-    def: Math.round(base.def * growth * b('def')),
-    spd: Math.round(base.spd * growth * b('spd')),
+    hp: Math.round(base.hp * growth + level * 2) + b('hp'),
+    atk: Math.round(base.atk * growth) + b('atk'),
+    def: Math.round(base.def * growth) + b('def'),
+    spd: Math.round(base.spd * growth) + b('spd'),
   };
 }
 
@@ -126,6 +150,11 @@ export function spawnInkDepth(spawn: SpawnSeed): InkDepth {
 
 const MONSTER_CHANCE = 0.3;
 const BARROWS_MONSTER_CHANCE = 0.6;
+/** After dark more of what stands on the map is Blotspawn. */
+const NIGHT_MONSTER_CHANCE = 0.12;
+/** How much more often a Wildling of the element the sky favours turns up. */
+const SKY_WEIGHT = 2.5;
+const DEEPER: Record<InkDepth, InkDepth> = { thin: 'even', even: 'deep', deep: 'deep' };
 
 const toSpeciesRarity = (r: SpawnRarity): Rarity => (r === 'epic' || r === 'legendary' ? 'rare' : r);
 
@@ -151,26 +180,34 @@ export interface Encounter {
   traits?: FoeTrait[];
   /** An Inkbinder's camp: this is the lead of their line of three Taken. */
   rival?: Rival;
+  /** A named Blotspawn on the Hearth's Wanted board. */
+  bounty?: Bounty;
 }
 
 /**
  * Decides which creature stands at a spawn point. The same spawn always gives the same creature.
  * Blotspawn are measured against the party's level, shifted by the ink depth of their patch of map.
+ * The real sky tips the odds: weather and night favour some elements, and after dark the ink runs deeper.
  */
-export function creatureForSpawn(spawn: SpawnSeed, partyLevel: number): Encounter {
+export function creatureForSpawn(spawn: SpawnSeed, partyLevel: number, sky?: Sky): Encounter {
   const rng = mulberry32(spawn.seed);
   const tier = toSpeciesRarity(spawn.rarity);
   const favoured = spawn.realm ? REALM_ELEMENTS[spawn.realm] : [];
-  const monsterChance = spawn.realm === 'barrows' ? BARROWS_MONSTER_CHANCE : MONSTER_CHANCE;
+  const skyFavoured = skyElements(sky);
+  const monsterChance = (spawn.realm === 'barrows' ? BARROWS_MONSTER_CHANCE : MONSTER_CHANCE) + (sky?.night ? NIGHT_MONSTER_CHANCE : 0);
   const weight = (s: Species) =>
-    RARITY_WEIGHT[s.rarity] * (s.rarity === tier ? 3 : 1) * (favoured.includes(s.element) ? 3 : 1);
+    RARITY_WEIGHT[s.rarity] *
+    (s.rarity === tier ? 3 : 1) *
+    (favoured.includes(s.element) ? 3 : 1) *
+    (s.kind === 'pet' && skyFavoured.includes(s.element) ? SKY_WEIGHT : 1);
 
   const isMonster = rng() < monsterChance;
   // There are many Taken, so each is rarer than an old Blotspawn: together about two foes in five.
   const foeWeight = (s: MonsterSpecies) => weight(s) * (s.id.startsWith('taken-') ? 0.25 : 1);
   const species: Species = isMonster ? weightedPick<MonsterSpecies>(rng, FOES, foeWeight) : weightedPick(rng, PETS, weight);
   const bonus = spawn.rarity === 'legendary' ? 4 : spawn.rarity === 'epic' ? 2 : 0;
-  const [low, high] = INK_LEVELS[spawnInkDepth(spawn)];
+  const depth = spawnInkDepth(spawn);
+  const [low, high] = INK_LEVELS[sky?.night ? DEEPER[depth] : depth];
   const level = isMonster
     ? partyLevel + low + Math.round(rng() * (high - low)) + bonus
     : 1 + Math.floor(rng() * (partyLevel + 2)) + bonus;

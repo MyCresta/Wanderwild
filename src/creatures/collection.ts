@@ -1,4 +1,4 @@
-import { addXp, rollBoost, statsAt, type Boost, type Encounter } from './stats';
+import { addXp, bonusFromPercent, rollBonus, statsAt, type Bonus, type Encounter } from './stats';
 import { getSpecies } from './species';
 
 /** A Wildling the player has bound. */
@@ -17,8 +17,8 @@ export interface OwnedPet {
   bondM?: number;
   /** How well it was sketched when it was bound (from before Wildlings were befriended). */
   sketch?: string;
-  /** Extra percent on each stat; absent means what its seed rolled. Kin that join it raise these. */
-  boost?: Boost;
+  /** Flat points on each stat; absent means what its seed rolled. Kin that join it raise these. */
+  bonus?: Bonus;
   /** Share of its health left after a fight (0..1) and when; it rests back to full over time. Absent means full. */
   vigor?: number;
   vigorAt?: number;
@@ -91,6 +91,13 @@ export function loadCollection(storage: Pick<Storage, 'getItem'> | undefined = g
       const lead = companion(c);
       c.lineup = lead ? [lead.uid, ...(party ?? []).filter((u) => u !== lead.uid)].slice(0, PARTY_SIZE) : [];
     }
+    // Bonuses were percentages for a day; they become flat points.
+    for (const pet of c.pets as (OwnedPet & { boost?: Bonus })[]) {
+      if (pet.boost) {
+        pet.bonus ??= bonusFromPercent(pet.seed, pet.boost);
+        delete pet.boost;
+      }
+    }
     return c;
   } catch {
     return emptyCollection();
@@ -157,7 +164,7 @@ export function partyLevel(c: Collection): number {
 }
 
 /** A Wildling's stat bonuses: what kin have raised them to, or what it was born with. */
-export const petBoost = (pet: OwnedPet): Boost => pet.boost ?? rollBoost(pet.seed);
+export const petBonus = (pet: OwnedPet): Bonus => pet.bonus ?? rollBonus(pet.seed);
 
 export function markSeen(c: Collection, speciesId: string): void {
   if (!c.seen.includes(speciesId)) c.seen.push(speciesId);
@@ -171,7 +178,7 @@ export function addPet(c: Collection, encounter: Encounter): OwnedPet {
     level: encounter.level,
     xp: 0,
     caughtAt: Date.now(),
-    boost: rollBoost(encounter.seed),
+    bonus: rollBonus(encounter.seed),
   };
   c.pets.push(pet);
   markSeen(c, pet.speciesId);
@@ -229,7 +236,7 @@ export const fitToFight = (pet: OwnedPet, now = Date.now()) => vigorNow(pet, now
 /** Health at full, before gear. */
 export function petMaxHp(pet: OwnedPet): number {
   const species = getSpecies(pet.speciesId);
-  return statsAt(species.base, pet.level, petBoost(pet)).hp;
+  return statsAt(species.base, pet.level, petBonus(pet)).hp;
 }
 
 /** Heals a pet by a flat amount of health outside battle, e.g. with a tonic. */

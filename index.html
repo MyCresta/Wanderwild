@@ -17,10 +17,12 @@
 
     <header class="hud">
       <div class="hud-panel hud-bar">
-        <div class="hud-level" title="Wayfarer level">
+        <div class="hud-level" id="level-box" title="Wayfarer level">
           <span class="hud-level-num" id="level">1</span>
+          <span class="hud-blessing" id="blessing" aria-hidden="true"></span>
           <span class="hud-xp" role="img" aria-label="XP"><span id="xp-bar"></span></span>
         </div>
+        <button class="hud-sky" id="sky" type="button" aria-label="Sky"></button>
         <button class="hud-stat hud-distance hud-steps" id="steps" type="button" aria-label="Steps today">
           <span class="hud-value"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3c2 0 3 2 3 5s-1 5-3 5-3-2-3-5 1-5 3-5zm-.5 11.5c1.6 0 2.5 1 2.5 2.4S8 20 6.5 20 4 19 4 17s1-2.5 2.5-2.5zM17 7c2 0 3 2 3 5s-1 5-3 5-3-2-3-5 1-5 3-5zm-.5 11.5c1.6 0 2.5 1 2.5 2.4S18 24 16.5 24 14 23 14 21s1-2.5 2.5-2.5z" fill="currentColor"/></svg><span id="steps-today">0</span></span>
           <span class="stride-pop" id="stride-pop" aria-live="polite"></span>
@@ -67,13 +69,6 @@
       <header class="journal-head">
         <h2 id="journal-title">Wayfarer level 1</h2>
         <button class="satchel-close" id="journal-close" type="button" aria-label="Close">×</button>
-        <div class="tabs journal-tabs" role="tablist">
-          <button class="tab" id="journal-tab-wayfarer" type="button" role="tab">Hero</button>
-          <button class="tab" id="journal-tab-bestiary" type="button" role="tab">Bestiary</button>
-          <button class="tab" id="journal-tab-bag" type="button" role="tab">Bag</button>
-          <button class="tab" id="journal-tab-hearth" type="button" role="tab" hidden>Hearth</button>
-          <button class="tab" id="journal-tab-settings" type="button" role="tab" aria-label="Settings">⚙</button>
-        </div>
       </header>
       <section class="journal-pane" id="journal-wayfarer" role="tabpanel">
         <div id="hero-panel"></div>
@@ -91,6 +86,7 @@
         </details>
       </section>
       <section class="journal-pane" id="journal-hearth" role="tabpanel" hidden></section>
+      <section class="journal-pane" id="journal-trips" role="tabpanel" hidden></section>
       <section class="journal-pane" id="journal-settings" role="tabpanel" hidden>
         <h3>Sound</h3>
         <div class="choice-row" id="sound-choice" role="radiogroup" aria-label="Sound">
@@ -110,6 +106,14 @@
           <input type="file" id="save-file" accept="application/json,.json" hidden />
         </div>
       </section>
+      <nav class="tabs journal-tabs" role="tablist" aria-label="Journal">
+        <button class="tab" id="journal-tab-wayfarer" type="button" role="tab">Hero</button>
+        <button class="tab" id="journal-tab-bestiary" type="button" role="tab">Bestiary</button>
+        <button class="tab" id="journal-tab-bag" type="button" role="tab">Bag</button>
+        <button class="tab" id="journal-tab-hearth" type="button" role="tab" hidden>Hearth</button>
+        <button class="tab" id="journal-tab-trips" type="button" role="tab" aria-label="Expeditions" hidden>Trips</button>
+        <button class="tab" id="journal-tab-settings" type="button" role="tab" aria-label="Settings">⚙</button>
+      </nav>
     </dialog>
 
     <script type="module" src="./src/main.ts"></script>

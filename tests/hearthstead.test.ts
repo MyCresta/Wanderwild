@@ -69,6 +69,16 @@ describe('hearthstead in the game', () => {
     expect(game.save.materials.ironbark).toBe(6);
   });
 
+  it('brews a tonic every two hours, with no limit on how many you carry', () => {
+    const game = new GameState(newSave(0));
+    game.grantXp(283 + 520);
+    game.build('herbGarden', 0);
+    expect(game.collect('herbGarden', 4 * HOUR)).toBe(2);
+    expect(game.collect('herbGarden', 12 * HOUR)).toBe(4);
+    expect(game.collect('herbGarden', 24 * HOUR)).toBe(4);
+    expect(game.save.supplies.tonic).toBe(10);
+  });
+
   it('applies the stride boost while walking', () => {
     const game = new GameState(newSave(0));
     game.grantXp(283 + 520);

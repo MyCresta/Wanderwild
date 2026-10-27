@@ -1080,6 +1080,7 @@ body:has(> .catch-scene) .parchment-overlay {
 }
 
 .hud-level {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1187,7 +1188,28 @@ body:has(> .catch-scene) .parchment-overlay {
 
 .blessed .hud-level-num {
   box-shadow: 0 0 12px #9fe3d0, 0 0 2px #fff;
-  border-color: #cdf3e6;
+}
+
+/* A tiny mark of the shrine blessing, laid over the level ring so nothing moves. */
+.hud-blessing {
+  position: absolute;
+  top: 16px;
+  left: calc(50% + 6px);
+  display: none;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #2f6b55;
+  border: 1px solid #cdf3e6;
+  color: #eafff6;
+  font-size: 9px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.blessed .hud-blessing {
+  display: grid;
 }
 
 /* ---- Realm banner ---- */
@@ -1931,14 +1953,6 @@ body:has(> .catch-scene) .parchment-overlay {
 
 /* ---------- The Forge ---------- */
 
-.exp-pets {
-  display: grid;
-  gap: 8px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
 .gear-svg {
   flex: none;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
@@ -2128,51 +2142,6 @@ span.forge-up {
   display: block;
   margin-top: 4px;
   color: #3f6f9a;
-}
-
-.exp-pets button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border: 2px solid var(--leather-dark);
-  border-radius: 8px;
-  background: linear-gradient(var(--leather), var(--leather-dark));
-  color: var(--gold);
-  font: inherit;
-  font-size: 13px;
-  font-weight: bold;
-  text-align: left;
-  cursor: pointer;
-}
-
-.exp-pets small {
-  display: block;
-  font-size: 11px;
-  font-weight: normal;
-  opacity: 0.85;
-}
-
-.exp-form {
-  display: flex;
-  gap: 10px;
-  margin: 8px 0;
-  font-size: 14px;
-}
-
-.exp-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-}
-
-.exp-form select {
-  padding: 6px;
-  border: 1px solid var(--leather);
-  border-radius: 6px;
-  background: var(--parchment);
-  font: inherit;
 }
 
 /* ---- Glyphwalking ---- */
@@ -2916,6 +2885,9 @@ span.forge-up {
   /* One fixed height for every tab, so switching tabs never resizes or moves the sheet. */
   height: min(680px, calc(100dvh - var(--safe-top) - var(--safe-bottom) - 48px));
   max-height: none;
+  /* Sit low on the screen, clear of the home bar, so the tabs at the foot are in thumb reach. */
+  margin-top: auto;
+  margin-bottom: calc(var(--safe-bottom) + 12px);
   overflow: hidden;
 }
 
@@ -2935,16 +2907,34 @@ span.forge-up {
   right: 6px;
 }
 
+/* The tab bar is the sheet's foot, where thumbs rest: tall, full-width tap targets. */
 .journal-tabs {
+  flex: none;
   gap: 2px;
   margin: 0;
+  padding: 0 6px 6px;
+  border-top: 2px solid var(--leather);
+  border-bottom: 0;
 }
 
 .journal-tabs .tab {
   position: relative;
-  min-height: 36px;
-  padding: 0 4px;
-  font-size: 12.5px;
+  /* Sized to their labels so "Bestiary" fits even with all six tabs on a narrow phone. */
+  flex: 1 1 auto;
+  min-width: 44px;
+  min-height: 52px;
+  padding: 0 2px;
+  border-radius: 0 0 10px 10px;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  touch-action: manipulation;
+}
+
+.journal-tabs #journal-tab-settings {
+  flex: 0 0 44px;
+  font-size: 20px;
 }
 
 .journal-tabs .tab[hidden] {
@@ -4130,4 +4120,442 @@ span.forge-up {
 
 .mana-help {
   margin: -4px 0 6px;
+/* ---- Expeditions: three trails from the Hearthstead to a realm and back ---- */
+.trip-chips {
+  display: flex;
+  gap: 6px;
+  height: 34px;
+  margin: 0 0 8px !important;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+p.trip-chips {
+  align-items: center;
+  font-size: 13px;
+}
+
+.trip-chips button {
+  flex: 1 0 auto;
+  min-width: 56px;
+  padding: 0 10px;
+  border: 2px solid var(--realm, var(--leather));
+  border-radius: 17px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: bold;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.trip-chips button[aria-checked='true'] {
+  background: var(--realm, var(--leather));
+  color: #fdf3dc;
+}
+
+.trip-board {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 10px 10px 8px;
+  list-style: none;
+  border: 1px solid var(--parchment-dark);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(111, 132, 85, 0.16), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(63, 111, 122, 0.14), transparent 45%),
+    rgba(255, 255, 255, 0.22);
+}
+
+.trip-trail {
+  display: grid;
+  grid-template-columns: 26px 1fr 66px;
+  grid-template-rows: 44px 30px;
+  align-items: center;
+  column-gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  position: relative;
+}
+
+button.trip-trail {
+  cursor: pointer;
+}
+
+.trip-home {
+  width: 26px;
+  height: 26px;
+  background: var(--leather);
+  clip-path: polygon(50% 0, 100% 45%, 86% 45%, 86% 100%, 14% 100%, 14% 45%, 0 45%);
+}
+
+.trip-path {
+  position: relative;
+  height: 44px;
+  margin: 0 18px 0 20px;
+  background: repeating-linear-gradient(90deg, var(--leather) 0 6px, transparent 6px 12px) center / 100% 2px no-repeat;
+}
+
+.trip-path-done {
+  position: absolute;
+  top: 21px;
+  left: 0;
+  height: 2px;
+  background: #c99a3a;
+}
+
+.trip-walker {
+  position: absolute;
+  top: 0;
+  width: 40px;
+  height: 40px;
+  margin-left: -20px;
+  transition: left 0.6s ease;
+}
+
+.trip-walker svg {
+  display: block;
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.3));
+}
+
+.trip-realm {
+  overflow: hidden;
+  padding: 4px 2px;
+  border-radius: 6px;
+  background: var(--realm);
+  color: #fdf3dc;
+  font-size: 11px;
+  font-weight: bold;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.trip-label {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.trip-label b {
+  font-size: 14px;
+}
+
+.trip-label small,
+.trip-label b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trip-label small {
+  font-size: 12px;
+  color: var(--leather);
+}
+
+.trip-waiting .trip-path {
+  opacity: 0.55;
+}
+
+.trip-waiting .trip-walker {
+  opacity: 0.8;
+}
+
+.trip-done .trip-label small {
+  color: #2f6b55;
+  font-weight: bold;
+}
+
+.trip-trail[data-hint]::after {
+  top: 6px;
+  left: 18px;
+  right: auto;
+}
+
+.trip-go {
+  position: relative;
+  width: 100%;
+  height: 48px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 10px;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  font: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.trip-go:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.trip-haul {
+  margin: 6px 0 0 !important;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--leather);
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.trip-level {
+  flex: none;
+  font-size: 12px;
+  font-weight: bold;
+  color: #2f6b55;
+}
+
+.trip-picker {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.trip-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+  height: 32px;
+}
+
+.trip-picker-head button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.trip-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.trip-picker-grid button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: 86px;
+  padding: 2px 2px 4px;
+  border: 2px solid rgba(59, 42, 26, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.35);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.trip-picker-grid button[aria-pressed='true'] {
+  border-color: #2f6b55;
+  background: rgba(47, 107, 85, 0.15);
+}
+
+.trip-picker-grid b,
+.trip-picker-grid small {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.trip-picker-grid small {
+  font-size: 11px;
+  color: var(--leather);
+}
+
+/* ---- Sky: a small weather button in the bar, and a tint over the map ---- */
+.hud-sky {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.hud-sky svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+}
+
+body.sky-night #map .maplibregl-canvas {
+  filter: sepia(0.22) saturate(0.75) contrast(0.96) brightness(0.72) hue-rotate(-12deg);
+}
+
+body.sky-rain:not(.sky-night) #map .maplibregl-canvas,
+body.sky-storm:not(.sky-night) #map .maplibregl-canvas,
+body.sky-fog:not(.sky-night) #map .maplibregl-canvas {
+  filter: sepia(0.22) saturate(0.75) contrast(0.92) brightness(0.9);
+}
+
+/* ---- Wanted board, at the top of the Hearth tab ---- */
+.wanted h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0 8px;
+  font-size: 16px;
+}
+
+.wanted h3 small {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--leather);
+}
+
+.wanted-empty {
+  font-size: 13px;
+}
+
+.wanted-list {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.wanted-post {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 52px;
+  padding: 4px 12px 4px 6px;
+  border: 1px dashed #8e2b22;
+  border-radius: 8px;
+  background: rgba(142, 43, 34, 0.08);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wanted-post.claimed {
+  opacity: 0.55;
+  border-style: solid;
+  border-color: var(--parchment-dark);
+  background: rgba(255, 255, 255, 0.2);
+  cursor: default;
+}
+
+.wanted-art {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+
+.wanted-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.wanted-text b,
+.wanted-text small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wanted-text small {
+  font-size: 12px;
+  color: var(--leather);
+}
+
+.wanted-reward {
+  flex: none;
+  font-size: 13px;
+  font-weight: bold;
+  color: #8e2b22;
+}
+
+.wanted-post.claimed .wanted-reward {
+  color: #2f6b55;
+}
+
+/* A Wanted Blotspawn on the map wears a small red ribbon. */
+.map-creature-wanted .creature {
+  filter: drop-shadow(0 0 6px rgba(142, 43, 34, 0.95));
+}
+
+.map-creature-wanted::after {
+  content: 'Wanted';
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  translate: -50% 0;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: #8e2b22;
+  color: #f6e7c1;
+  font-size: calc(10px * var(--marker-scale, 1));
+  font-weight: bold;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: none;
+  white-space: nowrap;
+}
+
+/* Daily wander trail marks (src/map/trailLayer.ts). */
+.trail-marker {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: max(44px, calc(38px * var(--marker-scale, 1)));
+  height: max(44px, calc(38px * var(--marker-scale, 1)));
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+}
+
+.trail-marker svg {
+  width: calc(38px * var(--marker-scale, 1));
+  height: calc(38px * var(--marker-scale, 1));
+}
+
+.trail-marker.trail-done {
+  opacity: 0.6;
 }

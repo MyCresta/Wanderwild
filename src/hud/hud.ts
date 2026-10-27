@@ -2,10 +2,23 @@ import { exportSave, importSave } from '../game/save';
 import { REALMS, type RealmId } from '../game/realms';
 import { STEP_XP, type GameState } from '../game/state';
 import { UNLOCKS } from '../game/wayfarer';
+import { BLESSINGS } from '../game/shrines';
 import { sound } from '../audio/sound';
 import { glyphSvg } from '../game/glyphs';
 import { journal } from '../ui/journal';
 import { formatCount, formatDistance, formatDuration } from './format';
+import { skyLine, type Sky, type Weather } from '../game/weather';
+
+/** Small line icons for the sky button, drawn in the bar's ink colour. */
+const SKY_ICONS: Record<Weather | 'moon', string> = {
+  clear: '<circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+  moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
+  clouds: '<path d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 18z"/>',
+  fog: '<path d="M3 9h18M5 13h14M3 17h18"/>',
+  rain: '<path d="M7 14h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 14zM8 17l-1 3M12 17l-1 3M16 17l-1 3"/>',
+  snow: '<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/>',
+  storm: '<path d="M7 13h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 13zM13 13l-3 5h4l-3 5"/>',
+};
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -20,10 +33,14 @@ export class Hud {
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
   private realmTimer: ReturnType<typeof setTimeout> | undefined;
   private realm: RealmId | undefined;
+  private readonly skyEl = $<HTMLButtonElement>('sky');
+  private sky: Sky = { weather: null, night: false };
 
   constructor(private readonly game: GameState) {
     journal.onShow('bag', () => this.renderSatchel());
     $('steps').addEventListener('click', () => this.toast(`${formatCount(game.stepsToday())} steps today. Every step gives ${STEP_XP} XP.`));
+    this.skyEl.addEventListener('click', () => this.toast(skyLine(this.sky), 5000));
+    $('level-box').addEventListener('click', () => this.levelToast());
     this.setupSoundChoice();
     $('save-export').addEventListener('click', () => this.exportFile());
     const fileInput = $<HTMLInputElement>('save-file');
@@ -64,8 +81,34 @@ export class Hud {
     this.xpBar.parentElement?.setAttribute('aria-label', `${formatCount(lvl.into)} of ${formatCount(lvl.needed)} XP`);
     this.stepsEl.textContent = formatCount(this.game.stepsToday());
     this.coinEl.textContent = formatCount(s.currencies.coin);
-    document.body.classList.toggle('blessed', this.game.isBlessed());
+    const kind = this.game.blessing();
+    document.body.classList.toggle('blessed', !!kind);
+    const badge = $('blessing');
+    badge.textContent = kind ? BLESSINGS[kind].mark : '';
+    badge.title = kind ? BLESSINGS[kind].name : '';
     if (journal.showing('bag')) this.renderSatchel();
+  }
+
+  /** The sky button's icon, and a tint over the map at night or in bad weather. */
+  setSky(sky: Sky): void {
+    this.sky = sky;
+    const icon = sky.night && (!sky.weather || sky.weather === 'clear') ? 'moon' : (sky.weather ?? 'clear');
+    this.skyEl.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${SKY_ICONS[icon]}</svg>`;
+    this.skyEl.setAttribute('aria-label', skyLine(sky));
+    document.body.classList.toggle('sky-night', sky.night);
+    for (const w of Object.keys(SKY_ICONS)) document.body.classList.toggle(`sky-${w}`, w === sky.weather);
+  }
+
+  /** Tapping the level ring: XP to the next level and any blessing that is on. */
+  private levelToast(): void {
+    const lvl = this.game.level;
+    const xp = lvl.needed ? `${formatCount(lvl.needed - lvl.into)} XP to level ${lvl.level + 1}.` : `Level ${lvl.level}.`;
+    const kind = this.game.blessing();
+    const left = kind ? Math.ceil(((this.game.save.blessing?.until ?? 0) - Date.now()) / 60_000) : 0;
+    const blessing = kind
+      ? ` ${BLESSINGS[kind].name}: ${BLESSINGS[kind].effect}, ${left} min left.`
+      : ' Touch a shrine for a blessing.';
+    this.toast(xp + blessing);
   }
 
   /** Unfurls the realm's name for a few seconds when the Wayfarer walks into it. */

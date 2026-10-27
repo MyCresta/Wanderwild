@@ -44,14 +44,17 @@ export class CreatureMarkers {
       el.type = 'button';
       const rival = encounter.rival;
       const rank = rival ? ` map-creature-rival map-creature-rival-${rival.grade}` : encounter.rank && encounter.rank !== 'normal' ? ` map-creature-rank-${encounter.rank}` : '';
-      el.className = `map-creature map-creature-${encounter.species.kind} map-creature-${encounter.species.rarity}${rank}`;
+      const wanted = encounter.bounty ? ' map-creature-wanted' : '';
+      el.className = `map-creature map-creature-${encounter.species.kind} map-creature-${encounter.species.rarity}${rank}${wanted}`;
       el.dataset.lngLat = `${spawn.lng},${spawn.lat}`;
       const rankName = encounter.rank === 'boss' ? 'Boss ' : encounter.rank === 'elite' ? 'Elite ' : encounter.rank === 'rare' ? 'Rare ' : '';
       el.setAttribute(
         'aria-label',
         rival
           ? `${rival.grade === 'arch' ? 'Archbinder' : 'Inkbinder'} ${rival.name} with three Taken, level ${encounter.level}`
-          : `${encounter.species.kind === 'pet' ? 'Wild' : `Hostile ${rankName}`}${encounter.species.name}, level ${encounter.level}`,
+          : encounter.bounty
+            ? `Wanted: ${encounter.species.name}, level ${encounter.level}`
+            : `${encounter.species.kind === 'pet' ? 'Wild' : `Hostile ${rankName}`}${encounter.species.name}, level ${encounter.level}`,
       );
       // An Inkbinder's camp shows the Inkbinder; their Taken wait on the challenge sheet.
       if (rival) el.insertAdjacentHTML('beforeend', inkbinderSvg(rival, 52));

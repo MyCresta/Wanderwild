@@ -2,7 +2,7 @@ import { cellAt } from './cells';
 import { curioReward, type Curio, type CurioReward } from './farsight';
 import { pruneSave, storeSave, type SaveData } from './save';
 import { MATERIALS, type MaterialId, type RealmId } from './realms';
-import { BLESSING_MS, BLESSING_XP_BONUS, rollShrineReward, SHRINE_COOLDOWN_MS, type Shrine } from './shrines';
+import { BLESSING_MS, BLESSINGS, INSIGHT_XP, nextMorning, rollShrineReward, type Shrine, type ShrineKind } from './shrines';
 import { levelFromXp, unlocksBetween, type Unlock } from './wayfarer';
 import {
   canPickSecond,
@@ -57,6 +57,8 @@ import {
   type ExpeditionReward,
 } from './expeditions';
 import { hashString, seededRandom } from './rng';
+import { reachMark, trailChest, trailDone, trailToday, type Trail, type TrailChest } from './trail';
+import type { CompanionFind } from './companionFinds';
 import type { Glyph } from './glyphs';
 import { MAX_WAYMARKS } from './waymarks';
 
@@ -119,8 +121,10 @@ export class GameState {
     return levelFromXp(this.save.wayfarer.xp);
   }
 
-  isBlessed(now = Date.now()): boolean {
-    return this.save.blessingUntil > now;
+  /** The shrine kind whose blessing is on the Wayfarer now, if any. */
+  blessing(now = Date.now()): ShrineKind | undefined {
+    const b = this.save.blessing;
+    return b && b.until > now ? b.kind : undefined;
   }
 
   /** Replaces the whole save (after an import) and writes it straight away. */
@@ -132,7 +136,7 @@ export class GameState {
 
   grantXp(amount: number): void {
     const before = this.level.level;
-    this.save.wayfarer.xp += Math.round(amount);
+    this.save.wayfarer.xp += Math.round(amount * (this.blessing() === 'archive' ? INSIGHT_XP : 1));
     const after = this.level.level;
     if (after > before) this.emit({ kind: 'levelUp', level: after, unlocks: unlocksBetween(before, after) });
   }
@@ -156,7 +160,7 @@ export class GameState {
       const today = dayKey(now);
       if (s.steps.day !== today) s.steps = { day: today, count: 0 };
       s.steps.count += footfalls;
-      this.grantXp(footfalls * STEP_XP * (this.isBlessed(now) ? BLESSING_XP_BONUS : 1));
+      this.grantXp(footfalls * STEP_XP);
     }
     const steps = Math.floor((s.distanceMetres - s.rewardedMetres) / WALK_REWARD_STEP_M);
     if (steps > 0) {
@@ -273,8 +277,15 @@ export class GameState {
     return Object.values(this.save.gear);
   }
 
+  /** Gear bonuses, plus whatever the current shrine blessing adds. */
   bonuses(): GearBonuses {
-    return gearBonuses(this.equippedItems());
+    const b = gearBonuses(this.equippedItems());
+    const blessing = this.blessing();
+    if (blessing === 'chapel') b.catchBonus += 0.1;
+    if (blessing === 'monument') b.petDamage += 0.1;
+    if (blessing === 'vista') b.reachM += 20;
+    if (blessing === 'hall') b.stride += 0.25;
+    return b;
   }
 
   private canPay(cost: { coin: number; material: MaterialId; amount: number }): boolean {
@@ -464,17 +475,18 @@ export class GameState {
     return this.save.shrineCooldowns[shrine.id] ?? 0;
   }
 
-  /** Touches a shrine. Returns false while it is cooling down. */
+  /** Touches a shrine. Returns false if it already answered today. */
   useShrine(shrine: Shrine, realm: RealmId, now = Date.now()): boolean {
     if (this.shrineReadyAt(shrine) > now) return false;
     const reward = rollShrineReward(shrine, realm, now);
     const s = this.save;
-    s.shrineCooldowns[shrine.id] = now + SHRINE_COOLDOWN_MS;
+    s.shrineCooldowns[shrine.id] = nextMorning(now);
     s.shrinesVisited += 1;
-    s.blessingUntil = now + BLESSING_MS;
     s.currencies.coin += reward.coin;
     this.addMaterials(reward.materials);
     this.grantXp(reward.xp);
+    s.blessing = { kind: shrine.kind, until: now + BLESSING_MS };
+    const blessing = BLESSINGS[shrine.kind];
     let found = '';
     if (this.level.level >= RUNE_LEVEL && Math.random() < RUNE_SHRINE_CHANCE) {
       const rune = RUNE_IDS[Math.floor(Math.random() * RUNE_IDS.length)];
@@ -486,7 +498,7 @@ export class GameState {
     const mats = (Object.entries(reward.materials) as [MaterialId, number][])
       .map(([id, n]) => `${n} ${MATERIALS[id].name}`)
       .join(', ');
-    this.emit({ kind: 'reward', text: `+${reward.coin} coin, ${mats}, +${reward.xp} XP. Blessed for 10 minutes.${found}` });
+    this.emit({ kind: 'reward', text: `${blessing.name}: ${blessing.effect} for 30 min. +${reward.coin} coin, ${mats}, +${reward.xp} XP.${found}` });
     this.changed();
     return true;
   }
@@ -503,6 +515,43 @@ export class GameState {
     const gear = this.findGear({ kind: 'curio', onFoot });
     this.changed();
     return { ...reward, gear };
+  }
+
+  /** Banks what the companion sniffed out on the road. */
+  takeFind(find: CompanionFind): void {
+    this.save.currencies.coin += find.coin;
+    this.save.currencies.wanderlight += find.wanderlight;
+    this.addMaterials(find.materials);
+    this.changed();
+  }
+
+  /** Today's wander trail around `at`, drawing a fresh one each morning. */
+  trail(at: { lat: number; lng: number }, now = Date.now()): { trail: Trail; fresh: boolean } {
+    const trail = trailToday(this.save.trail, at, now);
+    const fresh = trail !== this.save.trail;
+    if (fresh) {
+      this.save.trail = trail;
+      this.changed();
+    }
+    return { trail, fresh };
+  }
+
+  /** Reaches a mark of today's trail; the last one opens the chest. Null if it did not count. */
+  reachTrailMark(index: number, how: 'foot' | 'farsight', realm: RealmId): { chest: (TrailChest & { gear: GearFind | null }) | null } | null {
+    const trail = this.save.trail;
+    if (!trail || !reachMark(trail, index, how)) return null;
+    let chest: (TrailChest & { gear: GearFind | null }) | null = null;
+    if (trailDone(trail) && !trail.opened) {
+      trail.opened = true;
+      const loot = trailChest(trail, realm);
+      this.save.currencies.coin += loot.coin;
+      this.save.currencies.wanderlight += loot.wanderlight;
+      this.addMaterials(loot.materials);
+      this.grantXp(loot.xp);
+      chest = { ...loot, gear: this.findGear({ kind: 'chest', hints: loot.peeked ? 2 : 1 }) };
+    }
+    this.changed();
+    return { chest };
   }
 
   changed(): void {

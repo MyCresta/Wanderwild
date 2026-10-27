@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CURIO_WINDOW_MS, curioReward, curiosNear, FARSIGHT_RANGE_M, FARSIGHT_SHARE } from '../src/game/farsight';
+import { CURIO_WINDOW_MS, curioReward, curiosNear, FARSIGHT_RANGE_M, FARSIGHT_SHARE, farsightRange } from '../src/game/farsight';
 import { SPAWN_CELL_M, SPAWN_WINDOW_MS, spawnsNear } from '../src/game/spawns';
 import { creatureForSpawn } from '../src/creatures/stats';
 import { haversine } from '../src/geo/distance';
@@ -64,5 +64,13 @@ describe('the Farsight ring', () => {
     expect(foes / days).toBeLessThan(50);
     expect(curios / days).toBeGreaterThan(30);
     expect(curios / days).toBeLessThan(80);
+  });
+});
+
+describe('Farsight range', () => {
+  it('grows three metres for every metre of reach from gear', () => {
+    expect(farsightRange()).toBe(FARSIGHT_RANGE_M);
+    expect(farsightRange(20)).toBe(FARSIGHT_RANGE_M + 60);
+    expect(farsightRange(-5)).toBe(FARSIGHT_RANGE_M);
   });
 });
