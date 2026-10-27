@@ -4,6 +4,7 @@ import { MELT, RARITY_ORDER, RUNE_IDS, runeSockets, SLOT_DEFS, SLOTS, type GearI
 import { REALMS, type MaterialId, type RealmId } from './realms';
 import type { Waymark } from './waymarks';
 import type { GlyphKind } from './glyphs';
+import type { Trail, TrailMark } from './trail';
 import { isHeroClass, LOOKS, METRES_PER_MANA, newHero, TALENTS, talentKey, type HeroState } from './hero';
 
 /**
@@ -53,6 +54,8 @@ export interface SaveData {
   curiosFound: Record<string, number>;
   /** Steps counted on `day` (a local date), for the daily step counter. */
   steps: { day: string; count: number };
+  /** Today's wander trail, drawn at the first fix of the day. */
+  trail: Trail | null;
 }
 
 export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
@@ -82,6 +85,7 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     glyphsCast: { ring: 0, stroke: 0, knot: 0 },
     curiosFound: {},
     steps: { day: '', count: 0 },
+    trail: null,
   };
 }
 
@@ -163,7 +167,18 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
       const st = isObject(raw.steps) ? raw.steps : {};
       return { day: typeof st.day === 'string' ? st.day : '', count: Math.max(0, num(st.count)) };
     })(),
+    trail: parseTrail(raw.trail),
   };
+}
+
+function parseTrail(v: unknown): Trail | null {
+  if (!isObject(v) || typeof v.day !== 'string' || !isObject(v.origin) || !Array.isArray(v.marks)) return null;
+  const marks = v.marks.filter(isObject).map((m): TrailMark => ({
+    lat: num(m.lat),
+    lng: num(m.lng),
+    ...(m.reached === 'foot' || m.reached === 'farsight' ? { reached: m.reached as TrailMark['reached'] } : {}),
+  }));
+  return { day: v.day, origin: { lat: num(v.origin.lat), lng: num(v.origin.lng) }, marks, opened: v.opened === true };
 }
 
 const addUp = (a: Partial<Record<MaterialId, number>>, b: Partial<Record<MaterialId, number>>) => {
