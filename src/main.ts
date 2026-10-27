@@ -13,7 +13,7 @@ import { watchLocation } from './geo/location';
 import { setupInstallButton } from './install';
 import { loadSave } from './game/save';
 import { GameState } from './game/state';
-import type { Shrine } from './game/shrines';
+import { BLESSINGS, type Shrine } from './game/shrines';
 import { isNight } from './game/gear';
 import { MATERIALS, type MaterialId, type RealmId } from './game/realms';
 import { installProbeLayers, realmAt, shrinesNear } from './map/realmProbe';
@@ -27,7 +27,6 @@ import { ForgePanel } from './hud/forgePanel';
 import { BagPanel } from './hud/bagPanel';
 import { HeroPanel, openHeroChoice } from './hud/heroPanel';
 import { heroSvg } from './hud/heroArt';
-import { formatWait } from './hud/format';
 import { CompanionMarker, CreatureMarkers, FollowerMarker } from './map/creatures';
 import { companion, loadCollection, partyLevel, saveCollection, walkRewards } from './creatures/collection';
 import { foeThreat } from './creatures/foes';
@@ -133,10 +132,12 @@ function useShrine(shrine: Shrine): void {
   if (!lastFix) return hud.toast('Find your location first to reach a shrine.');
   const away = haversine(lastFix, shrine);
   if (!onFoot(shrine)) return hud.toast(`${shrine.name} is ${Math.round(away)} m away. Walk until it is inside your ring to touch it.`);
-  const wait = game.shrineReadyAt(shrine) - Date.now();
-  if (wait > 0) return hud.toast(`${shrine.name} is gathering its power. Ready in ${formatWait(wait)}.`);
+  const blessing = BLESSINGS[shrine.kind];
+  if (game.shrineReadyAt(shrine) > Date.now())
+    return hud.toast(`${shrine.name} already blessed you today. Its ${blessing.name} (${blessing.effect}) returns tomorrow.`);
   if (game.useShrine(shrine, realmAt(map, shrine.lng, shrine.lat) ?? currentRealm ?? 'hearthfields')) sound.play('shrine');
   refreshWorld();
+  showReach();
 }
 
 const shrines = new ShrineLayer(map, useShrine);

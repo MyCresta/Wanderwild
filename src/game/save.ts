@@ -2,6 +2,7 @@ import { BUILDING_IDS, newHearthstead, type HearthsteadState, type SupplyId } fr
 import type { Expedition } from './expeditions';
 import { MELT, RARITY_ORDER, RUNE_IDS, runeSockets, SLOT_DEFS, SLOTS, type GearItem, type GearRarity, type RuneId, type Slot } from './gear';
 import { REALMS, type MaterialId, type RealmId } from './realms';
+import { BLESSINGS, type ShrineKind } from './shrines';
 import type { Waymark } from './waymarks';
 import type { GlyphKind } from './glyphs';
 import { isHeroClass, LOOKS, METRES_PER_MANA, newHero, TALENTS, talentKey, type HeroState } from './hero';
@@ -31,8 +32,8 @@ export interface SaveData {
   shrineCooldowns: Record<string, number>;
   /** Shrines ever touched, for "visit a new shrine" goals later. */
   shrinesVisited: number;
-  /** Time (ms) the current shrine blessing ends. */
-  blessingUntil: number;
+  /** The current shrine blessing: which kind of shrine gave it and when (ms) it ends. */
+  blessing: { kind: ShrineKind; until: number } | null;
   /** Coarse ~50 m cells walked through, never a raw GPS trail. */
   visitedCells: string[];
   supplies: Record<SupplyId, number>;
@@ -69,7 +70,7 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     materials: {},
     shrineCooldowns: {},
     shrinesVisited: 0,
-    blessingUntil: 0,
+    blessing: null,
     visitedCells: [],
     supplies: { tonic: 0, petXp: 0 },
     hearthstead: newHearthstead(now),
@@ -125,7 +126,7 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
     materials: addUp(numbers(raw.materials), gear.materials),
     shrineCooldowns: numbers(raw.shrineCooldowns) as Record<string, number>,
     shrinesVisited: num(raw.shrinesVisited),
-    blessingUntil: num(raw.blessingUntil),
+    blessing: parseBlessing(raw.blessing),
     visitedCells: strings(raw.visitedCells),
     supplies: { tonic: num(supplies.tonic), petXp: num(supplies.petXp) },
     hero: parseHero(raw.hero, num(raw.spellChargeM)),
@@ -257,6 +258,11 @@ export function importSave(text: string, now = Date.now()): SaveData {
   }
   if (!isObject(parsed) || parsed.game !== 'wanderwild') throw new Error('That file is not a Wanderwild save');
   return migrate(parsed, now);
+}
+
+function parseBlessing(v: unknown): SaveData['blessing'] {
+  if (!isObject(v) || typeof v.kind !== 'string' || !(v.kind in BLESSINGS)) return null;
+  return { kind: v.kind as ShrineKind, until: num(v.until) };
 }
 
 /** Drops cooldowns that have already passed so the save does not grow forever. */
