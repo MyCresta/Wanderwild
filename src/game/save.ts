@@ -1,4 +1,4 @@
-import { BUILDING_IDS, newHearthstead, TONIC_CARRY, type HearthsteadState, type SupplyId } from './hearthstead';
+import { BUILDING_IDS, newHearthstead, type HearthsteadState, type SupplyId } from './hearthstead';
 import type { Expedition } from './expeditions';
 import { MELT, RARITY_ORDER, RUNE_IDS, runeSockets, SLOT_DEFS, SLOTS, type GearItem, type GearRarity, type RuneId, type Slot } from './gear';
 import { REALMS, type MaterialId, type RealmId } from './realms';
@@ -127,8 +127,7 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
     shrinesVisited: num(raw.shrinesVisited),
     blessingUntil: num(raw.blessingUntil),
     visitedCells: strings(raw.visitedCells),
-    // Tonics were once uncapped; old stockpiles shrink to what the satchel holds.
-    supplies: { tonic: Math.min(TONIC_CARRY, num(supplies.tonic)), petXp: num(supplies.petXp) },
+    supplies: { tonic: num(supplies.tonic), petXp: num(supplies.petXp) },
     hero: parseHero(raw.hero, num(raw.spellChargeM)),
     hearthstead: {
       buildings: Object.fromEntries(
