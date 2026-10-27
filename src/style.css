@@ -1931,14 +1931,6 @@ body:has(> .catch-scene) .parchment-overlay {
 
 /* ---------- The Forge ---------- */
 
-.exp-pets {
-  display: grid;
-  gap: 8px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
 .gear-svg {
   flex: none;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
@@ -2128,51 +2120,6 @@ span.forge-up {
   display: block;
   margin-top: 4px;
   color: #3f6f9a;
-}
-
-.exp-pets button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border: 2px solid var(--leather-dark);
-  border-radius: 8px;
-  background: linear-gradient(var(--leather), var(--leather-dark));
-  color: var(--gold);
-  font: inherit;
-  font-size: 13px;
-  font-weight: bold;
-  text-align: left;
-  cursor: pointer;
-}
-
-.exp-pets small {
-  display: block;
-  font-size: 11px;
-  font-weight: normal;
-  opacity: 0.85;
-}
-
-.exp-form {
-  display: flex;
-  gap: 10px;
-  margin: 8px 0;
-  font-size: 14px;
-}
-
-.exp-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-}
-
-.exp-form select {
-  padding: 6px;
-  border: 1px solid var(--leather);
-  border-radius: 6px;
-  background: var(--parchment);
-  font: inherit;
 }
 
 /* ---- Glyphwalking ---- */
@@ -3949,4 +3896,194 @@ span.forge-up {
   color: #3e7a2e;
   font-weight: 600;
   text-align: center;
+}
+
+/* ---- Expeditions: three trails from the Hearthstead to a realm and back ---- */
+.trip-chips {
+  display: flex;
+  gap: 6px;
+  height: 34px;
+  margin: 0 0 8px !important;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+p.trip-chips {
+  align-items: center;
+  font-size: 13px;
+}
+
+.trip-chips button {
+  flex: 1 0 auto;
+  min-width: 56px;
+  padding: 0 10px;
+  border: 2px solid var(--realm, var(--leather));
+  border-radius: 17px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: bold;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.trip-chips button[aria-checked='true'] {
+  background: var(--realm, var(--leather));
+  color: #fdf3dc;
+}
+
+.trip-board {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 10px 10px 8px;
+  list-style: none;
+  border: 1px solid var(--parchment-dark);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(111, 132, 85, 0.16), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(63, 111, 122, 0.14), transparent 45%),
+    rgba(255, 255, 255, 0.22);
+}
+
+.trip-trail {
+  display: grid;
+  grid-template-columns: 26px 1fr 66px;
+  grid-template-rows: 44px 30px;
+  align-items: center;
+  column-gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  position: relative;
+}
+
+button.trip-trail {
+  cursor: pointer;
+}
+
+.trip-home {
+  width: 26px;
+  height: 26px;
+  background: var(--leather);
+  clip-path: polygon(50% 0, 100% 45%, 86% 45%, 86% 100%, 14% 100%, 14% 45%, 0 45%);
+}
+
+.trip-path {
+  position: relative;
+  height: 44px;
+  margin: 0 18px 0 20px;
+  background: repeating-linear-gradient(90deg, var(--leather) 0 6px, transparent 6px 12px) center / 100% 2px no-repeat;
+}
+
+.trip-path-done {
+  position: absolute;
+  top: 21px;
+  left: 0;
+  height: 2px;
+  background: #c99a3a;
+}
+
+.trip-walker {
+  position: absolute;
+  top: 0;
+  width: 40px;
+  height: 40px;
+  margin-left: -20px;
+  transition: left 0.6s ease;
+}
+
+.trip-walker svg {
+  display: block;
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.3));
+}
+
+.trip-realm {
+  overflow: hidden;
+  padding: 4px 2px;
+  border-radius: 6px;
+  background: var(--realm);
+  color: #fdf3dc;
+  font-size: 11px;
+  font-weight: bold;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.trip-label {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.trip-label b {
+  font-size: 14px;
+}
+
+.trip-label small,
+.trip-label b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trip-label small {
+  font-size: 12px;
+  color: var(--leather);
+}
+
+.trip-waiting .trip-path {
+  opacity: 0.55;
+}
+
+.trip-waiting .trip-walker {
+  opacity: 0.8;
+}
+
+.trip-done .trip-label small {
+  color: #2f6b55;
+  font-weight: bold;
+}
+
+.trip-trail[data-hint]::after {
+  top: 6px;
+  left: 18px;
+  right: auto;
+}
+
+.trip-go {
+  position: relative;
+  width: 100%;
+  height: 48px;
+  border: 2px solid var(--leather-dark);
+  border-radius: 10px;
+  background: linear-gradient(var(--leather), var(--leather-dark));
+  color: var(--gold);
+  font: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.trip-go:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.trip-haul {
+  margin: 6px 0 0 !important;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--leather);
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }

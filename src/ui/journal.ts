@@ -1,20 +1,21 @@
 import { sound } from '../audio/sound';
 import { hint } from './hint';
 
-export type JournalTab = 'wayfarer' | 'bestiary' | 'bag' | 'hearth' | 'settings';
+export type JournalTab = 'wayfarer' | 'bestiary' | 'bag' | 'hearth' | 'trips' | 'settings';
 
-const TABS: JournalTab[] = ['wayfarer', 'bestiary', 'bag', 'hearth', 'settings'];
+const TABS: JournalTab[] = ['wayfarer', 'bestiary', 'bag', 'hearth', 'trips', 'settings'];
 const TITLES: Record<JournalTab, string> = {
   wayfarer: 'Hero',
   bestiary: 'Bestiary',
   bag: 'Bag',
   hearth: 'The Hearthstead',
+  trips: 'Expeditions',
   settings: 'Settings',
 };
 
 /**
  * The one sheet behind the hero's portrait button: the hero, the Bestiary, the bag, the
- * Hearthstead and settings as tabs, so the map keeps only a handful of buttons. Each panel
+ * Hearthstead, expeditions and settings as tabs, so the map keeps only a handful of buttons. Each panel
  * renders into its pane when its tab is shown, and can light a dot on its tab and on
  * the map button when something waits there.
  */
