@@ -7,6 +7,7 @@ import {
   heroClasses,
   heroStats,
   LOOKS,
+  MANA_HELP,
   openTalentRows,
   SECOND_CLASS_LEVEL,
   STATS,
@@ -110,7 +111,7 @@ export class HeroPanel {
       </div>
       <ul class="hero-stats">
         ${(Object.keys(STATS) as Stat[]).map((s) => `<li title="${STATS[s].blurb}"><b>${STATS[s].glyph} ${stats[s]}</b>${STATS[s].name}</li>`).join('')}
-        <li class="hero-mana" title="Fills as you walk"><b>✦ ${g.mana}/${g.maxMana}</b>Mana<span class="meter meter-mana"><span style="width:${manaPct}%"></span></span></li>
+        <li class="hero-mana" title="${MANA_HELP}"><b>✦ ${g.mana}/${g.maxMana}</b>Mana<span class="meter meter-mana"><span style="width:${manaPct}%"></span></span></li>
       </ul>`;
 
     const spells = classSpells(hero)
@@ -149,6 +150,7 @@ export class HeroPanel {
       ${card}
       ${canPickSecond(hero, level) ? '<div class="second-class"><h3>Choose a second class</h3><div id="second-picker"></div></div>' : ''}
       <h3>Spells <small>one per turn in battle, free</small></h3>
+      <p class="hint mana-help">✦ Mana: ${MANA_HELP}.</p>
       <ul class="hero-spells">${spells}</ul>
       <h3>Talents ${anyPicked ? '<button type="button" class="link-button" data-act="reset">Reset</button>' : ''}</h3>
       <ul class="talent-rows">${talents}</ul>

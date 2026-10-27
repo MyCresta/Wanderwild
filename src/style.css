@@ -3950,3 +3950,184 @@ span.forge-up {
   font-weight: 600;
   text-align: center;
 }
+
+/* A bond move not yet learned: dimmed, with the walk still to go. */
+.move-locked {
+  opacity: 0.6;
+}
+
+.move-locked .move-name {
+  color: inherit;
+}
+
+/* ---------- Battle panel: fixed log, 2×2 attacks, a hero panel, tonic beside the party ---------- */
+
+/* The log keeps one height (three lines) through the fight, so the crit bar laid over it never moves anything. */
+.log-wrap {
+  height: 60px;
+  margin-top: 8px;
+}
+
+.log-wrap .battle-log {
+  display: -webkit-box;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 20px;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.log-wrap.log-done {
+  height: auto;
+}
+
+.log-wrap.log-done .battle-log {
+  display: block;
+  height: auto;
+}
+
+.sweep-bar {
+  gap: 4px;
+  padding: 2px 4px 6px;
+}
+
+/* Four attack slots in two rows, each one line for the name and one for power and pace. */
+.cmd-grid-attacks {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.cmd-attack {
+  height: 58px;
+  min-height: 58px;
+  justify-content: center;
+  gap: 4px;
+}
+
+.cmd-attack .cmd-name {
+  display: block;
+  height: auto;
+  padding-right: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+}
+
+.cmd-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cmd-meta .cmd-wait {
+  flex-shrink: 0;
+}
+
+.cmd-locked {
+  border-style: dashed;
+  border-left-style: dashed;
+  background: transparent;
+  box-shadow: none;
+}
+
+.cmd.cmd-locked:disabled {
+  opacity: 0.55;
+}
+
+/* The hero's own panel: spells and the mana that pays for them, set apart from the Wildling's attacks. */
+.cmd-hero {
+  padding: 6px 8px 8px;
+  border: 1px solid rgba(91, 47, 120, 0.35);
+  border-radius: 12px;
+  background: rgba(91, 47, 120, 0.08);
+}
+
+.cmd-hero-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.cmd-hero-head .cmd-title {
+  min-width: 0;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mana-meter {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  color: #5b2f78;
+}
+
+.mana-meter .meter {
+  width: 64px;
+}
+
+.mana-text {
+  min-width: 4.2em;
+  text-align: right;
+}
+
+.cmd-grid-spells .cmd {
+  height: 50px;
+  min-height: 50px;
+  justify-content: center;
+}
+
+.cmd-grid-spells .cmd-name,
+.cmd-grid-spells .cmd-sub,
+.cmd-tonic .cmd-name,
+.cmd-tonic .cmd-sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmd-grid-spells .cmd-name {
+  font-size: 13px;
+}
+
+/* The party bench with the tonic at its end: both are about the Wildling in front. */
+.party-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.party-row .party-bench {
+  flex: 1;
+  justify-content: flex-start;
+  gap: 6px;
+  margin-top: 0;
+}
+
+.party-row .bench-pet {
+  width: 58px;
+}
+
+.cmd-tonic {
+  flex: 0 0 96px;
+  min-height: 0;
+  justify-content: center;
+}
+
+.cmd-tonic[hidden] {
+  display: none;
+}
+
+.mana-help {
+  margin: -4px 0 6px;
+}

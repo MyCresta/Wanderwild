@@ -78,6 +78,7 @@ export function mergeDuplicates(c: Collection): Map<string, string> {
       keep.level = Math.max(keep.level, other.level);
       keep.realmWalkM = Math.max(keep.realmWalkM ?? 0, other.realmWalkM ?? 0) || undefined;
       keep.homeRing = keep.homeRing || other.homeRing || undefined;
+      keep.bondM = Math.max(keep.bondM ?? 0, other.bondM ?? 0) || undefined;
       keep.boost = mergeBoost(petBoost(keep), petBoost(other));
       if (individualFromSeed(other.seed, kind).gilded && !individualFromSeed(keep.seed, kind).gilded) keep.seed = other.seed;
       folded.set(other.uid, keep.uid);

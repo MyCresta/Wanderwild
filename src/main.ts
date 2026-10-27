@@ -49,6 +49,7 @@ import { Trace } from './game/glyphs';
 import { waymarkSpawn } from './game/waymarks';
 import { GlyphLayer } from './map/glyphLayer';
 import { evolutionStatus, ringInRealm, walkInRealm } from './creatures/evolution';
+import { bondMoveFor, walkBond } from './creatures/bond';
 import { playerReach } from './geo/reach';
 import { watchLayout } from './ui/layout';
 import { installOrbitCamera } from './map/orbitCamera';
@@ -183,6 +184,7 @@ creatureGame.wayfarer = {
   hero: () => game.heroPower(),
   heroName: () => game.save.hero.name,
   mana: () => game.mana,
+  maxMana: () => game.maxMana,
   spellCost: (spell) => game.spellCost(spell),
   spendMana: (spell) => game.spendMana(spell),
   findGear: (foe) => game.findGear({ kind: 'foe', ...foe })?.text ?? null,
@@ -512,6 +514,11 @@ function onFix(fix: Fix): void {
     if (pet && reward.levels > 0 && before !== pet.level) {
       sound.play('levelUp');
       toast(`${getSpecies(pet.speciesId).name} grew to level ${pet.level} on the road!`);
+    }
+    const bonded = walkBond(collection, metres);
+    if (bonded) {
+      sound.play('discover');
+      toast(`${getSpecies(bonded.speciesId).name} learned its bond move, ${bondMoveFor(bonded.speciesId)?.name}, from your walks together!`);
     }
     if (collection.follower) settleFollower(followerTrust(collection, metres));
     const readyToEvolve = walkInRealm(collection, metres, currentRealm);

@@ -12,8 +12,9 @@ export interface WayfarerHooks {
   /** The hero beside the party: stat boosts, talents and known spells. */
   hero(): HeroPower;
   heroName?(): string;
-  /** Mana ready to spend; it fills by walking. */
+  /** Mana ready to spend; it fills by walking, and slowly on its own. */
   mana(): number;
+  maxMana(): number;
   spellCost(spell: HeroSpellId): number;
   /** Pays for a spell. Returns false when there is not enough mana. */
   spendMana(spell: HeroSpellId): boolean;

@@ -13,6 +13,8 @@ export interface OwnedPet {
   realmWalkM?: number;
   /** Whether it has walked a Ring in its home realm as companion, the last step to evolving. */
   homeRing?: boolean;
+  /** Metres walked as companion toward learning its bond move (see bond.ts). */
+  bondM?: number;
   /** How well it was sketched when it was bound (from before Wildlings were befriended). */
   sketch?: string;
   /** Extra percent on each stat; absent means what its seed rolled. Kin that join it raise these. */
