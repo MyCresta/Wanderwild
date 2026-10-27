@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cellAt, cellsAround } from '../src/game/cells';
 import { pointInPolygon, realmFromFeatures, distanceToLineM } from '../src/game/realms';
 import { exportSave, importSave, migrate, newSave } from '../src/game/save';
-import { rollShrineReward, shrineKind, SHRINE_COOLDOWN_MS, type Shrine } from '../src/game/shrines';
+import { BLESSING_MS, rollShrineReward, shrineKind, type Shrine } from '../src/game/shrines';
 import { spawnsInCell, spawnsNear, SPAWN_WINDOW_MS } from '../src/game/spawns';
 import { GameState, STEP_XP, STRIDE_M } from '../src/game/state';
 import { levelFromXp, nextUnlock, xpForLevel } from '../src/game/wayfarer';
@@ -175,15 +175,37 @@ describe('game state', () => {
     expect(events).toEqual([{ kind: 'levelUp', level: 3, unlocks: [expect.objectContaining({ level: 3 })] }]);
   });
 
-  it('puts a shrine on cooldown and blesses the wayfarer', () => {
+  it('lets each shrine bless once a day', () => {
+    const noon = new Date(2026, 9, 27, 12).getTime();
     const game = new GameState(newSave(0));
     const shrine: Shrine = { id: 'shrine:a', name: 'A', kind: 'vista', lat: 0, lng: 0 };
-    expect(game.useShrine(shrine, 'wildwood', 1000)).toBe(true);
-    expect(game.useShrine(shrine, 'wildwood', 2000)).toBe(false);
+    expect(game.useShrine(shrine, 'wildwood', noon)).toBe(true);
+    expect(game.useShrine(shrine, 'wildwood', noon + 11 * 3600_000)).toBe(false);
     expect(game.save.materials.ironbark).toBeGreaterThan(0);
-    expect(game.isBlessed(2000)).toBe(true);
-    expect(game.useShrine(shrine, 'wildwood', 1000 + SHRINE_COOLDOWN_MS)).toBe(true);
+    expect(game.blessing(noon + 1000)).toBe('vista');
+    expect(game.blessing(noon + BLESSING_MS)).toBeUndefined();
+    expect(game.useShrine(shrine, 'wildwood', new Date(2026, 9, 28, 0, 1).getTime())).toBe(true);
     expect(game.save.shrinesVisited).toBe(2);
+  });
+
+  it('gives each kind of shrine its own blessing, newest first', () => {
+    const now = Date.now();
+    const game = new GameState(newSave(0));
+    const reach = game.bonuses().reachM;
+    game.useShrine({ id: 'shrine:v', name: 'V', kind: 'vista', lat: 0, lng: 0 }, 'wildwood', now);
+    expect(game.bonuses().reachM).toBe(reach + 20);
+    game.useShrine({ id: 'shrine:b', name: 'B', kind: 'archive', lat: 0, lng: 0 }, 'wildwood', now);
+    expect(game.bonuses().reachM).toBe(reach);
+    const xp = game.save.wayfarer.xp;
+    game.grantXp(100);
+    expect(game.save.wayfarer.xp - xp).toBe(110);
+  });
+
+  it('keeps a blessing through a save round trip', () => {
+    const save = newSave(0);
+    save.blessing = { kind: 'monument', until: 5000 };
+    expect(importSave(exportSave(save)).blessing).toEqual({ kind: 'monument', until: 5000 });
+    expect(migrate({ ...JSON.parse(exportSave(save)), blessing: { kind: 'nope', until: 1 } }, 0).blessing).toBeNull();
   });
 
   it('records each ~50 m square only once', () => {

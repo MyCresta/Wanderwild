@@ -2,6 +2,7 @@ import { exportSave, importSave } from '../game/save';
 import { REALMS, type RealmId } from '../game/realms';
 import { STEP_XP, type GameState } from '../game/state';
 import { UNLOCKS } from '../game/wayfarer';
+import { BLESSINGS } from '../game/shrines';
 import { sound } from '../audio/sound';
 import { glyphSvg } from '../game/glyphs';
 import { journal } from '../ui/journal';
@@ -24,6 +25,7 @@ export class Hud {
   constructor(private readonly game: GameState) {
     journal.onShow('bag', () => this.renderSatchel());
     $('steps').addEventListener('click', () => this.toast(`${formatCount(game.stepsToday())} steps today. Every step gives ${STEP_XP} XP.`));
+    $('level-box').addEventListener('click', () => this.levelToast());
     this.setupSoundChoice();
     $('save-export').addEventListener('click', () => this.exportFile());
     const fileInput = $<HTMLInputElement>('save-file');
@@ -64,8 +66,24 @@ export class Hud {
     this.xpBar.parentElement?.setAttribute('aria-label', `${formatCount(lvl.into)} of ${formatCount(lvl.needed)} XP`);
     this.stepsEl.textContent = formatCount(this.game.stepsToday());
     this.coinEl.textContent = formatCount(s.currencies.coin);
-    document.body.classList.toggle('blessed', this.game.isBlessed());
+    const kind = this.game.blessing();
+    document.body.classList.toggle('blessed', !!kind);
+    const badge = $('blessing');
+    badge.textContent = kind ? BLESSINGS[kind].mark : '';
+    badge.title = kind ? BLESSINGS[kind].name : '';
     if (journal.showing('bag')) this.renderSatchel();
+  }
+
+  /** Tapping the level ring: XP to the next level and any blessing that is on. */
+  private levelToast(): void {
+    const lvl = this.game.level;
+    const xp = lvl.needed ? `${formatCount(lvl.needed - lvl.into)} XP to level ${lvl.level + 1}.` : `Level ${lvl.level}.`;
+    const kind = this.game.blessing();
+    const left = kind ? Math.ceil(((this.game.save.blessing?.until ?? 0) - Date.now()) / 60_000) : 0;
+    const blessing = kind
+      ? ` ${BLESSINGS[kind].name}: ${BLESSINGS[kind].effect}, ${left} min left.`
+      : ' Touch a shrine for a blessing.';
+    this.toast(xp + blessing);
   }
 
   /** Unfurls the realm's name for a few seconds when the Wayfarer walks into it. */
