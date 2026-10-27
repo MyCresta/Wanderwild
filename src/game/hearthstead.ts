@@ -28,7 +28,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   herbGarden: {
     id: 'herbGarden',
     name: 'Herb Garden',
-    blurb: 'Brews a healing tonic every two hours. You carry 6 at most.',
+    blurb: 'Brews a healing tonic every two hours.',
     unlockLevel: 3,
     product: { kind: 'supply', id: 'tonic' },
     productName: 'Tonic',
@@ -66,9 +66,6 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     upgradeMaterial: 'hearthgrain',
   },
 };
-
-/** Most tonics the satchel holds, so they cannot pile up while you are away. */
-export const TONIC_CARRY = 6;
 
 export const BUILDING_IDS = Object.keys(BUILDINGS) as BuildingId[];
 export const MAX_BUILDING_LEVEL = 10;
@@ -154,9 +151,9 @@ export function strideLeftToday(h: HearthsteadState, now: number): number {
   return h.strideDay === dayKey(now) ? STRIDE_DAILY_CAP_MS - h.strideUsedMs : STRIDE_DAILY_CAP_MS;
 }
 
-/** Takes what a building has made, up to `max`, keeping the rest. Returns the amount. */
-export function collect(def: BuildingDef, b: BuildingState, max = Infinity): number {
-  const amount = Math.max(0, Math.min(stored(def, b), Math.floor(max)));
+/** Takes what a building has made, keeping any part-made unit. Returns the amount. */
+export function collect(def: BuildingDef, b: BuildingState): number {
+  const amount = stored(def, b);
   if (amount > 0) b.progressMs -= (amount / ratePerHour(def, b.level)) * HOUR;
   return amount;
 }
