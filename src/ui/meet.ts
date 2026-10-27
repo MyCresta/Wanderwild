@@ -3,7 +3,7 @@ import { formatDistance, formatDuration } from '../hud/format';
 import { markSeen, type OwnedPet } from '../creatures/collection';
 import { keptOfLine, lineOf } from '../creatures/roost';
 import { getSpecies } from '../creatures/species';
-import { individualFromSeed, STAT_KEYS, STAT_NAMES, type Boost, type Encounter } from '../creatures/stats';
+import { individualFromSeed, STAT_NAMES, type Encounter, type StatKey } from '../creatures/stats';
 import { createCreatureSvg } from '../creatures/view';
 import { elementBadge, rarityBadge } from './badges';
 import type { GameContext } from './context';
@@ -104,7 +104,7 @@ export function openFollower(ctx: GameContext): void {
 }
 
 /** The moment a follower decides to stay. */
-export function openJoined(ctx: GameContext, pet: OwnedPet, upgraded = false, fromLevel = pet.level, gained: Partial<Boost> = {}): void {
+export function openJoined(ctx: GameContext, pet: OwnedPet, upgraded = false, fromLevel = pet.level, gained: { stat: StatKey; amount: number } | null = null): void {
   const species = getSpecies(pet.speciesId);
   const sheet = openSheet(upgraded ? `${species.name} grows` : `${species.name} stays`, { className: 'sheet-meet' });
   sound.play('achievement');
@@ -121,9 +121,7 @@ export function openJoined(ctx: GameContext, pet: OwnedPet, upgraded = false, fr
       ? h(
           'p',
           { class: 'stat-gains' },
-          STAT_KEYS.filter((k) => gained[k])
-            .map((k) => `${STAT_NAMES[k]} +${gained[k]}%`)
-            .join(' · ') || 'Its bonuses are already at their best.',
+          gained ? `${STAT_NAMES[gained.stat]} +${gained.amount}` : 'Its bonuses are already at their best.',
         )
       : '',
     h(
