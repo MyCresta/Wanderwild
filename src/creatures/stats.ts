@@ -13,6 +13,8 @@ import { matchup } from './elements';
 import { ELITE_TIERS, INK_CELL_M, INK_LEVELS, inkDepth, rollFoe, type FoeTrait, type InkDepth, type Rank } from './foes';
 import { cellAt } from '../game/cells';
 import type { Rival } from '../game/rivals';
+import type { Bounty } from '../game/wanted';
+import { skyElements, type Sky } from '../game/weather';
 
 export const MAX_LEVEL = 30;
 
@@ -148,6 +150,11 @@ export function spawnInkDepth(spawn: SpawnSeed): InkDepth {
 
 const MONSTER_CHANCE = 0.3;
 const BARROWS_MONSTER_CHANCE = 0.6;
+/** After dark more of what stands on the map is Blotspawn. */
+const NIGHT_MONSTER_CHANCE = 0.12;
+/** How much more often a Wildling of the element the sky favours turns up. */
+const SKY_WEIGHT = 2.5;
+const DEEPER: Record<InkDepth, InkDepth> = { thin: 'even', even: 'deep', deep: 'deep' };
 
 const toSpeciesRarity = (r: SpawnRarity): Rarity => (r === 'epic' || r === 'legendary' ? 'rare' : r);
 
@@ -173,26 +180,34 @@ export interface Encounter {
   traits?: FoeTrait[];
   /** An Inkbinder's camp: this is the lead of their line of three Taken. */
   rival?: Rival;
+  /** A named Blotspawn on the Hearth's Wanted board. */
+  bounty?: Bounty;
 }
 
 /**
  * Decides which creature stands at a spawn point. The same spawn always gives the same creature.
  * Blotspawn are measured against the party's level, shifted by the ink depth of their patch of map.
+ * The real sky tips the odds: weather and night favour some elements, and after dark the ink runs deeper.
  */
-export function creatureForSpawn(spawn: SpawnSeed, partyLevel: number): Encounter {
+export function creatureForSpawn(spawn: SpawnSeed, partyLevel: number, sky?: Sky): Encounter {
   const rng = mulberry32(spawn.seed);
   const tier = toSpeciesRarity(spawn.rarity);
   const favoured = spawn.realm ? REALM_ELEMENTS[spawn.realm] : [];
-  const monsterChance = spawn.realm === 'barrows' ? BARROWS_MONSTER_CHANCE : MONSTER_CHANCE;
+  const skyFavoured = skyElements(sky);
+  const monsterChance = (spawn.realm === 'barrows' ? BARROWS_MONSTER_CHANCE : MONSTER_CHANCE) + (sky?.night ? NIGHT_MONSTER_CHANCE : 0);
   const weight = (s: Species) =>
-    RARITY_WEIGHT[s.rarity] * (s.rarity === tier ? 3 : 1) * (favoured.includes(s.element) ? 3 : 1);
+    RARITY_WEIGHT[s.rarity] *
+    (s.rarity === tier ? 3 : 1) *
+    (favoured.includes(s.element) ? 3 : 1) *
+    (s.kind === 'pet' && skyFavoured.includes(s.element) ? SKY_WEIGHT : 1);
 
   const isMonster = rng() < monsterChance;
   // There are many Taken, so each is rarer than an old Blotspawn: together about two foes in five.
   const foeWeight = (s: MonsterSpecies) => weight(s) * (s.id.startsWith('taken-') ? 0.25 : 1);
   const species: Species = isMonster ? weightedPick<MonsterSpecies>(rng, FOES, foeWeight) : weightedPick(rng, PETS, weight);
   const bonus = spawn.rarity === 'legendary' ? 4 : spawn.rarity === 'epic' ? 2 : 0;
-  const [low, high] = INK_LEVELS[spawnInkDepth(spawn)];
+  const depth = spawnInkDepth(spawn);
+  const [low, high] = INK_LEVELS[sky?.night ? DEEPER[depth] : depth];
   const level = isMonster
     ? partyLevel + low + Math.round(rng() * (high - low)) + bonus
     : 1 + Math.floor(rng() * (partyLevel + 2)) + bonus;

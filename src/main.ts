@@ -36,7 +36,10 @@ import { creatureForSpawn, type Encounter } from './creatures/stats';
 import { wildlingWanted } from './creatures/scarcity';
 import type { GameContext } from './ui/context';
 import { openBattle } from './ui/battle';
-import { lairsNear } from './game/lairs';
+import { lairsNear, lairWeek } from './game/lairs';
+import { wantedAnchor, wantedPosts, type Bounty, type WantedAnchor, type WantedPost } from './game/wanted';
+import { WantedBoard } from './hud/wantedBoard';
+import { SkyWatch } from './game/weather';
 import { rivalsNear } from './game/rivals';
 import { renderBestiary, openStarterChoice } from './ui/bestiary';
 import { toast } from './ui/dom';
@@ -202,6 +205,16 @@ journal.onShow('bestiary', () =>
   renderBestiary(creatureGame, { body: journal.pane('bestiary'), setTitle: (text) => journal.setTitle(text), close: () => journal.close() }),
 );
 new HearthsteadPanel(game, (text) => hud.toast(text));
+new WantedBoard({
+  posts: () => wanted(),
+  claimed: (id) => id in collection.cleared,
+  here: () => lastFix,
+  show(post) {
+    journal.close();
+    setFollowing(false);
+    map.easeTo({ center: [post.spawn.lng, post.spawn.lat], zoom: Math.max(map.getZoom(), 16) });
+  },
+});
 new ExpeditionsPanel(game, creatureGame, (text) => hud.toast(text));
 new HeroPanel(game, forge, (text) => hud.toast(text));
 new BagPanel(game, creatureGame, (text) => hud.toast(text));
@@ -231,6 +244,19 @@ function clearSpawn(spawn: Spawn, won: boolean, remote = false): void {
     game.changed();
   }
   creatureGame.changed();
+}
+
+/** Pays a Wanted poster's bounty on top of the fight's own spoils; by Farsight it pays a share. */
+function claimBounty(bounty: Bounty, remote: boolean): void {
+  const share = remote ? FARSIGHT_SHARE : 1;
+  const coin = Math.round(bounty.coin * share);
+  const xp = Math.round(bounty.xp * share);
+  game.save.currencies.coin += coin;
+  game.grantXp(xp);
+  const gear = bounty.gear ? game.findGear({ kind: 'chest', hints: 0 }) : null;
+  game.changed();
+  sound.play('coin');
+  toast(`Bounty on ${bounty.name} claimed: +${coin} coin, +${xp} XP.${gear ? ` ${gear.text}` : ''}`);
 }
 
 /** A follower has been won over, or has given up and wandered off. */
@@ -270,6 +296,7 @@ function meet(spawn: Spawn, encounter: Encounter): void {
     openBattle(creatureGame, encounter, (won) => {
       if (!won) return;
       clearSpawn(spawn, true, remote);
+      if (encounter.bounty) claimBounty(encounter.bounty, remote);
       // A Wildling that sees you drive off a Blotspawn trusts you all the faster.
       if (collection.follower) settleFollower(followerTrust(collection, remote ? BLOT_TRUST_M / 2 : BLOT_TRUST_M));
     });
@@ -332,6 +359,21 @@ function focus(): { lat: number; lng: number } | null {
   return { lat: c.lat, lng: c.lng };
 }
 
+// The real sky: weather and night change what turns up, so spawns are read again when it turns.
+const skyWatch = new SkyWatch((sky) => {
+  hud.setSky(sky);
+  refreshSpawns(true);
+});
+hud.setSky(skyWatch.sky);
+
+// The Wanted board is pinned where the Wayfarer was first seen this week.
+let wantedAt: WantedAnchor | null = null;
+function wanted(): WantedPost[] | null {
+  if (!lastFix) return null;
+  if (wantedAt?.week !== lairWeek(Date.now())) wantedAt = wantedAnchor(lastFix.lat, lastFix.lng);
+  return wantedPosts(wantedAt, partyLevel(collection));
+}
+
 let spawnCheck: { lat: number; lng: number; at: number } | null = null;
 // Realm lookups read tiles, so each spawn's realm is worked out once.
 const spawnRealms = new globalThis.Map<string, RealmId>();
@@ -360,12 +402,14 @@ function refreshSpawns(force = false): void {
   const lairs = lairsNear(fix.lat, fix.lng, now, strongest).filter(({ spawn }) => !(spawn.id in collection.cleared));
   // Inkbinders camp for a day with three Taken, levelled against the party they will fight.
   const rivals = rivalsNear(fix.lat, fix.lng, now, level).filter(({ spawn }) => !(spawn.id in collection.cleared));
+  const posters = (wanted() ?? []).filter(({ spawn }) => !(spawn.id in collection.cleared));
   shown = [
     ...live
-      .map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level) }))
+      .map((spawn) => ({ spawn, encounter: creatureForSpawn(spawn, level, skyWatch.sky) }))
       .filter(({ spawn, encounter }) => wildlingWanted(spawn.id, encounter, collection)),
     ...lairs,
     ...rivals,
+    ...posters,
   ];
   creatures.show(shown, (e) => (e.species.kind === 'monster' ? foeThreat(e.level, level, e.rank, e.tier) : null));
   showReach();
@@ -604,6 +648,7 @@ function onFix(fix: Fix): void {
     }
     glyphLayer.showTrace(trace.line);
   }
+  skyWatch.update(fix.lat, fix.lng);
   refreshSpawns(firstFix);
   showReach();
   if (firstFix || !farsight.active) refreshCurios();

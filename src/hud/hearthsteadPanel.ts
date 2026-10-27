@@ -9,7 +9,8 @@ const HEARTHSTEAD_LEVEL = Math.min(...BUILDING_IDS.map((id) => BUILDINGS[id].unl
 
 /** The journal's Hearth tab: buildings to build, collect and upgrade. */
 export class HearthsteadPanel {
-  private readonly body = journal.pane('hearth');
+  // Its own box in the tab, so the Wanted board above it keeps its place.
+  private readonly body = journal.pane('hearth').appendChild(document.createElement('div'));
 
   constructor(
     private readonly game: GameState,
