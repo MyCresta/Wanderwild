@@ -22,8 +22,10 @@ const petName = (pet: OwnedPet | undefined) => (pet ? getSpecies(pet.speciesId).
  */
 export class ExpeditionsPanel {
   private readonly body = journal.pane('trips');
-  /** Who waits at the head of each empty trail; tap one to swap in another free Wildling. */
+  /** Who waits at the head of each empty trail; tap one to choose another free Wildling. */
   private picks: string[] = [];
+  /** The empty trail whose Wildling is being chosen, while the picker is open. */
+  private choosing: number | null = null;
   private plan: { realm: RealmId | null; hours: number } = { realm: null, hours: 1 };
 
   constructor(
@@ -38,7 +40,10 @@ export class ExpeditionsPanel {
     } catch {
       // A private window or blocked storage: start with the defaults.
     }
-    journal.onShow('trips', () => this.render());
+    journal.onShow('trips', () => {
+      this.choosing = null;
+      this.render();
+    });
     game.on((event) => {
       if (event.kind !== 'change') return;
       if (journal.showing('trips')) this.render();
@@ -76,18 +81,46 @@ export class ExpeditionsPanel {
     return picks;
   }
 
-  private swap(i: number): void {
-    const free = this.free().map((p) => p.uid);
-    const others = this.picks.filter((_, j) => j !== i);
-    const start = free.indexOf(this.picks[i]);
-    for (let k = 1; k <= free.length; k++) {
-      const next = free[(start + k) % free.length];
-      if (!others.includes(next)) {
-        this.picks[i] = next;
-        break;
-      }
-    }
+  /** Puts a Wildling on empty trail i; if it already waited on another trail, the two swap. */
+  private choose(i: number, uid: string): void {
+    const j = this.picks.indexOf(uid);
+    if (j >= 0) this.picks[j] = this.picks[i];
+    this.picks[i] = uid;
+    this.choosing = null;
     this.render();
+  }
+
+  /** Every free Wildling with its level, in place of the trails, to pick who walks trail i. */
+  private picker(i: number, height: number): HTMLElement {
+    const free = this.free();
+    return h(
+      'div',
+      { class: 'trip-board trip-picker', style: height ? { height: `${height}px` } : undefined },
+      h(
+        'div',
+        { class: 'trip-picker-head' },
+        h('b', {}, 'Who goes?'),
+        h('button', { type: 'button', 'aria-label': 'Back', onclick: () => ((this.choosing = null), this.render()) }, '×'),
+      ),
+      h(
+        'ul',
+        { class: 'trip-picker-grid' },
+        ...free.map((p) => {
+          const on = this.picks.indexOf(p.uid);
+          return h(
+            'li',
+            {},
+            h(
+              'button',
+              { type: 'button', 'aria-pressed': String(on === i), onclick: () => this.choose(i, p.uid) },
+              createCreatureSvg({ speciesId: p.speciesId, seed: p.seed, size: 44, still: true }),
+              h('b', {}, petName(p)),
+              h('small', {}, `Lv ${p.level}${on >= 0 && on !== i ? ' · waiting' : ''}`),
+            ),
+          );
+        }),
+      ),
+    );
   }
 
   private realm(): RealmId | null {
@@ -155,7 +188,8 @@ export class ExpeditionsPanel {
     const realm = this.realm();
     const doneCount = s.expeditions.filter((e) => expeditionDone(e, now)).length;
     const picks = this.fillPicks(EXPEDITION_SLOTS - s.expeditions.length);
-    const canSwap = this.free().length > picks.length;
+    const canSwap = this.free().length > 1;
+    if (this.choosing !== null && (!canSwap || this.choosing >= picks.length)) this.choosing = null;
 
     // Where to and how long: chosen once, kept for every send after.
     const where = realm
@@ -215,6 +249,7 @@ export class ExpeditionsPanel {
         at: spot.at,
         facing: spot.back ? -1 : 1,
         label: petName(pet),
+        level: pet?.level,
         note: done ? 'Home!' : `${spot.back ? 'Heading home' : 'Exploring'} · ${formatDuration(msLeft(e, now))}`,
         done,
       });
@@ -229,9 +264,10 @@ export class ExpeditionsPanel {
           at: 0,
           facing: 1,
           label: pet ? petName(pet) : 'No one free',
-          note: pet ? (canSwap ? 'Ready · tap to swap' : 'Ready to go') : 'Your party stays with you',
+          level: pet?.level,
+          note: pet ? (canSwap ? 'Ready · tap to choose' : 'Ready to go') : 'Your party stays with you',
           waiting: true,
-          onclick: pet && canSwap ? () => this.swap(slot) : undefined,
+          onclick: pet && canSwap ? () => ((this.choosing = slot), this.render()) : undefined,
         }),
       );
     }
@@ -269,10 +305,12 @@ export class ExpeditionsPanel {
           })()
         : 'Walking makes every trip faster';
 
+    // The picker takes the board's place at the board's size, so nothing below it moves.
+    const boardHeight = this.body.querySelector<HTMLElement>('.trip-board')?.offsetHeight ?? 0;
     this.body.replaceChildren(
       where,
       howLong,
-      h('ol', { class: 'trip-board', 'aria-label': 'Expeditions' }, ...trails),
+      this.choosing !== null ? this.picker(this.choosing, boardHeight) : h('ol', { class: 'trip-board', 'aria-label': 'Expeditions' }, ...trails),
       action,
       h('p', { class: 'trip-haul' }, haul),
     );
@@ -284,6 +322,7 @@ export class ExpeditionsPanel {
     at: number;
     facing: 1 | -1;
     label: string;
+    level?: number;
     note: string;
     done?: boolean;
     waiting?: boolean;
@@ -298,7 +337,7 @@ export class ExpeditionsPanel {
       h('span', { class: 'trip-home', 'aria-hidden': 'true' }),
       h('span', { class: 'trip-path', 'aria-hidden': 'true' }, h('span', { class: 'trip-path-done', style: { width: `${t.at * 100}%` } }), walker),
       h('span', { class: 'trip-realm', style: `--realm:${color}`, title: t.realm ? REALMS[t.realm].name : '' }, t.realm ? realmName(t.realm) : '?'),
-      h('span', { class: 'trip-label' }, h('b', {}, t.label), h('small', {}, t.note)),
+      h('span', { class: 'trip-label' }, h('b', {}, t.label), t.level ? h('span', { class: 'trip-level' }, `Lv ${t.level}`) : null, h('small', {}, t.note)),
     );
     const li = h('li', { class: `trip${t.done ? ' trip-done' : ''}${t.waiting ? ' trip-waiting' : ''}` }, row);
     hint(row, !!t.done);
