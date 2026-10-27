@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  TONIC_CARRY,
   BUILDINGS,
   capMs,
   collect,
@@ -67,6 +68,20 @@ describe('hearthstead in the game', () => {
     expect(game.save.hearthstead.buildings.mine?.level).toBe(2);
     expect(game.save.currencies.coin).toBe(60);
     expect(game.save.materials.ironbark).toBe(6);
+  });
+
+  it('brews a tonic every two hours and keeps only a satchel-full', () => {
+    const game = new GameState(newSave(0));
+    game.grantXp(283 + 520);
+    game.build('herbGarden', 0);
+    expect(game.collect('herbGarden', 4 * HOUR)).toBe(2);
+    expect(game.collect('herbGarden', 12 * HOUR)).toBe(4);
+    expect(game.save.supplies.tonic).toBe(TONIC_CARRY);
+    // A full satchel leaves the rest brewing in the garden.
+    expect(game.collect('herbGarden', 24 * HOUR)).toBe(0);
+    game.useTonic();
+    expect(game.collect('herbGarden', 24 * HOUR)).toBe(1);
+    expect(migrate({ version: 5, supplies: { tonic: 40 } }, 10).supplies.tonic).toBe(TONIC_CARRY);
   });
 
   it('applies the stride boost while walking', () => {
