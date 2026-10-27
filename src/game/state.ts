@@ -23,6 +23,7 @@ import {
   dayKey,
   strideBoost,
   tick,
+  TONIC_CARRY,
   upgradeCost,
   type BuildingId,
 } from './hearthstead';
@@ -411,7 +412,9 @@ export class GameState {
     if (!b) return 0;
     tick(this.save.hearthstead, now);
     const def = BUILDINGS[id];
-    const amount = collect(def, b);
+    // The satchel holds only so many tonics; the rest wait in the garden.
+    const room = def.product.kind === 'supply' && def.product.id === 'tonic' ? TONIC_CARRY - this.save.supplies.tonic : Infinity;
+    const amount = collect(def, b, room);
     if (amount > 0) {
       if (def.product.kind === 'material') this.addMaterials({ [def.product.id]: amount });
       else this.save.supplies[def.product.id] += amount;

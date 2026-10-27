@@ -1,4 +1,4 @@
-import { BUILDING_IDS, BUILDINGS, capMs, isFull, MAX_BUILDING_LEVEL, msUntilFull, ratePerHour, storageCap, stored, STRIDE_DAILY_CAP_MS, strideLeftToday, upgradeCost } from '../game/hearthstead';
+import { BUILDING_IDS, BUILDINGS, capMs, TONIC_CARRY, isFull, MAX_BUILDING_LEVEL, msUntilFull, ratePerHour, storageCap, stored, STRIDE_DAILY_CAP_MS, strideLeftToday, upgradeCost } from '../game/hearthstead';
 import { MATERIALS } from '../game/realms';
 import type { GameState } from '../game/state';
 import { formatCount, formatDuration } from './format';
@@ -27,7 +27,8 @@ export class HearthsteadPanel {
       if (button.dataset.act === 'build' && game.build(id)) this.toast(`The ${def.name} is built.`);
       if (button.dataset.act === 'collect') {
         const n = game.collect(id);
-        this.toast(n ? `Collected ${n} ${def.productName}.` : 'Nothing ready yet.');
+        const satchelFull = def.product.kind === 'supply' && def.product.id === 'tonic' && game.save.supplies.tonic >= TONIC_CARRY;
+        this.toast(n ? `Collected ${n} ${def.productName}.` : satchelFull ? `Your satchel holds ${TONIC_CARRY} tonics at most.` : 'Nothing ready yet.');
       }
       if (button.dataset.act === 'upgrade' && game.upgrade(id)) this.toast(`${def.name} is now level ${game.save.hearthstead.buildings[id]?.level}.`);
       this.render();
@@ -86,7 +87,7 @@ export class HearthsteadPanel {
         <div class="building-actions">
           <button type="button" data-act="collect" data-id="${id}" ${have ? '' : 'disabled'}${hintAttr(!full)}>Collect</button>
           <button type="button" data-act="upgrade" data-id="${id}" ${this.game.canUpgrade(id) ? '' : 'disabled'}
-            title="${maxed ? '' : `${formatCount(ratePerHour(def, b.level))}/h now`}">
+            title="${maxed ? '' : `${+ratePerHour(def, b.level).toFixed(1)}/h now`}">
             ${maxed ? 'Max level' : `Upgrade · ${formatCount(cost.coin)}c, ${cost.amount} ${MATERIALS[cost.material].name}`}
           </button>
         </div>
