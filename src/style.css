@@ -4185,3 +4185,153 @@ button.trip-trail {
   font-size: 11px;
   color: var(--leather);
 }
+
+/* ---- Sky: a small weather button in the bar, and a tint over the map ---- */
+.hud-sky {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.hud-sky svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+}
+
+body.sky-night #map .maplibregl-canvas {
+  filter: sepia(0.22) saturate(0.75) contrast(0.96) brightness(0.72) hue-rotate(-12deg);
+}
+
+body.sky-rain:not(.sky-night) #map .maplibregl-canvas,
+body.sky-storm:not(.sky-night) #map .maplibregl-canvas,
+body.sky-fog:not(.sky-night) #map .maplibregl-canvas {
+  filter: sepia(0.22) saturate(0.75) contrast(0.92) brightness(0.9);
+}
+
+/* ---- Wanted board, at the top of the Hearth tab ---- */
+.wanted h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0 8px;
+  font-size: 16px;
+}
+
+.wanted h3 small {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--leather);
+}
+
+.wanted-empty {
+  font-size: 13px;
+}
+
+.wanted-list {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.wanted-post {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 52px;
+  padding: 4px 12px 4px 6px;
+  border: 1px dashed #8e2b22;
+  border-radius: 8px;
+  background: rgba(142, 43, 34, 0.08);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wanted-post.claimed {
+  opacity: 0.55;
+  border-style: solid;
+  border-color: var(--parchment-dark);
+  background: rgba(255, 255, 255, 0.2);
+  cursor: default;
+}
+
+.wanted-art {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+
+.wanted-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.wanted-text b,
+.wanted-text small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wanted-text small {
+  font-size: 12px;
+  color: var(--leather);
+}
+
+.wanted-reward {
+  flex: none;
+  font-size: 13px;
+  font-weight: bold;
+  color: #8e2b22;
+}
+
+.wanted-post.claimed .wanted-reward {
+  color: #2f6b55;
+}
+
+/* A Wanted Blotspawn on the map wears a small red ribbon. */
+.map-creature-wanted .creature {
+  filter: drop-shadow(0 0 6px rgba(142, 43, 34, 0.95));
+}
+
+.map-creature-wanted::after {
+  content: 'Wanted';
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  translate: -50% 0;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: #8e2b22;
+  color: #f6e7c1;
+  font-size: calc(10px * var(--marker-scale, 1));
+  font-weight: bold;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: none;
+  white-space: nowrap;
+}
