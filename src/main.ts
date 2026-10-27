@@ -54,7 +54,7 @@ import { watchLayout } from './ui/layout';
 import { installOrbitCamera } from './map/orbitCamera';
 import { Farsight } from './ui/farsight';
 import { CurioLayer } from './map/curioLayer';
-import { CURIO_KINDS, curiosNear, FARSIGHT_RANGE_M, FARSIGHT_SHARE, type Curio } from './game/farsight';
+import { CURIO_KINDS, curiosNear, FARSIGHT_SHARE, farsightRange, type Curio } from './game/farsight';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -240,8 +240,10 @@ function settleFollower(outcome: FollowOutcome): void {
 
 /** Within the purple ring of where the Wayfarer actually stands. */
 const onFoot = (p: { lat: number; lng: number }) => !!lastFix && haversine(lastFix, p) <= playerReach(game.bonuses().reachM);
+/** How far Farsight sees: a lantern widens it three times as much as it widens reach. */
+const farsightReach = () => farsightRange(game.bonuses().reachM);
 /** In Farsight, and inside the dashed ring the eye may roam. */
-const byFarsight = (p: { lat: number; lng: number }) => farsight.active && !!lastFix && haversine(lastFix, p) <= FARSIGHT_RANGE_M;
+const byFarsight = (p: { lat: number; lng: number }) => farsight.active && !!lastFix && haversine(lastFix, p) <= farsightReach();
 
 function meet(spawn: Spawn, encounter: Encounter): void {
   // By Farsight anything on the map can be met, for a smaller reward; in person it pays in full.
@@ -291,7 +293,7 @@ const farsight = new Farsight({
     recenterEl.setAttribute('aria-pressed', 'false');
     recenterEl.hidden = true;
     orbit.setFree(true);
-    player.setFarsight(FARSIGHT_RANGE_M);
+    player.setFarsight(farsightReach());
     if (!seenFarsightHint()) {
       hud.toast(`Farsight: explore inside the dashed ring for ${Math.round(FARSIGHT_SHARE * 100)}% rewards. Walking pays full.`, 5000);
     }
@@ -310,8 +312,9 @@ map.on('move', () => {
   if (!farsight.active || !lastFix || leashing) return;
   const c = map.getCenter();
   const d = haversine(lastFix, c);
-  if (d <= FARSIGHT_RANGE_M) return;
-  const k = FARSIGHT_RANGE_M / d;
+  const range = farsightReach();
+  if (d <= range) return;
+  const k = range / d;
   leashing = true;
   map.setCenter([lastFix.lng + (c.lng - lastFix.lng) * k, lastFix.lat + (c.lat - lastFix.lat) * k]);
   leashing = false;
@@ -367,6 +370,7 @@ function showReach(): void {
   const fix = focus();
   if (!fix) return;
   if (lastFix) player.setReach(playerReach(game.bonuses().reachM));
+  if (farsight.active) player.setFarsight(farsightReach());
   // By Farsight everything inside the dashed ring is in reach.
   creatures.markReach((spawn) => onFoot(spawn) || byFarsight(spawn));
   // Shrines need the Wayfarer in person; curios can still be taken by Farsight for a share.

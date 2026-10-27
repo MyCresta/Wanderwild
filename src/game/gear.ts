@@ -1,4 +1,5 @@
 import { weightedPick } from './rng';
+import { FARSIGHT_PER_REACH } from './farsight';
 import type { MaterialId } from './realms';
 
 /**
@@ -33,7 +34,7 @@ export const SLOT_DEFS: Record<Slot, SlotDef> = {
   staff: { name: 'Staff', material: 'ironbark', effect: (p) => `${pct(p * PER_POWER.staff)} damage` },
   cloak: { name: 'Cloak', material: 'mistwool', effect: (p) => `${pct(p * PER_POWER.cloak)} health` },
   boots: { name: 'Boots', material: 'cobbleOre', effect: (p) => `${pct(p * PER_POWER.boots)} stride` },
-  lantern: { name: 'Lantern', material: 'gravemoss', effect: (p) => `+${Math.round(p * PER_POWER.lantern)} m reach` },
+  lantern: { name: 'Lantern', material: 'gravemoss', effect: (p) => `+${Math.round(p * PER_POWER.lantern)} m reach, +${Math.round(p * PER_POWER.lantern * FARSIGHT_PER_REACH)} m Farsight` },
   charm: { name: 'Charm', material: 'shrineRelic', effect: (p) => `${pct(p * PER_POWER.charm)} befriending` },
 };
 
@@ -49,7 +50,7 @@ export const RUNES: Record<RuneId, { name: string; blurb: string }> = {
   nightfang: { name: 'Nightfang', blurb: '+20% Wildling damage at night' },
   hatchstone: { name: 'Kinstone', blurb: 'Wildlings trust you 15% sooner' },
   swiftsole: { name: 'Swiftsole', blurb: '+10% stride boost' },
-  seer: { name: 'Seer', blurb: '+10 m reach' },
+  seer: { name: 'Seer', blurb: `+10 m reach, +${10 * FARSIGHT_PER_REACH} m Farsight` },
   warding: { name: 'Warding', blurb: '+10% party health' },
 };
 export const RUNE_IDS = Object.keys(RUNES) as RuneId[];
