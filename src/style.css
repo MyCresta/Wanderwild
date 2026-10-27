@@ -2863,6 +2863,9 @@ span.forge-up {
   /* One fixed height for every tab, so switching tabs never resizes or moves the sheet. */
   height: min(680px, calc(100dvh - var(--safe-top) - var(--safe-bottom) - 48px));
   max-height: none;
+  /* Sit low on the screen, clear of the home bar, so the tabs at the foot are in thumb reach. */
+  margin-top: auto;
+  margin-bottom: calc(var(--safe-bottom) + 12px);
   overflow: hidden;
 }
 
@@ -2882,16 +2885,34 @@ span.forge-up {
   right: 6px;
 }
 
+/* The tab bar is the sheet's foot, where thumbs rest: tall, full-width tap targets. */
 .journal-tabs {
+  flex: none;
   gap: 2px;
   margin: 0;
+  padding: 0 6px 6px;
+  border-top: 2px solid var(--leather);
+  border-bottom: 0;
 }
 
 .journal-tabs .tab {
   position: relative;
-  min-height: 36px;
-  padding: 0 4px;
-  font-size: 12.5px;
+  /* Sized to their labels so "Bestiary" fits even with all six tabs on a narrow phone. */
+  flex: 1 1 auto;
+  min-width: 44px;
+  min-height: 52px;
+  padding: 0 2px;
+  border-radius: 0 0 10px 10px;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  touch-action: manipulation;
+}
+
+.journal-tabs #journal-tab-settings {
+  flex: 0 0 44px;
+  font-size: 20px;
 }
 
 .journal-tabs .tab[hidden] {
