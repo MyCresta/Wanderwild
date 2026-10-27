@@ -16,6 +16,11 @@ export const FARSIGHT_SHARE = 0.5;
  * roughly 30 Blotspawn every 15 minutes and 50 curios a day (see tests/farsight.test.ts).
  */
 export const FARSIGHT_RANGE_M = 750;
+/** Each metre of reach from gear widens Farsight by this many metres. */
+export const FARSIGHT_PER_REACH = 3;
+
+/** Farsight's range with gear: reach bonuses count FARSIGHT_PER_REACH times over. */
+export const farsightRange = (reachBonusM = 0) => FARSIGHT_RANGE_M + FARSIGHT_PER_REACH * Math.max(0, reachBonusM);
 
 // ---- Curios: small finds scattered over the map, a fresh set every day ----
 
