@@ -20,6 +20,7 @@ import { installProbeLayers, realmAt, shrinesNear } from './map/realmProbe';
 import { ShrineLayer } from './map/shrineLayer';
 import { Hud } from './hud/hud';
 import { HearthsteadPanel } from './hud/hearthsteadPanel';
+import { ExpeditionsPanel } from './hud/expeditionsPanel';
 import { renderParty } from './hud/partyPanel';
 import { journal } from './ui/journal';
 import { ForgePanel } from './hud/forgePanel';
@@ -196,7 +197,8 @@ journal.onShow('wayfarer', () => renderParty($('satchel-party'), creatureGame));
 journal.onShow('bestiary', () =>
   renderBestiary(creatureGame, { body: journal.pane('bestiary'), setTitle: (text) => journal.setTitle(text), close: () => journal.close() }),
 );
-new HearthsteadPanel(game, (text) => hud.toast(text), creatureGame);
+new HearthsteadPanel(game, (text) => hud.toast(text));
+new ExpeditionsPanel(game, creatureGame, (text) => hud.toast(text));
 new HeroPanel(game, forge, (text) => hud.toast(text));
 new BagPanel(game, creatureGame, (text) => hud.toast(text));
 

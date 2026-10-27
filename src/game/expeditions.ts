@@ -45,3 +45,12 @@ export function expeditionReward(e: Expedition): ExpeditionReward {
     petXp: Math.round(hours * (10 + e.petLevel * 2)),
   };
 }
+
+/**
+ * Where a Wildling stands on its trail, from 0 (the Hearthstead) to 1 (the realm): it walks
+ * out for the first half of the trip and home for the second.
+ */
+export function trailSpot(progress: number): { at: number; back: boolean } {
+  const p = Math.max(0, Math.min(1, progress));
+  return p < 0.5 ? { at: p * 2, back: false } : { at: 2 - p * 2, back: true };
+}
