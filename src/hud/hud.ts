@@ -3,6 +3,7 @@ import { REALMS, type RealmId } from '../game/realms';
 import { STEP_XP, type GameState } from '../game/state';
 import { UNLOCKS } from '../game/wayfarer';
 import { BLESSINGS } from '../game/shrines';
+import { STREAK_MAX_DAYS, STREAK_STEPS, STREAK_XP_PER_DAY } from '../game/streak';
 import { sound } from '../audio/sound';
 import { glyphSvg } from '../game/glyphs';
 import { journal } from '../ui/journal';
@@ -38,7 +39,7 @@ export class Hud {
 
   constructor(private readonly game: GameState) {
     journal.onShow('bag', () => this.renderSatchel());
-    $('steps').addEventListener('click', () => this.toast(`${formatCount(game.stepsToday())} steps today. Every step gives ${STEP_XP} XP.`));
+    $('steps').addEventListener('click', () => this.stepsToast());
     this.skyEl.addEventListener('click', () => this.toast(skyLine(this.sky), 5000));
     $('level-box').addEventListener('click', () => this.levelToast());
     this.setupSoundChoice();
@@ -81,6 +82,11 @@ export class Hud {
     this.xpBar.parentElement?.setAttribute('aria-label', `${formatCount(lvl.into)} of ${formatCount(lvl.needed)} XP`);
     this.stepsEl.textContent = formatCount(this.game.stepsToday());
     this.coinEl.textContent = formatCount(s.currencies.coin);
+    const streak = this.game.streak();
+    const stepsBtn = $('steps');
+    stepsBtn.classList.toggle('streak', streak.days > 0);
+    stepsBtn.classList.toggle('streak-kept', streak.kept);
+    $('streak-days').textContent = streak.days > 0 ? String(streak.days) : '';
     const kind = this.game.blessing();
     document.body.classList.toggle('blessed', !!kind);
     const badge = $('blessing');
@@ -97,6 +103,19 @@ export class Hud {
     this.skyEl.setAttribute('aria-label', skyLine(sky));
     document.body.classList.toggle('sky-night', sky.night);
     for (const w of Object.keys(SKY_ICONS)) document.body.classList.toggle(`sky-${w}`, w === sky.weather);
+  }
+
+  /** Tapping the step counter: today's steps, and the walk streak. */
+  private stepsToast(): void {
+    const steps = this.game.stepsToday();
+    const { days, kept } = this.game.streak();
+    const bonus = Math.round(100 * STREAK_XP_PER_DAY * Math.min(STREAK_MAX_DAYS, days));
+    const streak = !days
+      ? ` Walk ${formatCount(STREAK_STEPS)} a day to light a streak.`
+      : kept
+        ? ` Streak: ${days} day${days > 1 ? 's' : ''}, +${bonus}% XP.`
+        : ` Streak: ${days} day${days > 1 ? 's' : ''}, +${bonus}% XP. ${formatCount(STREAK_STEPS - steps)} more today to keep it.`;
+    this.toast(`${formatCount(steps)} steps today, ${STEP_XP} XP each.${streak}`, 5000);
   }
 
   /** Tapping the level ring: XP to the next level and any blessing that is on. */

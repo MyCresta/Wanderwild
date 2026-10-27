@@ -42,7 +42,7 @@ import { WantedBoard } from './hud/wantedBoard';
 import { SkyWatch } from './game/weather';
 import { rivalsNear } from './game/rivals';
 import { renderBestiary, openStarterChoice } from './ui/bestiary';
-import { toast } from './ui/dom';
+import { h, openSheet, toast } from './ui/dom';
 import { openFollower, openJoined, openMeeting } from './ui/meet';
 import { gatherRoost, materialName, mergeDuplicates } from './creatures/roost';
 import { BLOT_TRUST_M, followerTrust, type FollowOutcome } from './creatures/befriend';
@@ -62,6 +62,10 @@ import { CURIO_KINDS, curiosNear, FARSIGHT_SHARE, farsightRange, type Curio } fr
 import { companionFind, FIND_EVERY_M, findsBetween } from './game/companionFinds';
 import { marksReached, peekUsed, TRAIL_MARKS } from './game/trail';
 import { TrailLayer } from './map/trailLayer';
+import { PeddlerLayer } from './map/peddlerLayer';
+import type { PeddlerWare } from './game/peddler';
+import { power, RARITIES, RUNES, SLOT_DEFS } from './game/gear';
+import { gearSvg } from './hud/gearArt';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -534,11 +538,82 @@ function tapTrailMark(i: number): void {
   toast(`Trail mark, ${away}Walk there, or peek one a day by Farsight 👁.`);
 }
 
+// The wandering peddler: one tent a day within a kilometre, selling one rare ware for coin.
+const peddlerLayer = new PeddlerLayer(map, () => tapPeddler());
+
+const wareName = (ware: PeddlerWare) =>
+  ware.kind === 'rune' ? `${RUNES[ware.rune].name} rune` : `${RARITIES[ware.rarity].name} ${SLOT_DEFS[ware.slot].name}`;
+
+function tapPeddler(): void {
+  const peddler = game.save.peddler;
+  const ware = game.peddlerWare();
+  if (!peddler || !ware) return toast('The peddler has nothing you need today. Another comes tomorrow.');
+  if (!onFoot(peddler)) {
+    const away = lastFix ? `${Math.round(haversine(lastFix, peddler))} m away. ` : '';
+    return hud.toast(`A peddler selling a ${wareName(ware)} for ${ware.price} coin, ${away}Walk there to trade.`, 5000);
+  }
+  openPeddler(ware);
+}
+
+function openPeddler(ware: PeddlerWare): void {
+  const sheet = openSheet('Wandering peddler', { className: 'sheet-peddler' });
+  const worn = ware.kind === 'gear' ? game.save.gear[ware.slot] : undefined;
+  let line: string;
+  if (ware.kind === 'rune') line = RUNES[ware.rune].blurb;
+  else {
+    const effect = SLOT_DEFS[ware.slot].effect(power({ rarity: ware.rarity, plus: worn?.plus ?? 0 }));
+    const swap = worn
+      ? `replaces your ${RARITIES[worn.rarity].name} ${SLOT_DEFS[ware.slot].name}${worn.plus ? ` and keeps its +${worn.plus}` : ''}`
+      : 'fills an empty slot';
+    line = `${effect}, ${swap}.`;
+  }
+  const art =
+    ware.kind === 'rune'
+      ? `<span class="peddler-rune">${RUNES[ware.rune].name[0]}</span>`
+      : gearSvg({ slot: ware.slot, rarity: ware.rarity, plus: worn?.plus ?? 0 }, 64);
+  const coin = game.save.currencies.coin;
+  const artBox = h('div', { class: 'peddler-ware' });
+  artBox.innerHTML = art;
+  const color = ware.kind === 'gear' ? RARITIES[ware.rarity].color : '#5b3f8a';
+  sheet.body.append(
+    artBox,
+    h('p', { class: 'peddler-name', style: `color:${color}` }, wareName(ware)),
+    h('p', { class: 'peddler-line' }, line),
+    h(
+      'div',
+      { class: 'actions' },
+      h('button', { class: 'btn', type: 'button', onclick: () => sheet.close() }, 'Leave'),
+      h(
+        'button',
+        {
+          class: 'btn btn-primary',
+          type: 'button',
+          disabled: coin < ware.price,
+          onclick: () => {
+            const text = game.buyFromPeddler();
+            sheet.close();
+            if (!text) return;
+            sound.play('reward');
+            peddlerLayer.show(game.save.peddler);
+            hud.toast(`${text} The peddler packs up.`, 5000);
+          },
+        },
+        coin < ware.price ? `Need ${ware.price} coin` : `Buy, ${ware.price} coin`,
+      ),
+    ),
+  );
+}
+
 /** Draws today's trail around the Wayfarer, and reaches any mark they walk up to. */
 function walkTrail(fix: Fix): void {
   const { trail, fresh } = game.trail(fix);
   trailLayer.show(trail);
-  if (fresh) hud.toast('A wander trail is inked on your map: three marks within a kilometre, and a chest at the last.', 5000);
+  const { peddler, fresh: newPeddler } = game.peddler(fix);
+  peddlerLayer.show(peddler);
+  peddlerLayer.markReach(onFoot(peddler));
+  const camp = newPeddler && game.peddlerWare() ? ' A peddler has pitched a tent nearby, too.' : '';
+  if (fresh) hud.toast(`A wander trail is inked on your map: three marks within a kilometre, and a chest at the last.${camp}`, 6000);
+  else if (camp) hud.toast(camp.trim().replace(', too.', '.'), 5000);
   trail.marks.forEach((mark, i) => !mark.reached && onFoot(mark) && reachTrailMark(i, 'foot'));
 }
 

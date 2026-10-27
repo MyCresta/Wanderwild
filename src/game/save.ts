@@ -6,6 +6,8 @@ import { BLESSINGS, type ShrineKind } from './shrines';
 import type { Waymark } from './waymarks';
 import type { GlyphKind } from './glyphs';
 import type { Trail, TrailMark } from './trail';
+import type { Peddler } from './peddler';
+import type { Streak } from './streak';
 import { isHeroClass, LOOKS, METRES_PER_MANA, newHero, TALENTS, talentKey, type HeroState } from './hero';
 
 /**
@@ -57,6 +59,10 @@ export interface SaveData {
   steps: { day: string; count: number };
   /** Today's wander trail, drawn at the first fix of the day. */
   trail: Trail | null;
+  /** Days in a row the step goal was reached, for the walk streak. */
+  streak: Streak;
+  /** Today's wandering peddler, placed at the first fix of the day. */
+  peddler: Peddler | null;
 }
 
 export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
@@ -87,6 +93,8 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     curiosFound: {},
     steps: { day: '', count: 0 },
     trail: null,
+    streak: { day: '', days: 0 },
+    peddler: null,
   };
 }
 
@@ -169,6 +177,11 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
       return { day: typeof st.day === 'string' ? st.day : '', count: Math.max(0, num(st.count)) };
     })(),
     trail: parseTrail(raw.trail),
+    streak: (() => {
+      const st = isObject(raw.streak) ? raw.streak : {};
+      return { day: typeof st.day === 'string' ? st.day : '', days: Math.max(0, Math.floor(num(st.days))) };
+    })(),
+    peddler: parsePeddler(raw.peddler),
   };
 }
 
@@ -180,6 +193,11 @@ function parseTrail(v: unknown): Trail | null {
     ...(m.reached === 'foot' || m.reached === 'farsight' ? { reached: m.reached as TrailMark['reached'] } : {}),
   }));
   return { day: v.day, origin: { lat: num(v.origin.lat), lng: num(v.origin.lng) }, marks, opened: v.opened === true };
+}
+
+function parsePeddler(v: unknown): Peddler | null {
+  if (!isObject(v) || typeof v.day !== 'string' || !isObject(v.origin)) return null;
+  return { day: v.day, origin: { lat: num(v.origin.lat), lng: num(v.origin.lng) }, lat: num(v.lat), lng: num(v.lng), sold: v.sold === true };
 }
 
 const addUp = (a: Partial<Record<MaterialId, number>>, b: Partial<Record<MaterialId, number>>) => {

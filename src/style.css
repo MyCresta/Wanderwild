@@ -1156,6 +1156,42 @@ body:has(> .catch-scene) .parchment-overlay {
   opacity: 0.8;
 }
 
+/* The walk streak swaps the footprints for a flame of the same size; its day count sits over it. */
+.hud-streak {
+  position: relative;
+  display: none;
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: #ef7d32;
+}
+
+.hud-steps .hud-streak svg {
+  opacity: 1;
+}
+
+.hud-streak b {
+  position: absolute;
+  right: -6px;
+  bottom: -5px;
+  color: #f6d27a;
+  font-size: 8px;
+  line-height: 9px;
+}
+
+.streak .hud-streak {
+  display: block;
+}
+
+.streak .hud-feet {
+  display: none;
+}
+
+/* Alive from yesterday, not yet kept today. */
+.streak:not(.streak-kept) .hud-streak {
+  opacity: 0.5;
+}
+
 .hud-purse {
   display: flex;
   flex-direction: row;
@@ -4556,6 +4592,67 @@ body.sky-fog:not(.sky-night) #map .maplibregl-canvas {
 .trail-marker svg {
   width: calc(38px * var(--marker-scale, 1));
   height: calc(38px * var(--marker-scale, 1));
+}
+
+.peddler-marker {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: max(44px, calc(40px * var(--marker-scale, 1)));
+  height: max(44px, calc(40px * var(--marker-scale, 1)));
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+}
+
+.peddler-marker svg {
+  width: calc(40px * var(--marker-scale, 1));
+  height: calc(40px * var(--marker-scale, 1));
+}
+
+.peddler-marker.out-of-reach {
+  opacity: 0.75;
+}
+
+.sheet-peddler .sheet-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.peddler-ware {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+}
+
+.peddler-rune {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid #2a1d10;
+  background: #5b3f8a;
+  color: #f6e7c4;
+  font-size: 26px;
+  font-weight: bold;
+}
+
+.peddler-name {
+  margin: 4px 0 0;
+  font-weight: bold;
+  font-size: 17px;
+}
+
+.peddler-line {
+  margin: 2px 0 12px;
+  font-size: 13px;
+  opacity: 0.85;
 }
 
 .trail-marker.trail-done {
