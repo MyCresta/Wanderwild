@@ -2,8 +2,10 @@ import { BUILDING_IDS, newHearthstead, type HearthsteadState, type SupplyId } fr
 import type { Expedition } from './expeditions';
 import { MELT, RARITY_ORDER, RUNE_IDS, runeSockets, SLOT_DEFS, SLOTS, type GearItem, type GearRarity, type RuneId, type Slot } from './gear';
 import { REALMS, type MaterialId, type RealmId } from './realms';
+import { BLESSINGS, type ShrineKind } from './shrines';
 import type { Waymark } from './waymarks';
 import type { GlyphKind } from './glyphs';
+import type { Trail, TrailMark } from './trail';
 import { isHeroClass, LOOKS, METRES_PER_MANA, newHero, TALENTS, talentKey, type HeroState } from './hero';
 
 /**
@@ -31,8 +33,8 @@ export interface SaveData {
   shrineCooldowns: Record<string, number>;
   /** Shrines ever touched, for "visit a new shrine" goals later. */
   shrinesVisited: number;
-  /** Time (ms) the current shrine blessing ends. */
-  blessingUntil: number;
+  /** The current shrine blessing: which kind of shrine gave it and when (ms) it ends. */
+  blessing: { kind: ShrineKind; until: number } | null;
   /** Coarse ~50 m cells walked through, never a raw GPS trail. */
   visitedCells: string[];
   supplies: Record<SupplyId, number>;
@@ -53,6 +55,8 @@ export interface SaveData {
   curiosFound: Record<string, number>;
   /** Steps counted on `day` (a local date), for the daily step counter. */
   steps: { day: string; count: number };
+  /** Today's wander trail, drawn at the first fix of the day. */
+  trail: Trail | null;
 }
 
 export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
@@ -69,7 +73,7 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     materials: {},
     shrineCooldowns: {},
     shrinesVisited: 0,
-    blessingUntil: 0,
+    blessing: null,
     visitedCells: [],
     supplies: { tonic: 0, petXp: 0 },
     hearthstead: newHearthstead(now),
@@ -82,6 +86,7 @@ export function newSave(now = Date.now(), distanceMetres = 0): SaveData {
     glyphsCast: { ring: 0, stroke: 0, knot: 0 },
     curiosFound: {},
     steps: { day: '', count: 0 },
+    trail: null,
   };
 }
 
@@ -125,7 +130,7 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
     materials: addUp(numbers(raw.materials), gear.materials),
     shrineCooldowns: numbers(raw.shrineCooldowns) as Record<string, number>,
     shrinesVisited: num(raw.shrinesVisited),
-    blessingUntil: num(raw.blessingUntil),
+    blessing: parseBlessing(raw.blessing),
     visitedCells: strings(raw.visitedCells),
     supplies: { tonic: num(supplies.tonic), petXp: num(supplies.petXp) },
     hero: parseHero(raw.hero, num(raw.spellChargeM)),
@@ -163,7 +168,18 @@ export function migrate(raw: unknown, now = Date.now()): SaveData {
       const st = isObject(raw.steps) ? raw.steps : {};
       return { day: typeof st.day === 'string' ? st.day : '', count: Math.max(0, num(st.count)) };
     })(),
+    trail: parseTrail(raw.trail),
   };
+}
+
+function parseTrail(v: unknown): Trail | null {
+  if (!isObject(v) || typeof v.day !== 'string' || !isObject(v.origin) || !Array.isArray(v.marks)) return null;
+  const marks = v.marks.filter(isObject).map((m): TrailMark => ({
+    lat: num(m.lat),
+    lng: num(m.lng),
+    ...(m.reached === 'foot' || m.reached === 'farsight' ? { reached: m.reached as TrailMark['reached'] } : {}),
+  }));
+  return { day: v.day, origin: { lat: num(v.origin.lat), lng: num(v.origin.lng) }, marks, opened: v.opened === true };
 }
 
 const addUp = (a: Partial<Record<MaterialId, number>>, b: Partial<Record<MaterialId, number>>) => {
@@ -257,6 +273,11 @@ export function importSave(text: string, now = Date.now()): SaveData {
   }
   if (!isObject(parsed) || parsed.game !== 'wanderwild') throw new Error('That file is not a Wanderwild save');
   return migrate(parsed, now);
+}
+
+function parseBlessing(v: unknown): SaveData['blessing'] {
+  if (!isObject(v) || typeof v.kind !== 'string' || !(v.kind in BLESSINGS)) return null;
+  return { kind: v.kind as ShrineKind, until: num(v.until) };
 }
 
 /** Drops cooldowns that have already passed so the save does not grow forever. */

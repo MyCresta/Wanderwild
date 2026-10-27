@@ -13,7 +13,7 @@ import { watchLocation } from './geo/location';
 import { setupInstallButton } from './install';
 import { loadSave } from './game/save';
 import { GameState } from './game/state';
-import type { Shrine } from './game/shrines';
+import { BLESSINGS, type Shrine } from './game/shrines';
 import { isNight } from './game/gear';
 import { MATERIALS, type MaterialId, type RealmId } from './game/realms';
 import { installProbeLayers, realmAt, shrinesNear } from './map/realmProbe';
@@ -27,7 +27,6 @@ import { ForgePanel } from './hud/forgePanel';
 import { BagPanel } from './hud/bagPanel';
 import { HeroPanel, openHeroChoice } from './hud/heroPanel';
 import { heroSvg } from './hud/heroArt';
-import { formatWait } from './hud/format';
 import { CompanionMarker, CreatureMarkers, FollowerMarker } from './map/creatures';
 import { companion, loadCollection, partyLevel, saveCollection, walkRewards } from './creatures/collection';
 import { foeThreat } from './creatures/foes';
@@ -59,6 +58,9 @@ import { installOrbitCamera } from './map/orbitCamera';
 import { Farsight } from './ui/farsight';
 import { CurioLayer } from './map/curioLayer';
 import { CURIO_KINDS, curiosNear, FARSIGHT_SHARE, farsightRange, type Curio } from './game/farsight';
+import { companionFind, FIND_EVERY_M, findsBetween } from './game/companionFinds';
+import { marksReached, peekUsed, TRAIL_MARKS } from './game/trail';
+import { TrailLayer } from './map/trailLayer';
 
 // Shown until the first GPS fix arrives, or for good if location is unavailable.
 const FALLBACK_CENTER: [number, number] = [-3.1883, 55.9533]; // Edinburgh
@@ -136,10 +138,12 @@ function useShrine(shrine: Shrine): void {
   if (!lastFix) return hud.toast('Find your location first to reach a shrine.');
   const away = haversine(lastFix, shrine);
   if (!onFoot(shrine)) return hud.toast(`${shrine.name} is ${Math.round(away)} m away. Walk until it is inside your ring to touch it.`);
-  const wait = game.shrineReadyAt(shrine) - Date.now();
-  if (wait > 0) return hud.toast(`${shrine.name} is gathering its power. Ready in ${formatWait(wait)}.`);
+  const blessing = BLESSINGS[shrine.kind];
+  if (game.shrineReadyAt(shrine) > Date.now())
+    return hud.toast(`${shrine.name} already blessed you today. Its ${blessing.name} (${blessing.effect}) returns tomorrow.`);
   if (game.useShrine(shrine, realmAt(map, shrine.lng, shrine.lat) ?? currentRealm ?? 'hearthfields')) sound.play('shrine');
   refreshWorld();
+  showReach();
 }
 
 const shrines = new ShrineLayer(map, useShrine);
@@ -449,14 +453,8 @@ function takeCurio(curio: Curio): void {
   const reward = game.findCurio(curio, realmAt(map, curio.lng, curio.lat) ?? currentRealm ?? 'hearthfields', here);
   curioLayer.remove(curio.id);
   if (!reward) return;
-  const parts = [
-    reward.coin && `+${reward.coin} coin`,
-    reward.xp && `+${reward.xp} XP`,
-    reward.wanderlight && `+${reward.wanderlight} Wanderlight`,
-    ...Object.entries(reward.materials).map(([id, n]) => `+${n} ${MATERIALS[id as MaterialId].name}`),
-  ].filter(Boolean);
   sound.play('coin');
-  toast(`${CURIO_KINDS[curio.kind].name}${here ? '' : ' (by Farsight)'}: ${parts.join(', ')}.${reward.gear ? ` ${reward.gear.text}` : ''}`);
+  toast(`${CURIO_KINDS[curio.kind].name}${here ? '' : ' (by Farsight)'}: ${rewardText(reward)}.${reward.gear ? ` ${reward.gear.text}` : ''}`);
 }
 
 /** Today's curios around wherever play is happening. */
@@ -470,6 +468,76 @@ function refreshCurios(): void {
 function pickUpNearby(fix: Fix): void {
   for (const curio of curiosNear(fix.lat, fix.lng, Date.now(), game.save.curiosFound, 1))
     if (haversine(fix, curio) <= Math.max(25, Math.min(fix.accuracy, 40))) takeCurio(curio);
+}
+
+/** Lists a reward as "+12 coin, +3 Ironbark". */
+function rewardText(r: { coin?: number; xp?: number; wanderlight?: number; materials: Partial<Record<MaterialId, number>> }): string {
+  return [
+    r.coin && `+${r.coin} coin`,
+    r.xp && `+${r.xp} XP`,
+    r.wanderlight && `+${r.wanderlight} Wanderlight`,
+    ...Object.entries(r.materials).map(([id, n]) => `+${n} ${MATERIALS[id as MaterialId].name}`),
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
+// Companion finds: every thousand steps or so the companion noses out something of its element.
+function companionFinds(before: number, after: number): void {
+  const pet = companion(collection);
+  const count = findsBetween(before, after);
+  if (!pet || !count) return;
+  const species = getSpecies(pet.speciesId);
+  const first = Math.floor(after / FIND_EVERY_M) - count + 1;
+  for (let n = first; n < first + count; n++) {
+    const find = companionFind(species.element, pet.level, n);
+    game.takeFind(find);
+    sound.play('coin');
+    toast(`${species.name} sniffed something out: ${rewardText(find)}.`);
+  }
+}
+
+// The daily wander trail: three ink marks within a kilometre, the last one holding a chest.
+const trailLayer = new TrailLayer(map, (i) => tapTrailMark(i));
+
+function reachTrailMark(i: number, how: 'foot' | 'farsight'): void {
+  const mark = game.save.trail?.marks[i];
+  if (!mark) return;
+  const result = game.reachTrailMark(i, how, realmAt(map, mark.lng, mark.lat) ?? currentRealm ?? 'hearthfields');
+  if (!result) return;
+  trailLayer.show(game.save.trail);
+  const by = how === 'farsight' ? ' (by Farsight)' : '';
+  if (result.chest) {
+    sound.play('reward');
+    hud.toast(`Trail chest${by}: ${rewardText(result.chest)}.${result.chest.gear ? ` ${result.chest.gear.text}` : ''}`, 6000);
+  } else {
+    sound.play('discover');
+    const done = marksReached(game.save.trail!);
+    toast(`Trail mark ${done} of ${TRAIL_MARKS}${by}. ${done === TRAIL_MARKS - 1 ? 'The last one holds a chest.' : 'Two more to go.'}`);
+  }
+}
+
+function tapTrailMark(i: number): void {
+  const trail = game.save.trail;
+  const mark = trail?.marks[i];
+  if (!trail || !mark) return;
+  if (mark.reached) return toast(trail.opened ? 'Today’s trail is walked. A new one is inked each morning.' : `Mark reached. ${TRAIL_MARKS - marksReached(trail)} still to go.`);
+  if (onFoot(mark)) return reachTrailMark(i, 'foot');
+  if (byFarsight(mark)) {
+    if (peekUsed(trail)) return toast('You already peeked a mark today. Walk to this one.');
+    return reachTrailMark(i, 'farsight');
+  }
+  sound.play('error');
+  const away = lastFix ? `${Math.round(haversine(lastFix, mark))} m away. ` : '';
+  toast(`Trail mark, ${away}Walk there, or peek one a day by Farsight 👁.`);
+}
+
+/** Draws today's trail around the Wayfarer, and reaches any mark they walk up to. */
+function walkTrail(fix: Fix): void {
+  const { trail, fresh } = game.trail(fix);
+  trailLayer.show(trail);
+  if (fresh) hud.toast('A wander trail is inked on your map: three marks within a kilometre, and a chest at the last.', 5000);
+  trail.marks.forEach((mark, i) => !mark.reached && onFoot(mark) && reachTrailMark(i, 'foot'));
 }
 
 /** Re-reads spawns, curios and shrines around the lens or the Wayfarer. */
@@ -555,7 +623,9 @@ function onFix(fix: Fix): void {
 
   const metres = walk.add(fix);
   if (metres > 0) {
+    const walkedBefore = game.save.distanceMetres;
     game.recordWalk(metres);
+    companionFinds(walkedBefore, game.save.distanceMetres);
     const before = companion(collection)?.level;
     const reward = walkRewards(collection, metres);
     const pet = companion(collection);
@@ -583,6 +653,7 @@ function onFix(fix: Fix): void {
   showReach();
   if (firstFix || !farsight.active) refreshCurios();
   pickUpNearby(fix);
+  walkTrail(fix);
   hunts.update(fix, metres);
   if (fix.accuracy <= 40) game.visit(fix.lat, fix.lng);
 

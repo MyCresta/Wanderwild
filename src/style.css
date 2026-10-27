@@ -1080,6 +1080,7 @@ body:has(> .catch-scene) .parchment-overlay {
 }
 
 .hud-level {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1187,7 +1188,28 @@ body:has(> .catch-scene) .parchment-overlay {
 
 .blessed .hud-level-num {
   box-shadow: 0 0 12px #9fe3d0, 0 0 2px #fff;
-  border-color: #cdf3e6;
+}
+
+/* A tiny mark of the shrine blessing, laid over the level ring so nothing moves. */
+.hud-blessing {
+  position: absolute;
+  top: 16px;
+  left: calc(50% + 6px);
+  display: none;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #2f6b55;
+  border: 1px solid #cdf3e6;
+  color: #eafff6;
+  font-size: 9px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.blessed .hud-blessing {
+  display: grid;
 }
 
 /* ---- Realm banner ---- */
@@ -4334,4 +4356,27 @@ body.sky-fog:not(.sky-night) #map .maplibregl-canvas {
   text-transform: uppercase;
   text-shadow: none;
   white-space: nowrap;
+}
+
+/* Daily wander trail marks (src/map/trailLayer.ts). */
+.trail-marker {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: max(44px, calc(38px * var(--marker-scale, 1)));
+  height: max(44px, calc(38px * var(--marker-scale, 1)));
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+}
+
+.trail-marker svg {
+  width: calc(38px * var(--marker-scale, 1));
+  height: calc(38px * var(--marker-scale, 1));
+}
+
+.trail-marker.trail-done {
+  opacity: 0.6;
 }

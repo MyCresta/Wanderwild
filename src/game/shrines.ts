@@ -3,13 +3,11 @@ import { REALMS, type MaterialId, type RealmId } from './realms';
 
 /**
  * Wayshrines are real points of interest (churches, libraries, statues, viewpoints).
- * Touch one within reach for coin, XP, materials and a short blessing.
+ * Touch one within reach for coin, XP, materials and a blessing. Each shrine answers
+ * once a day, and each kind of shrine blesses something different for half an hour.
  */
 
-export const SHRINE_COOLDOWN_MS = 5 * 60 * 1000;
-export const BLESSING_MS = 10 * 60 * 1000;
-/** Walking XP multiplier while a blessing lasts. */
-export const BLESSING_XP_BONUS = 1.25;
+export const BLESSING_MS = 30 * 60 * 1000;
 
 export type ShrineKind = 'chapel' | 'archive' | 'monument' | 'vista' | 'hall';
 
@@ -47,6 +45,33 @@ export const KIND_TITLES: Record<ShrineKind, string> = {
   hall: 'Hall Shrine',
 };
 
+export interface Blessing {
+  name: string;
+  /** What it does, short enough for a toast. */
+  effect: string;
+  /** A one-character mark for the tiny badge on the level ring. */
+  mark: string;
+}
+
+/** Blessings by shrine kind. One lasts at a time; a newer one replaces it. */
+export const BLESSINGS: Record<ShrineKind, Blessing> = {
+  chapel: { name: 'Grace', effect: '+10% befriending', mark: '✦' },
+  archive: { name: 'Insight', effect: '+10% XP', mark: '✎' },
+  monument: { name: 'Valour', effect: 'Wildlings hit 10% harder', mark: '⚔' },
+  vista: { name: 'Far Eye', effect: '+20 m reach', mark: '◎' },
+  hall: { name: 'Hearth', effect: '+25% Hearthstead time from walking', mark: '⌂' },
+};
+
+/** Insight's XP multiplier. */
+export const INSIGHT_XP = 1.1;
+
+/** Next local midnight: a touched shrine wakes again then. */
+export function nextMorning(now: number): number {
+  const d = new Date(now);
+  d.setHours(24, 0, 0, 0);
+  return d.getTime();
+}
+
 export function shrineKind(poiClass?: string, poiSubclass?: string): ShrineKind | undefined {
   return KIND_BY_TAG[poiSubclass ?? ''] ?? KIND_BY_TAG[poiClass ?? ''];
 }
@@ -62,10 +87,10 @@ export interface ShrineReward {
   materials: Partial<Record<MaterialId, number>>;
 }
 
-/** What touching a shrine gives, seeded by the shrine and the cooldown slot. */
+/** What touching a shrine gives, seeded by the shrine and the day. */
 export function rollShrineReward(shrine: Shrine, realm: RealmId, now: number): ShrineReward {
-  const rand = seededRandom(hashString(`${shrine.id}:${Math.floor(now / SHRINE_COOLDOWN_MS)}`));
+  const rand = seededRandom(hashString(`${shrine.id}:${nextMorning(now)}`));
   const materials: Partial<Record<MaterialId, number>> = { [REALMS[realm].material]: 1 + Math.floor(rand() * 3) };
   if (rand() < 0.25) materials.shrineRelic = 1;
-  return { coin: 8 + Math.floor(rand() * 13), xp: 50, materials };
+  return { coin: 15 + Math.floor(rand() * 21), xp: 100, materials };
 }
