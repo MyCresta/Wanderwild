@@ -257,6 +257,7 @@ function parseHero(raw: unknown, oldChargeM: number): HeroState {
     look: Math.max(0, Math.min(LOOKS.warden.length - 1, Math.floor(num(raw.look)))),
     talents,
     mana: Math.max(0, num(raw.mana)),
+    ...(num(raw.manaAt) > 0 ? { manaAt: num(raw.manaAt) } : {}),
   };
 }
 

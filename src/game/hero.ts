@@ -1,7 +1,7 @@
 /**
  * The Wayfarer as a hero, in the spirit of Heroes of Might and Magic: a class picked at the
  * start (a second at level 20), three stats that quietly strengthen every creature in the
- * party, spells cast from mana that fills by walking, and rows of two-way talent choices.
+ * party, spells cast from mana that fills by walking (and slowly on its own), and rows of two-way talent choices.
  * Pure rules only; the hero page and the battle screen read from here.
  */
 
@@ -19,6 +19,8 @@ const TALENT_LEVELS = [5, 10, 15];
 const SECOND_TALENT_LEVELS = [22, 28, 35];
 /** Walking this far fills one point of mana. */
 export const METRES_PER_MANA = 25;
+/** Mana also comes back on its own, one point this often: walking is the quick way, never the only one. */
+export const MS_PER_MANA = 6 * 60 * 1000;
 export const BASE_MANA = 20;
 
 export interface ClassDef {
@@ -187,6 +189,8 @@ export interface HeroState {
   /** Row key (`warden0`, …) → which of the two talents is picked. */
   talents: Record<string, 0 | 1>;
   mana: number;
+  /** When mana last caught up with what it regained on its own. */
+  manaAt?: number;
 }
 
 export const newHero = (): HeroState => ({ name: 'Wayfarer', cls: null, second: null, look: 0, talents: {}, mana: 0 });
@@ -260,6 +264,12 @@ export const maxMana = (hero: HeroState, level: number) => BASE_MANA + heroStats
 
 export const spellCost = (hero: HeroState, level: number, id: HeroSpellId) =>
   Math.max(1, Math.round(HERO_SPELLS[id].cost * (1 - heroMods(hero, level).thrift)));
+
+/** How mana fills, in one line for the hero page. */
+export const MANA_HELP = `+1 per ${METRES_PER_MANA} m walked, or +1 every ${MS_PER_MANA / 60_000} min on its own`;
+
+/** Mana regained on its own over `ms`, before the cap. */
+export const manaFromRest = (ms: number) => Math.max(0, ms) / MS_PER_MANA;
 
 /** Mana gained from walking `metres`, before the cap. */
 export const manaFromWalk = (hero: HeroState, level: number, metres: number) =>

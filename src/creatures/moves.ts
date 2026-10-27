@@ -37,6 +37,9 @@ const HEAVY = 2.2;
 const HEAVY2 = 2.6;
 /** Quick element jabs: a little under Strike, but they ride the Wheel. */
 const JAB = 0.9;
+/** Bond moves, learned by walking far together: a heavy blow with a trick, resting two turns. Guards and heals hit softer. */
+const BOND = 1.8;
+const BOND_SOFT = 1.3;
 
 export const MOVES: Record<string, Move> = Object.fromEntries(
   [
@@ -91,6 +94,22 @@ export const MOVES: Record<string, Move> = Object.fromEntries(
     m('greenwood-charge', 'Greenwood Charge', 'grove', SIG2, 2),
     m('weir-breaker', 'Weir Breaker', 'tide', SIG2, 2),
     m('thistle-gale', 'Thistle Gale', 'gale', SIG2, 2),
+    // Bond moves: one per line, learned after a long walk together as companion.
+    m('briarheart', 'Briarheart', 'grove', BOND_SOFT, 3, 'thorns'),
+    m('mistveil', 'Mistveil', 'tide', BOND, 3, 'dodge'),
+    m('hearthblaze', 'Hearthblaze', 'ember', BOND, 3, 'burn'),
+    m('mountain-heart', 'Mountain Heart', 'stone', BOND_SOFT, 3, 'bulwark'),
+    m('stormcall', 'Stormcall', 'gale', BOND, 3, 'focus'),
+    m('duskglow', 'Duskglow', 'lumen', BOND, 3, 'drain'),
+    m('rainbloom', 'Rainbloom', 'grove', BOND_SOFT, 3, 'heal'),
+    m('pearl-guard', 'Pearl Guard', 'tide', BOND_SOFT, 3, 'bulwark'),
+    m('wickfire', 'Wickfire', 'ember', BOND, 3, 'burn'),
+    m('landslide', 'Landslide', 'stone', BOND, 3, 'focus'),
+    m('skyreel', 'Skyreel', 'gale', BOND, 3, 'dodge'),
+    m('starleap', 'Starleap', 'lumen', BOND, 3, 'dodge'),
+    m('verdant-call', 'Verdant Call', 'grove', BOND_SOFT, 3, 'heal'),
+    m('eddy-spin', 'Eddy Spin', 'tide', BOND, 3, 'drain'),
+    m('wishwind', 'Wishwind', 'gale', BOND_SOFT, 3, 'heal'),
   ].map((move) => [move.id, move]),
 );
 

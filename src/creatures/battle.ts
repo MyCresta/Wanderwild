@@ -21,6 +21,8 @@ export interface Fighter {
   /** Elite tier 1-3 or boss tier 1-5. */
   tier: number;
   traits: FoeTrait[];
+  /** A fourth move learned by walking far together as companion (see bond.ts). */
+  bond?: Move;
 }
 
 export function makeFighter(
@@ -51,12 +53,12 @@ const bigMoveName = (s: Species) => (s.kind === 'monster' ? s.move : signature(s
 const SWIFT_SPEED = 1.25;
 
 /** The moves a fighter knows. Foes only Strike and telegraph a big attack, so they have none. */
-export const movesOf = (f: Fighter): Move[] => (f.species.kind === 'pet' ? f.species.moves.map(getMove) : []);
+export const movesOf = (f: Fighter): Move[] => (f.species.kind === 'pet' ? [...f.species.moves.map(getMove), ...(f.bond ? [f.bond] : [])] : []);
 
 export type Side = 'pet' | 'foe';
 
 export type Action =
-  /** One of the active Wildling's three moves, by slot. */
+  /** One of the active Wildling's moves (three, or four with its bond move), by slot. */
   | { kind: 'attack'; slot: number; /** 0..1 from the timing sweep; 1 is a perfect tap. */ quality?: number }
   | { kind: 'swap'; to: number }
   | { kind: 'tonic' };
@@ -200,7 +202,7 @@ export class Battle {
     this.foes = Array.isArray(foes) ? foes : [foes];
     this.foe = this.foes[0];
     this.tonicHeal = Math.round(TONIC_HEAL * tonicPower);
-    this.cooldowns = party.map(() => [0, 0, 0]);
+    this.cooldowns = party.map(() => [0, 0, 0, 0]);
     this.wardUp = this.foe.traits.includes('warded');
     const damage = petDamage * (hero?.damage ?? 1);
     const health = petHealth * (hero?.health ?? 1);
@@ -317,7 +319,7 @@ export class Battle {
         events.push({ kind: 'spell', spell }, { kind: 'status', target: 'pet', status: 'focus', name });
         break;
       case 'wildcall':
-        this.cooldowns[this.active] = [0, 0, 0];
+        this.cooldowns[this.active] = [0, 0, 0, 0];
         events.push({ kind: 'spell', spell });
         break;
       case 'packHowl':

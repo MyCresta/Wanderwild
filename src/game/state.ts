@@ -7,6 +7,7 @@ import { levelFromXp, unlocksBetween, type Unlock } from './wayfarer';
 import {
   canPickSecond,
   heroPower,
+  manaFromRest,
   manaFromWalk,
   maxMana,
   spellCost,
@@ -205,10 +206,19 @@ export class GameState {
 
   /** Whole points of mana ready to spend. */
   get mana(): number {
+    this.settleMana();
     return Math.floor(Math.min(this.save.hero.mana, this.maxMana));
   }
 
+  /** Adds the mana regained on its own since it was last counted. */
+  private settleMana(now = Date.now()): void {
+    const hero = this.save.hero;
+    if (hero.manaAt !== undefined && hero.mana < this.maxMana) hero.mana = Math.min(this.maxMana, hero.mana + manaFromRest(now - hero.manaAt));
+    hero.manaAt = now;
+  }
+
   fillMana(amount: number): void {
+    this.settleMana();
     const hero = this.save.hero;
     hero.mana = Math.min(this.maxMana, hero.mana + amount);
   }
@@ -224,6 +234,7 @@ export class GameState {
   spendMana(spell: HeroSpellId): boolean {
     const cost = this.spellCost(spell);
     if (this.mana < cost) return false;
+    // `mana` above has just counted what came back on its own.
     this.save.hero.mana = Math.min(this.save.hero.mana, this.maxMana) - cost;
     this.changed();
     return true;

@@ -36,6 +36,7 @@ import { inkbinderSvg } from '../creatures/art/inkbinder';
 import { GRADES, rivalTitle, unbound, type Rival } from '../game/rivals';
 import { startFollowing } from '../creatures/befriend';
 import { setBonus } from '../creatures/roost';
+import { BOND_METRES, bondStatus, learnedBond } from '../creatures/bond';
 import { lineWanted } from '../creatures/scarcity';
 
 /** How long the timing needle takes to sweep across an attack button. */
@@ -278,6 +279,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       const f = makeFighter(getSpecies(p.speciesId), p.level, p.seed, p.uid, {}, petBonus(p));
       // A completed element in the bestiary makes its Wildlings hit harder.
       f.atk = Math.round(f.atk * setBonus(ctx.collection, p.speciesId));
+      f.bond = learnedBond(p) ?? undefined;
       return f;
     }),
     line.map((e) => makeFighter(e.species, e.level, e.seed, undefined, e)),
@@ -390,30 +392,40 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
   const log = h('p', { class: 'battle-log' }, opening);
 
   const cmd = (extra = '') => h('button', { class: `cmd ${extra}`, type: 'button' });
-  const attacks = [0, 1, 2].map((slot) => {
+  // Four fixed slots in a 2×2 grid: three moves and the bond move, shown locked until it is learned.
+  const attacks = [0, 1, 2, 3].map((slot) => {
     const btn = cmd('cmd-attack');
     btn.addEventListener('click', () => act({ kind: 'attack', slot }));
     return btn;
   });
-  const tonicBtn = cmd('cmd-way');
+  const tonicBtn = cmd('cmd-way cmd-tonic');
   const spellBtns = (battle.hero?.spells ?? []).map((id) => ({ id, el: cmd('cmd-way cmd-spell') }));
   const fleeBtn = h('button', { class: 'btn btn-small btn-flee', type: 'button', onclick: () => sheet.close() }, practice ? 'Stop' : 'Flee');
   const bench = h('div', { class: 'party-bench', role: 'group', 'aria-label': 'Party' });
 
   const section = (title: string, ...children: HTMLElement[]) =>
     h('section', { class: 'cmd-section' }, h('h3', { class: 'cmd-title' }, title), ...children);
-  const attackSection = section('Attacks', h('div', { class: 'cmd-grid' }, ...attacks));
-  const waySection = section('Hero', h('div', { class: 'cmd-grid' }, ...spellBtns.map((s) => s.el), tonicBtn));
-  const wayTitle = waySection.querySelector('.cmd-title')!;
-  const partySection = section('Party · tap to swap', bench);
+  const attackSection = section('Attacks', h('div', { class: 'cmd-grid cmd-grid-attacks' }, ...attacks));
+  // The hero acts beside the Wildling, so its spells sit in a panel of their own with the mana that pays for them.
+  const manaFill = h('span', {});
+  const manaText = h('span', { class: 'mana-text' });
+  const wayTitle = h('h3', { class: 'cmd-title' }, 'Hero');
+  const waySection = h(
+    'section',
+    { class: 'cmd-section cmd-hero' },
+    h('div', { class: 'cmd-hero-head' }, wayTitle, h('span', { class: 'mana-meter', title: 'Mana fills as you walk, and slowly on its own.' }, manaText, h('span', { class: 'meter meter-mana' }, manaFill))),
+    h('div', { class: 'cmd-grid cmd-grid-spells' }, ...spellBtns.map((s) => s.el)),
+  );
+  const partySection = section('Party · tap to swap', h('div', { class: 'party-row' }, bench, tonicBtn));
   const partyTitle = partySection.querySelector('.cmd-title')!;
-  waySection.hidden = !way;
-  partySection.hidden = battle.party.length < 2;
+  waySection.hidden = !way || !spellBtns.length;
+  tonicBtn.hidden = !way;
   const panel = h('div', { class: 'cmd-panel' }, attackSection, waySection, partySection);
   const footer = h('div', { class: 'battle-footer' }, wheelHelp(foe.species.element), fleeBtn);
-  // The crit bar lies over the log, so it shows above the attacks without shifting the buttons.
+  // The crit bar lies over the log, which keeps one fixed height, so the bar shows above the attacks and nothing moves.
   const sweepBar = h('div', { class: 'sweep-bar', 'aria-live': 'polite' });
-  sheet.body.append(arena, h('div', { class: 'log-wrap' }, log, sweepBar), panel, footer);
+  const logWrap = h('div', { class: 'log-wrap' }, log, sweepBar);
+  sheet.body.append(arena, logWrap, panel, footer);
 
   let busy = false;
   const all = () => [...attacks, tonicBtn, ...spellBtns.map((s) => s.el), ...bench.querySelectorAll('button')];
@@ -443,19 +455,39 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     foeSpot.classList.toggle('burning', battle.burn > 0);
   };
 
+  /** The fourth slot before the bond move is learned: what it will be, and how far there is to walk together. */
+  const lockedBond = (btn: HTMLButtonElement) => {
+    const bond = bondStatus(owned[battle.active]);
+    btn.classList.add('cmd-locked');
+    btn.classList.remove('cmd-strong');
+    btn.disabled = true;
+    btn.style.removeProperty('--el');
+    btn.title = bond ? `Bond move: walk ${BOND_METRES / 1000} km together as companion to learn ${bond.move.name}.` : '';
+    btn.replaceChildren(
+      h('span', { class: 'cmd-name' }, bond ? `🔒 ${bond.move.name}` : '🔒'),
+      h('span', { class: 'cmd-meta' }, h('span', { class: 'cmd-sub' }, bond ? `Bond · ${(bond.walked / 1000).toFixed(1)} / ${BOND_METRES / 1000} km walked` : '')),
+    );
+  };
+
   const refresh = () => {
     const cd = battle.cooldowns[battle.active];
     const forced = battle.mustSwap;
-    battle.moves.forEach((move, slot) => {
-      const btn = attacks[slot];
+    attacks.forEach((btn, slot) => {
+      const move = battle.moves[slot];
+      if (!move) return lockedBond(btn);
+      btn.classList.remove('cmd-locked');
       const wait = cd[slot];
       const edge = battle.edge(move);
-      // Fixed lines: the name (its colour edge shows the element), power pips and any trick, and how often it can be used.
+      // Fixed lines: the name (its colour edge shows the element), then power pips and any trick beside how often it can be used.
       // A ▲ or ▼ in the corner marks it strong or weak against this foe.
       btn.replaceChildren(
         h('span', { class: 'cmd-name' }, move.name),
-        h('span', { class: 'cmd-sub cmd-power' }, moveSummary(move)),
-        h('span', { class: `cmd-sub cmd-wait${wait > 0 ? ' cmd-resting' : ''}` }, wait > 0 ? readyIn(wait) : cadence(battle.waitFor(move))),
+        h(
+          'span',
+          { class: 'cmd-meta' },
+          h('span', { class: 'cmd-sub cmd-power' }, moveSummary(move)),
+          h('span', { class: `cmd-sub cmd-wait${wait > 0 ? ' cmd-resting' : ''}` }, wait > 0 ? readyIn(wait) : cadence(battle.waitFor(move))),
+        ),
         h('span', { class: `cmd-edge${edge > 1 ? ' edge-strong' : edge < 1 ? ' edge-weak' : ''}`, 'aria-hidden': 'true' }, edge > 1 ? '▲' : edge < 1 ? '▼' : ''),
       );
       btn.title = `${moveBlurb(move)}${edge > 1 ? ' Strong against this foe (×1.5).' : edge < 1 ? ' Weak against this foe (×0.6).' : ''}`;
@@ -498,10 +530,14 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
     );
 
     const tonics = way?.tonics() ?? 0;
-    card(tonicBtn, '⚗ Tonic', tonics ? `Heals ${battle.tonicHeal} · ×${tonics}` : 'None · brew at Hearthstead');
+    card(tonicBtn, `⚗ Tonic ×${tonics}`, tonics ? `+${battle.tonicHeal} health` : 'Brew at home');
+    tonicBtn.title = tonics ? `Heals ${battle.tonicHeal}. Uses your turn.` : 'No tonics left. The Herb Garden at Hearthstead brews more.';
     tonicBtn.disabled = busy || forced || !tonics || pet.hp >= pet.maxHp;
     const mana = way?.mana() ?? 0;
-    wayTitle.textContent = battle.cast ? 'Hero · spell cast, now attack' : `Hero · ✦ ${mana} mana · one spell a turn, free`;
+    const maxMana = Math.max(1, way?.maxMana() ?? mana);
+    wayTitle.textContent = battle.cast ? 'Spell cast · now attack' : 'Hero · 1 spell a turn';
+    manaText.textContent = `✦ ${mana}/${maxMana}`;
+    manaFill.style.width = `${Math.min(100, (100 * mana) / maxMana)}%`;
     for (const { id, el } of spellBtns) {
       const spell = HERO_SPELLS[id];
       const cost = way?.spellCost(id) ?? spell.cost;
@@ -510,7 +546,7 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
       el.title = spell.blurb;
       el.disabled = busy || forced || mana < cost || !battle.canCast(id);
     }
-    partyTitle.textContent = battle.freeSwap ? 'Party · pick who opens, free' : 'Party · tap to swap';
+    partyTitle.textContent = battle.party.length < 2 ? 'Party' : battle.freeSwap ? 'Party · pick who opens, free' : 'Party · tap to swap';
     fleeBtn.disabled = busy;
     showHp();
     setTurn(battle.winner ? null : 'pet');
@@ -683,6 +719,8 @@ export function openBattle(ctx: GameContext, encounter: Encounter, onDone: (won:
 
   const end = () => {
     intent.hidden = true;
+    // The fight is over and the buttons are gone, so the log may grow to tell the whole story.
+    logWrap.classList.add('log-done');
     setTurn(null);
     if (battle.winner === 'pet') {
       foeSpot.classList.add('dissolve');

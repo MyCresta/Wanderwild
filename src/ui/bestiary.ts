@@ -68,7 +68,7 @@ function petDetail(ctx: GameContext, sheet: Page, pet: OwnedPet, back: () => voi
       { class: 'stats' },
       ...STAT_KEYS.flatMap((k) => [h('dt', {}, STAT_NAMES[k]), stat(k)]),
       h('dt', {}, 'Moves'),
-      h('dd', {}, species.kind === 'pet' ? moveList(species) : ''),
+      h('dd', {}, species.kind === 'pet' ? moveList(species, pet) : ''),
     ),
     h('p', { class: 'lore' }, species.lore),
     evolutionPanel(ctx, sheet, pet),
