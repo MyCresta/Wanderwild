@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { haversine } from '../src/geo/distance';
 import { migrate, newSave } from '../src/game/save';
 import { GameState, STRIDE_M } from '../src/game/state';
@@ -40,7 +40,13 @@ describe('walk streak', () => {
     expect(game.streak(noon)).toEqual({ days: 1, kept: true });
     expect(game.streak(noon + DAY)).toEqual({ days: 1, kept: false });
     const xp = game.save.wayfarer.xp;
-    game.grantXp(100);
+    // grantXp reads the real clock, so pin it to the day the streak was kept.
+    vi.useFakeTimers({ now: noon });
+    try {
+      game.grantXp(100);
+    } finally {
+      vi.useRealTimers();
+    }
     expect(game.save.wayfarer.xp - xp).toBe(102);
   });
 
